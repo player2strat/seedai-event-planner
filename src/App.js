@@ -457,7 +457,7 @@ export default function App() {
   };
 
   const copy = async () => { await navigator.clipboard.writeText(exportText()); sound.play('complete'); setStatus('Copied!'); setTimeout(() => setStatus(''), 2000); };
-  const email = () => { window.open(`mailto:?subject=${encodeURIComponent(`Event: ${responses.event_name || 'New'}`)}&body=${encodeURIComponent(exportText())}`); };
+  const email = () => { window.open(`mailto:operations@seedai.org?subject=${encodeURIComponent(`${responses.event_name || 'New Event'} - Event Proposal`)}&body=${encodeURIComponent(exportText())}`); };
   const download = () => {
     const a = document.createElement('a'); 
     a.href = URL.createObjectURL(new Blob([exportText()], { type: 'text/plain' }));
