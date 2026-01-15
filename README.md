@@ -1,1 +1,0 @@
-# seedai-event-planner
