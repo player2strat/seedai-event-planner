@@ -475,7 +475,7 @@ export default function App() {
         <h1 className="text-5xl font-bold text-blue-400 mb-2" style={{ textShadow: '4px 4px 0 #1e3a8a' }}>SeedAI</h1>
         <h2 className="text-2xl text-yellow-400 mb-4" style={{ textShadow: '2px 2px 0 #92400e' }}>EVENT PLANNER</h2>
         <p className="text-slate-400 text-xs mb-6 max-w-xs mx-auto">From spark to comprehensive proposal—one phase at a time</p>
-        <div className={`text-white text-sm mb-6 ${blink ? '' : 'opacity-0'}`}>PRESS START</div>
+        <div className={`text-white text-sm mb-6 ${blink ? '' : 'opacity-0'}`}>PRESS NEW EVENT TO START</div>
         <div className="flex flex-col gap-2 items-center">
           <Btn onClick={() => { sound.play('start'); clearSave(); setScreen('character'); }} variant="warning">NEW EVENT</Btn>
           {hasSave && (
