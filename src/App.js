@@ -633,7 +633,7 @@ export default function App() {
 
           {phase === 0 && (
             <div className="p-3 border-b-4 border-slate-700">
-              <div className="text-yellow-400 text-xs mb-2 flex items-center gap-2"><Users size={12}/> PLANNING TEAM</div>
+              <div className="text-yellow-400 text-xs mb-2 flex items-center gap-2"><Users size={12}/> EVENT TEAM</div>
               <div className="text-slate-500 text-xs mb-2">Owner: <span className="text-yellow-400">{charNames[char]}</span></div>
               {team.length > 0 && (
                 <div className="space-y-1 mb-2">
