@@ -1,11 +1,45 @@
-import React, { useState, useEffect } from 'react';
-import { Share2, Mail, Download, Users, MessageSquare, HelpCircle, Trophy, Volume2, VolumeX, Plus, X, Sparkles, Calculator, AlertTriangle, Save, RotateCcw, Zap, Loader, Calendar, TrendingUp, Clock, CheckCircle, Lightbulb } from 'lucide-react';
+import React, { useState, useEffect, useCallback } from 'react';
+import { Share2, Mail, Download, Users, MessageSquare, HelpCircle, Trophy, Volume2, VolumeX, Plus, X, Sparkles, Calculator, AlertTriangle, Save, RotateCcw, Zap, Loader, Calendar, Clock, CheckCircle, Lightbulb, ExternalLink, MapPin, RefreshCw } from 'lucide-react';
 
 // ╔════════════════════════════════════════════════════════════════════════════╗
-// ║                        BUDGET CONFIGURATION                                 ║
+// ║                    GOOGLE SHEETS CONFIGURATION                              ║
+// ║  To use your own data, set these environment variables or edit below       ║
 // ╚════════════════════════════════════════════════════════════════════════════╝
 
-const BUDGET_CONFIG = {
+const SHEET_ID = process.env.REACT_APP_SHEET_ID || '16-es1Gxv-oaG7MgtH6-ZqrGwgPl-Ly3Q_fXaYFc3AAs';
+const API_KEY = process.env.REACT_APP_GOOGLE_API_KEY || ''; // Optional: for private sheets
+
+// Function to fetch data from published Google Sheet
+const fetchSheetData = async (sheetName) => {
+  try {
+    // Using published CSV format (sheet must be published to web)
+    const url = `https://docs.google.com/spreadsheets/d/${SHEET_ID}/gviz/tq?tqx=out:json&sheet=${sheetName}`;
+    const response = await fetch(url);
+    const text = await response.text();
+    // Parse the JSONP response
+    const json = JSON.parse(text.substring(47).slice(0, -2));
+    
+    const headers = json.table.cols.map(col => col.label);
+    const rows = json.table.rows.map(row => {
+      const obj = {};
+      row.c.forEach((cell, i) => {
+        obj[headers[i]] = cell ? cell.v : '';
+      });
+      return obj;
+    });
+    return rows;
+  } catch (error) {
+    console.log(`Could not fetch ${sheetName} from Google Sheets, using defaults`);
+    return null;
+  }
+};
+
+// ╔════════════════════════════════════════════════════════════════════════════╗
+// ║                    DEFAULT/FALLBACK BUDGET CONFIG                           ║
+// ║  Used when Google Sheets data is unavailable                               ║
+// ╚════════════════════════════════════════════════════════════════════════════╝
+
+const DEFAULT_BUDGET_CONFIG = {
   locations: {
     "Washington DC": { multiplier: 1.0, label: "Washington DC", peakMonths: [3, 4, 5, 9, 10] },
     "New York City": { multiplier: 1.35, label: "New York City", peakMonths: [5, 6, 9, 10, 12] },
@@ -18,316 +52,233 @@ const BUDGET_CONFIG = {
     "Denver": { multiplier: 0.9, label: "Denver", peakMonths: [6, 7, 8, 9] },
     "Atlanta": { multiplier: 0.85, label: "Atlanta", peakMonths: [3, 4, 9, 10] },
     "Miami": { multiplier: 1.0, label: "Miami", peakMonths: [1, 2, 3, 12] },
-    "Philadelphia": { multiplier: 0.95, label: "Philadelphia", peakMonths: [5, 6, 9, 10] },
-    "Phoenix": { multiplier: 0.8, label: "Phoenix", peakMonths: [1, 2, 3, 11, 12] },
-    "Minneapolis": { multiplier: 0.85, label: "Minneapolis", peakMonths: [6, 7, 8] },
-    "Other Major City": { multiplier: 0.9, label: "Other Major US City", peakMonths: [] },
     "Regional/Rural": { multiplier: 0.7, label: "Regional / Smaller City", peakMonths: [] },
   },
   venueTypes: {
-    "Conference center": { perPerson: 75, minSpend: 2000, description: "Professional event space", leadTime: 12 },
-    "Hotel": { perPerson: 85, minSpend: 3000, description: "Hotel ballroom/meeting rooms", leadTime: 8 },
-    "University/campus": { perPerson: 35, minSpend: 500, description: "Academic venue", leadTime: 16 },
-    "Government building": { perPerson: 0, minSpend: 0, description: "Often free for appropriate events", leadTime: 20 },
-    "Corporate office": { perPerson: 25, minSpend: 0, description: "Partner-hosted", leadTime: 4 },
-    "Museum/unique venue": { perPerson: 100, minSpend: 5000, description: "Premium unique spaces", leadTime: 16 },
-    "Outdoor space": { perPerson: 40, minSpend: 1500, description: "Parks, plazas", leadTime: 12 },
-    "Not sure yet": { perPerson: 75, minSpend: 2000, description: "Using conference center estimate", leadTime: 12 },
+    "Conference center": { perPerson: { budget: 50, standard: 75, premium: 110 }, minSpend: 2000, leadTime: 12 },
+    "Hotel": { perPerson: { budget: 60, standard: 85, premium: 130 }, minSpend: 3000, leadTime: 8 },
+    "University/campus": { perPerson: { budget: 25, standard: 35, premium: 55 }, minSpend: 500, leadTime: 16 },
+    "Government building": { perPerson: { budget: 0, standard: 0, premium: 0 }, minSpend: 0, leadTime: 20 },
+    "Museum/unique venue": { perPerson: { budget: 70, standard: 100, premium: 160 }, minSpend: 5000, leadTime: 16 },
+    "Corporate office": { perPerson: { budget: 15, standard: 25, premium: 40 }, minSpend: 0, leadTime: 4 },
+    "Not sure yet": { perPerson: { budget: 50, standard: 75, premium: 110 }, minSpend: 2000, leadTime: 12 },
   },
   foodAndBeverage: {
-    "Coffee/Light Snacks": 18, "Breakfast": 32, "Lunch": 45,
-    "Reception/Appetizers": 55, "Dinner": 95, "Special dietary options": 12, "Alcohol service": 35,
+    "Coffee/Light Snacks": { budget: 12, standard: 18, premium: 28 },
+    "Breakfast": { budget: 22, standard: 32, premium: 50 },
+    "Lunch": { budget: 32, standard: 45, premium: 70 },
+    "Reception/Appetizers": { budget: 40, standard: 55, premium: 85 },
+    "Dinner": { budget: 65, standard: 95, premium: 150 },
+    "Special dietary options": { budget: 8, standard: 12, premium: 18 },
+    "Alcohol service": { budget: 25, standard: 35, premium: 55 },
   },
   avTechnical: {
-    "Basic (mics, projector)": 2500, "Professional staging": 6000, "Multiple screens": 3500,
-    "Livestream": 5000, "Recording": 2500, "Lighting design": 4000,
-    "Teleprompter": 1200, "Interpretation/translation": 4000, "Audience polling/Q&A tech": 600,
+    "Basic (mics, projector)": { budget: 1500, standard: 2500, premium: 4000 },
+    "Professional staging": { budget: 4000, standard: 6000, premium: 12000 },
+    "Multiple screens": { budget: 2500, standard: 3500, premium: 6000 },
+    "Livestream": { budget: 3500, standard: 5000, premium: 10000 },
+    "Recording": { budget: 1800, standard: 2500, premium: 5000 },
+    "Lighting design": { budget: 2500, standard: 4000, premium: 8000 },
   },
   production: {
-    "Photographer": { cost: 2000, perDay: true }, "Videographer": { cost: 3500, perDay: true },
-    "Live graphics/lower thirds": { cost: 2500, perDay: false }, "Post-event highlight video": { cost: 3500, perDay: false },
-    "Social media coverage": { cost: 1200, perDay: true }, "Graphic recording": { cost: 2500, perDay: true },
+    "Photographer": { budget: 1400, standard: 2000, premium: 3500, perDay: true },
+    "Videographer": { budget: 2500, standard: 3500, premium: 6000, perDay: true },
+    "Post-event highlight video": { budget: 2500, standard: 3500, premium: 6000, perDay: false },
+    "Social media coverage": { budget: 800, standard: 1200, premium: 2000, perDay: true },
+    "Graphic recording": { budget: 1800, standard: 2500, premium: 4000, perDay: true },
   },
   collateral: {
-    "Event website": { cost: 2000, perPerson: false }, "Registration system": { cost: 600, perPerson: false },
-    "Event app": { cost: 4000, perPerson: false }, "Printed programs": { cost: 4, perPerson: true },
-    "Name badges": { cost: 3, perPerson: true }, "Signage/banners": { cost: 2000, perPerson: false },
-    "Swag/giveaways": { cost: 25, perPerson: true }, "Branded materials": { cost: 1200, perPerson: false },
-    "Sponsor materials": { cost: 600, perPerson: false }, "Post-event report": { cost: 1500, perPerson: false },
+    "Event website": { budget: 1400, standard: 2000, premium: 4000, perPerson: false },
+    "Registration system": { budget: 400, standard: 600, premium: 1200, perPerson: false },
+    "Event app": { budget: 2800, standard: 4000, premium: 8000, perPerson: false },
+    "Printed programs": { budget: 2.5, standard: 4, premium: 8, perPerson: true },
+    "Name badges": { budget: 2, standard: 3, premium: 6, perPerson: true },
+    "Signage/banners": { budget: 1400, standard: 2000, premium: 4000, perPerson: false },
+    "Swag/giveaways": { budget: 15, standard: 25, premium: 50, perPerson: true },
   },
   marketing: {
-    "Email campaigns": 600, "Social media (organic)": 600, "Social media (paid)": 2500,
-    "Press/media outreach": 2000, "Partner networks": 600, "Website/SEO": 1200,
-    "Direct outreach": 600, "Influencer engagement": 2000,
+    "Email campaigns": { budget: 400, standard: 600, premium: 1200 },
+    "Social media (organic)": { budget: 400, standard: 600, premium: 1000 },
+    "Social media (paid)": { budget: 1500, standard: 2500, premium: 5000 },
+    "Press/media outreach": { budget: 1400, standard: 2000, premium: 4000 },
   },
-  staffing: { perDay: 2500 },
-  contingency: { percentage: 0.15 },
-  scenarioMultipliers: { budget: 0.7, standard: 1.0, premium: 1.5 },
+  staffing: { budget: 1800, standard: 2500, premium: 4000 },
+  contingency: { budget: 0.12, standard: 0.15, premium: 0.18 },
   durationMultipliers: { "2-3 hours": 0.5, "Half day (4-5 hours)": 0.5, "Full day": 1, "1.5 days": 1.5, "2 days": 2, "Multi-day (3+)": 3 },
   attendanceDefaults: { "Under 25 (intimate)": 20, "25-50 (small)": 40, "50-100 (medium)": 75, "100-250 (large)": 175, "250-500 (very large)": 375, "500+ (major)": 600 },
 };
 
-// ╔════════════════════════════════════════════════════════════════════════════╗
-// ║                        SMART DEFAULTS BY EVENT TYPE                         ║
-// ╚════════════════════════════════════════════════════════════════════════════╝
-
-const SMART_DEFAULTS = {
-  "Conference": {
-    duration: "Full day",
-    attendance: "100-250 (large)",
-    venue_type: "Conference center",
-    program_elements: ["Keynote speeches", "Panel discussions", "Networking time", "Q&A sessions", "Meals/receptions"],
-    fnb_items: ["Coffee/Light Snacks", "Lunch", "Reception/Appetizers"],
-    av_needs: ["Basic (mics, projector)", "Multiple screens", "Recording"],
-    production_needs: ["Photographer", "Videographer"],
-    collateral_needs: ["Event website", "Registration system", "Name badges", "Printed programs"],
-  },
-  "Workshop/Training": {
-    duration: "Half day (4-5 hours)",
-    attendance: "25-50 (small)",
-    venue_type: "Conference center",
-    program_elements: ["Workshops/trainings", "Breakout sessions", "Q&A sessions"],
-    fnb_items: ["Coffee/Light Snacks", "Lunch"],
-    av_needs: ["Basic (mics, projector)"],
-    production_needs: [],
-    collateral_needs: ["Registration system", "Name badges", "Printed programs"],
-  },
-  "Roundtable Discussion": {
-    duration: "2-3 hours",
-    attendance: "Under 25 (intimate)",
-    venue_type: "Corporate office",
-    program_elements: ["Panel discussions", "Networking time", "Q&A sessions"],
-    fnb_items: ["Coffee/Light Snacks"],
-    av_needs: ["Basic (mics, projector)"],
-    production_needs: [],
-    collateral_needs: ["Name badges"],
-  },
-  "Summit": {
-    duration: "Full day",
-    attendance: "100-250 (large)",
-    venue_type: "Hotel",
-    program_elements: ["Keynote speeches", "Panel discussions", "Breakout sessions", "Networking time", "Meals/receptions"],
-    fnb_items: ["Coffee/Light Snacks", "Breakfast", "Lunch", "Reception/Appetizers"],
-    av_needs: ["Basic (mics, projector)", "Professional staging", "Multiple screens", "Recording"],
-    production_needs: ["Photographer", "Videographer", "Social media coverage"],
-    collateral_needs: ["Event website", "Registration system", "Name badges", "Signage/banners", "Swag/giveaways"],
-  },
-  "Reception/Networking": {
-    duration: "2-3 hours",
-    attendance: "50-100 (medium)",
-    venue_type: "Museum/unique venue",
-    program_elements: ["Networking time", "Entertainment", "Meals/receptions"],
-    fnb_items: ["Reception/Appetizers", "Alcohol service"],
-    av_needs: ["Basic (mics, projector)"],
-    production_needs: ["Photographer"],
-    collateral_needs: ["Name badges", "Signage/banners"],
-  },
-  "Briefing/Presentation": {
-    duration: "2-3 hours",
-    attendance: "25-50 (small)",
-    venue_type: "Corporate office",
-    program_elements: ["Keynote speeches", "Q&A sessions"],
-    fnb_items: ["Coffee/Light Snacks"],
-    av_needs: ["Basic (mics, projector)"],
-    production_needs: [],
-    collateral_needs: ["Printed programs"],
-  },
-  "Demo Day/Showcase": {
-    duration: "Half day (4-5 hours)",
-    attendance: "50-100 (medium)",
-    venue_type: "Conference center",
-    program_elements: ["Demos/showcases", "Networking time", "Q&A sessions"],
-    fnb_items: ["Coffee/Light Snacks", "Lunch"],
-    av_needs: ["Basic (mics, projector)", "Multiple screens"],
-    production_needs: ["Photographer", "Videographer"],
-    collateral_needs: ["Event website", "Registration system", "Name badges", "Signage/banners"],
-  },
-  "Multi-format": {
-    duration: "Full day",
-    attendance: "100-250 (large)",
-    venue_type: "Conference center",
-    program_elements: ["Keynote speeches", "Panel discussions", "Breakout sessions", "Workshops/trainings", "Networking time"],
-    fnb_items: ["Coffee/Light Snacks", "Lunch"],
-    av_needs: ["Basic (mics, projector)", "Multiple screens"],
-    production_needs: ["Photographer"],
-    collateral_needs: ["Event website", "Registration system", "Name badges", "Printed programs"],
-  },
+// Default vendor data (used when Google Sheets unavailable)
+const DEFAULT_VENDORS = {
+  venues: [
+    { city: "Washington DC", name: "Ronald Reagan Building", type: "Conference center", tier: "Premium", min_capacity: 50, max_capacity: 5000, min_price: 12000, max_price: 50000, url: "https://rrbitc.com", features: "AV included, 22 event spaces", notes: "65000 sq ft", source: "Venue website" },
+    { city: "Washington DC", name: "Partnership for Public Service", type: "Conference center", tier: "Standard", min_capacity: 15, max_capacity: 200, min_price: 4000, max_price: 12000, url: "https://ourpublicservice.org/about/conference-center-rental/", features: "Modern AV, hybrid capable", notes: "8000 sq ft. Discounts Mon/Fri", source: "Venue website" },
+    { city: "Washington DC", name: "National Building Museum", type: "Museum/unique venue", tier: "Premium", min_capacity: 100, max_capacity: 1000, min_price: 15000, max_price: 35000, url: "https://nbm.org", features: "Iconic Great Hall", notes: "Historic architecture", source: "Venue website" },
+    { city: "Washington DC", name: "National Press Club", type: "Conference center", tier: "Standard", min_capacity: 25, max_capacity: 500, min_price: 3000, max_price: 15000, url: "https://press.org", features: "Historic, media-friendly", notes: "Great for policy events", source: "Industry guides" },
+    { city: "Washington DC", name: "Georgetown Conference Center", type: "University/campus", tier: "Budget", min_capacity: 25, max_capacity: 300, min_price: 2000, max_price: 8000, url: "https://conference.georgetown.edu", features: "Academic setting, AV included", notes: "Partner discounts possible", source: "Venue website" },
+    { city: "Washington DC", name: "MLK Library", type: "Government building", tier: "Budget", min_capacity: 25, max_capacity: 200, min_price: 1500, max_price: 4000, url: "https://dclibrary.org/mlk", features: "Renovated 2020, modern", notes: "Mission alignment helps", source: "Venue website" },
+  ],
+  caterers: [
+    { city: "Washington DC", name: "Ridgewells Catering", tier: "Premium", budget_pp: 75, standard_pp: 125, premium_pp: 200, url: "https://ridgewells.com", notes: "95+ years. Award-winning." },
+    { city: "Washington DC", name: "Occasions Caterers", tier: "Premium", budget_pp: 65, standard_pp: 110, premium_pp: 175, url: "https://occasionscaterers.com", notes: "Custom menus, experiential." },
+    { city: "Washington DC", name: "RSVP Catering", tier: "Standard", budget_pp: 45, standard_pp: 75, premium_pp: 120, url: "https://rsvpcatering.com", notes: "25+ years. Corporate focus." },
+    { city: "Washington DC", name: "CNF Catering", tier: "Budget", budget_pp: 35, standard_pp: 55, premium_pp: 85, url: "https://cnfcatering.com", notes: "Since 1986. Good value." },
+  ],
+  av_companies: [
+    { city: "Washington DC", name: "Media Support Services", tier: "Standard", basic_day: 1500, standard_day: 3500, premium_day: 8000, url: "https://mssav.com", notes: "Since 1996. DC venue experts." },
+    { city: "Washington DC", name: "Meeting Tomorrow", tier: "Standard", basic_day: 2000, standard_day: 5000, premium_day: 15000, url: "https://meetingtomorrow.com", notes: "National company. Multi-city." },
+    { city: "Washington DC", name: "AV Universal", tier: "Budget", basic_day: 1000, standard_day: 2500, premium_day: 6000, url: "https://avuniversal.com", notes: "NoVA based. Responsive." },
+    { city: "Washington DC", name: "Electric Events DC", tier: "Standard", basic_day: 2000, standard_day: 5000, premium_day: 15000, url: "https://electriceventsdc.com", notes: "20+ years. Full service." },
+  ],
 };
 
 // ╔════════════════════════════════════════════════════════════════════════════╗
-// ║                        TIMELINE GENERATOR                                   ║
+// ║                              SMART DEFAULTS                                 ║
 // ╚════════════════════════════════════════════════════════════════════════════╝
 
-const generateTimeline = (eventDate, responses) => {
+const SMART_DEFAULTS = {
+  "Conference": { duration: "Full day", attendance: "100-250 (large)", venue_type: "Conference center", program_elements: ["Keynote speeches", "Panel discussions", "Networking time", "Q&A sessions"], fnb_items: ["Coffee/Light Snacks", "Lunch", "Reception/Appetizers"], av_needs: ["Basic (mics, projector)", "Multiple screens", "Recording"], production_needs: ["Photographer", "Videographer"], collateral_needs: ["Event website", "Registration system", "Name badges", "Printed programs"] },
+  "Workshop/Training": { duration: "Half day (4-5 hours)", attendance: "25-50 (small)", venue_type: "Conference center", program_elements: ["Workshops/trainings", "Breakout sessions", "Q&A sessions"], fnb_items: ["Coffee/Light Snacks", "Lunch"], av_needs: ["Basic (mics, projector)"], production_needs: [], collateral_needs: ["Registration system", "Name badges", "Printed programs"] },
+  "Roundtable Discussion": { duration: "2-3 hours", attendance: "Under 25 (intimate)", venue_type: "Corporate office", program_elements: ["Panel discussions", "Networking time", "Q&A sessions"], fnb_items: ["Coffee/Light Snacks"], av_needs: ["Basic (mics, projector)"], production_needs: [], collateral_needs: ["Name badges"] },
+  "Summit": { duration: "Full day", attendance: "100-250 (large)", venue_type: "Hotel", program_elements: ["Keynote speeches", "Panel discussions", "Breakout sessions", "Networking time"], fnb_items: ["Coffee/Light Snacks", "Breakfast", "Lunch", "Reception/Appetizers"], av_needs: ["Basic (mics, projector)", "Professional staging", "Multiple screens", "Recording"], production_needs: ["Photographer", "Videographer", "Social media coverage"], collateral_needs: ["Event website", "Registration system", "Name badges", "Signage/banners", "Swag/giveaways"] },
+  "Reception/Networking": { duration: "2-3 hours", attendance: "50-100 (medium)", venue_type: "Museum/unique venue", program_elements: ["Networking time", "Entertainment"], fnb_items: ["Reception/Appetizers", "Alcohol service"], av_needs: ["Basic (mics, projector)"], production_needs: ["Photographer"], collateral_needs: ["Name badges", "Signage/banners"] },
+  "Briefing/Presentation": { duration: "2-3 hours", attendance: "25-50 (small)", venue_type: "Corporate office", program_elements: ["Keynote speeches", "Q&A sessions"], fnb_items: ["Coffee/Light Snacks"], av_needs: ["Basic (mics, projector)"], production_needs: [], collateral_needs: ["Printed programs"] },
+  "Demo Day/Showcase": { duration: "Half day (4-5 hours)", attendance: "50-100 (medium)", venue_type: "Conference center", program_elements: ["Demos/showcases", "Networking time", "Q&A sessions"], fnb_items: ["Coffee/Light Snacks", "Lunch"], av_needs: ["Basic (mics, projector)", "Multiple screens"], production_needs: ["Photographer", "Videographer"], collateral_needs: ["Event website", "Registration system", "Name badges", "Signage/banners"] },
+  "Multi-format": { duration: "Full day", attendance: "100-250 (large)", venue_type: "Conference center", program_elements: ["Keynote speeches", "Panel discussions", "Breakout sessions", "Workshops/trainings", "Networking time"], fnb_items: ["Coffee/Light Snacks", "Lunch"], av_needs: ["Basic (mics, projector)", "Multiple screens"], production_needs: ["Photographer"], collateral_needs: ["Event website", "Registration system", "Name badges", "Printed programs"] },
+};
+
+const STORAGE_KEY = 'seedai-event-planner-save';
+
+// ╔════════════════════════════════════════════════════════════════════════════╗
+// ║                              HELPER FUNCTIONS                               ║
+// ╚════════════════════════════════════════════════════════════════════════════╝
+
+const generateTimeline = (eventDate, responses, budgetConfig) => {
   if (!eventDate) return [];
-  
   const date = new Date(eventDate);
   if (isNaN(date.getTime())) return [];
-  
   const today = new Date();
   const weeksOut = Math.floor((date - today) / (7 * 24 * 60 * 60 * 1000));
-  const venueLeadTime = BUDGET_CONFIG.venueTypes[responses.venue_type]?.leadTime || 12;
+  const venueLeadTime = budgetConfig.venueTypes[responses.venue_type]?.leadTime || 12;
   
   const milestones = [
     { weeks: Math.max(venueLeadTime, 16), task: "🏛️ Venue contract signed", category: "venue" },
     { weeks: 14, task: "🎤 Keynote speakers confirmed", category: "content" },
     { weeks: 12, task: "📋 Program outline finalized", category: "content" },
     { weeks: 10, task: "🎯 Marketing campaign launched", category: "marketing" },
-    { weeks: 10, task: "🌐 Event website live", category: "marketing" },
     { weeks: 8, task: "📝 Registration opens", category: "registration" },
     { weeks: 8, task: "🍽️ Catering menu selected", category: "logistics" },
     { weeks: 6, task: "🎬 AV requirements confirmed", category: "production" },
-    { weeks: 6, task: "👥 All speakers confirmed", category: "content" },
     { weeks: 4, task: "📦 Collateral to print", category: "logistics" },
-    { weeks: 4, task: "📧 Reminder emails sent", category: "marketing" },
     { weeks: 2, task: "🔢 Final headcount to venue", category: "logistics" },
-    { weeks: 2, task: "📑 Run of show drafted", category: "content" },
     { weeks: 1, task: "✅ Final walkthrough", category: "logistics" },
-    { weeks: 1, task: "📋 Run of show finalized", category: "content" },
     { weeks: 0, task: "🎉 EVENT DAY", category: "event" },
   ];
   
-  return milestones
-    .filter(m => m.weeks <= weeksOut + 2)
-    .map(m => {
-      const milestoneDate = new Date(date);
-      milestoneDate.setDate(milestoneDate.getDate() - (m.weeks * 7));
-      const isPast = milestoneDate < today;
-      const isUrgent = !isPast && milestoneDate < new Date(today.getTime() + 14 * 24 * 60 * 60 * 1000);
-      return { ...m, date: milestoneDate, isPast, isUrgent, weeksOut: m.weeks };
-    })
-    .sort((a, b) => a.date - b.date);
+  return milestones.filter(m => m.weeks <= weeksOut + 2).map(m => {
+    const milestoneDate = new Date(date);
+    milestoneDate.setDate(milestoneDate.getDate() - (m.weeks * 7));
+    const isPast = milestoneDate < today;
+    const isUrgent = !isPast && milestoneDate < new Date(today.getTime() + 14 * 24 * 60 * 60 * 1000);
+    return { ...m, date: milestoneDate, isPast, isUrgent, weeksOut: m.weeks };
+  }).sort((a, b) => a.date - b.date);
 };
 
-// ╔════════════════════════════════════════════════════════════════════════════╗
-// ║                        RISK FLAGS ANALYZER                                  ║
-// ╚════════════════════════════════════════════════════════════════════════════╝
-
-const analyzeRisks = (responses) => {
+const analyzeRisks = (responses, budgetConfig) => {
   const risks = [];
-  const attendance = BUDGET_CONFIG.attendanceDefaults[responses.attendance] || 75;
+  const attendance = budgetConfig.attendanceDefaults[responses.attendance] || 75;
   const eventDate = responses.target_date ? new Date(responses.target_date) : null;
   const today = new Date();
   const weeksOut = eventDate ? Math.floor((eventDate - today) / (7 * 24 * 60 * 60 * 1000)) : null;
-  const venueLeadTime = BUDGET_CONFIG.venueTypes[responses.venue_type]?.leadTime || 12;
-  const location = BUDGET_CONFIG.locations[responses.location];
+  const venueLeadTime = budgetConfig.venueTypes[responses.venue_type]?.leadTime || 12;
+  const location = budgetConfig.locations[responses.location];
   
-  // Timeline risks
   if (weeksOut !== null && weeksOut < venueLeadTime) {
-    risks.push({ severity: "high", icon: "⏰", message: `${responses.venue_type || 'This venue type'} typically requires ${venueLeadTime}+ weeks lead time. You have ${weeksOut} weeks.`, category: "timeline" });
+    risks.push({ severity: "high", icon: "⏰", message: `${responses.venue_type || 'This venue type'} typically requires ${venueLeadTime}+ weeks lead time. You have ${weeksOut} weeks.` });
   } else if (weeksOut !== null && weeksOut < 8) {
-    risks.push({ severity: "high", icon: "⏰", message: `Only ${weeksOut} weeks until event. Expedited planning may increase costs 15-25%.`, category: "timeline" });
-  } else if (weeksOut !== null && weeksOut < 12) {
-    risks.push({ severity: "medium", icon: "⏰", message: `${weeksOut} weeks is tight for an event of this size. Prioritize venue and speakers immediately.`, category: "timeline" });
+    risks.push({ severity: "high", icon: "⏰", message: `Only ${weeksOut} weeks until event. Expedited planning may increase costs 15-25%.` });
   }
   
-  // Location/date risks
   if (eventDate && location?.peakMonths?.includes(eventDate.getMonth() + 1)) {
-    risks.push({ severity: "medium", icon: "📅", message: `${location.label} is in peak season in ${eventDate.toLocaleString('default', { month: 'long' })}. Expect 20-30% higher venue/hotel costs.`, category: "cost" });
+    risks.push({ severity: "medium", icon: "📅", message: `${location.label} is in peak season in ${eventDate.toLocaleString('default', { month: 'long' })}. Expect 20-30% higher costs.` });
   }
   
-  // DC-specific risks
-  if (responses.location === "Washington DC") {
-    if (eventDate && [3, 4].includes(eventDate.getMonth() + 1)) {
-      risks.push({ severity: "medium", icon: "🌸", message: "Cherry blossom season (late March-April) means premium hotel rates and limited availability.", category: "cost" });
-    }
-    if (attendance > 100 && responses.venue_type === "Government building") {
-      risks.push({ severity: "medium", icon: "🏛️", message: "Government buildings have strict security protocols for 100+ attendees. Allow extra time for approvals.", category: "logistics" });
-    }
+  if (responses.location === "Washington DC" && eventDate && [3, 4].includes(eventDate.getMonth() + 1)) {
+    risks.push({ severity: "medium", icon: "🌸", message: "Cherry blossom season means premium hotel rates and limited availability." });
   }
   
-  // Format risks
   if (responses.format === "Hybrid (in-person + virtual)") {
-    risks.push({ severity: "medium", icon: "🖥️", message: "Hybrid events typically cost 30-40% more than in-person only due to AV and production needs.", category: "cost" });
+    risks.push({ severity: "medium", icon: "🖥️", message: "Hybrid events typically cost 30-40% more than in-person only." });
   }
   
-  // Scale risks
-  if (attendance > 250 && !responses.av_needs?.includes("Professional staging")) {
-    risks.push({ severity: "low", icon: "🎤", message: "Events with 250+ attendees usually need professional staging for visibility and engagement.", category: "production" });
+  if (responses.fnb_items?.includes("Alcohol service") && responses.venue_type === "Government building") {
+    risks.push({ severity: "high", icon: "🍷", message: "Most government buildings prohibit alcohol. Verify venue policy." });
   }
   
   if (attendance > 100 && !responses.collateral_needs?.includes("Registration system")) {
-    risks.push({ severity: "low", icon: "📝", message: "Consider a registration system to manage check-in and communications for 100+ attendees.", category: "logistics" });
+    risks.push({ severity: "low", icon: "📝", message: "Consider a registration system to manage check-in for 100+ attendees." });
   }
   
-  // Catering risks
-  if (responses.fnb_items?.includes("Alcohol service") && responses.venue_type === "Government building") {
-    risks.push({ severity: "high", icon: "🍷", message: "Most government buildings prohibit alcohol. Verify venue policy or choose different location.", category: "logistics" });
-  }
-  
-  if (attendance > 50 && !responses.fnb_items?.includes("Special dietary options")) {
-    risks.push({ severity: "low", icon: "🥗", message: "For 50+ attendees, plan for dietary restrictions (typically 15-20% have requirements).", category: "logistics" });
-  }
-  
-  // VIP risks
-  if (responses.vips?.toLowerCase().includes("secretary") || responses.vips?.toLowerCase().includes("senator") || responses.vips?.toLowerCase().includes("ceo")) {
-    risks.push({ severity: "medium", icon: "⭐", message: "High-profile speakers may require advance security coordination and green room space.", category: "logistics" });
-  }
-  
-  // Budget risks
-  if (responses.budget_known === "No, I need help estimating") {
-    risks.push({ severity: "low", icon: "💰", message: "Finalize budget range early to avoid scope creep and enable vendor negotiations.", category: "planning" });
-  }
-  
-  return risks.sort((a, b) => {
-    const order = { high: 0, medium: 1, low: 2 };
-    return order[a.severity] - order[b.severity];
-  });
+  return risks.sort((a, b) => ({ high: 0, medium: 1, low: 2 }[a.severity] - { high: 0, medium: 1, low: 2 }[b.severity]));
 };
 
-// ╔════════════════════════════════════════════════════════════════════════════╗
-// ║                        BUDGET CALCULATOR (WITH SCENARIOS)                   ║
-// ╚════════════════════════════════════════════════════════════════════════════╝
-
-const calculateBudget = (responses, scenario = 'standard') => {
+const calculateBudget = (responses, scenario, budgetConfig) => {
   const attendanceKey = responses.attendance || "50-100 (medium)";
-  const attendance = BUDGET_CONFIG.attendanceDefaults[attendanceKey] || 75;
+  const attendance = budgetConfig.attendanceDefaults[attendanceKey] || 75;
   const durationKey = responses.duration || "Full day";
-  const days = BUDGET_CONFIG.durationMultipliers[durationKey] || 1;
+  const days = budgetConfig.durationMultipliers[durationKey] || 1;
   const locationKey = responses.location || "Washington DC";
-  const locationMultiplier = BUDGET_CONFIG.locations[locationKey]?.multiplier || 1.0;
+  const locationMultiplier = budgetConfig.locations[locationKey]?.multiplier || 1.0;
   const venueType = responses.venue_type || "Not sure yet";
-  const venueConfig = BUDGET_CONFIG.venueTypes[venueType] || BUDGET_CONFIG.venueTypes["Not sure yet"];
-  const scenarioMultiplier = BUDGET_CONFIG.scenarioMultipliers[scenario] || 1.0;
+  const venueConfig = budgetConfig.venueTypes[venueType] || budgetConfig.venueTypes["Not sure yet"];
   
   let costs = { venue: 0, foodBeverage: 0, avTechnical: 0, production: 0, collateral: 0, marketing: 0, staffing: 0 };
   
-  const venueBase = Math.max(venueConfig.perPerson * attendance, venueConfig.minSpend);
-  costs.venue = venueBase * days * locationMultiplier * scenarioMultiplier;
+  const venuePerPerson = venueConfig.perPerson[scenario] || venueConfig.perPerson.standard;
+  const venueBase = Math.max(venuePerPerson * attendance, venueConfig.minSpend || 0);
+  costs.venue = venueBase * days * locationMultiplier;
   
-  (responses.fnb_items || []).forEach(item => { 
-    costs.foodBeverage += (BUDGET_CONFIG.foodAndBeverage[item] || 0) * attendance * days * locationMultiplier * scenarioMultiplier; 
+  (responses.fnb_items || []).forEach(item => {
+    const cfg = budgetConfig.foodAndBeverage[item];
+    if (cfg) costs.foodBeverage += (cfg[scenario] || cfg.standard) * attendance * days * locationMultiplier;
   });
   
-  (responses.av_needs || []).forEach(item => { 
-    costs.avTechnical += (BUDGET_CONFIG.avTechnical[item] || 0) * days * locationMultiplier * scenarioMultiplier; 
+  (responses.av_needs || []).forEach(item => {
+    const cfg = budgetConfig.avTechnical[item];
+    if (cfg) costs.avTechnical += (cfg[scenario] || cfg.standard) * days * locationMultiplier;
   });
   
-  (responses.production_needs || []).forEach(item => { 
-    const cfg = BUDGET_CONFIG.production[item]; 
-    if (cfg) costs.production += (cfg.perDay ? cfg.cost * days : cfg.cost) * locationMultiplier * scenarioMultiplier; 
+  (responses.production_needs || []).forEach(item => {
+    const cfg = budgetConfig.production[item];
+    if (cfg) {
+      const cost = cfg[scenario] || cfg.standard;
+      costs.production += (cfg.perDay ? cost * days : cost) * locationMultiplier;
+    }
   });
   
-  (responses.collateral_needs || []).forEach(item => { 
-    const cfg = BUDGET_CONFIG.collateral[item]; 
-    if (cfg) costs.collateral += (cfg.perPerson ? cfg.cost * attendance : cfg.cost) * scenarioMultiplier; 
+  (responses.collateral_needs || []).forEach(item => {
+    const cfg = budgetConfig.collateral[item];
+    if (cfg) {
+      const cost = cfg[scenario] || cfg.standard;
+      costs.collateral += cfg.perPerson ? cost * attendance : cost;
+    }
   });
   
-  (responses.marketing_channels || []).forEach(item => { 
-    costs.marketing += (BUDGET_CONFIG.marketing[item] || 0) * scenarioMultiplier; 
+  (responses.marketing_channels || []).forEach(item => {
+    const cfg = budgetConfig.marketing[item];
+    if (cfg) costs.marketing += cfg[scenario] || cfg.standard;
   });
   
-  costs.staffing = BUDGET_CONFIG.staffing.perDay * days * locationMultiplier * scenarioMultiplier;
+  costs.staffing = (budgetConfig.staffing[scenario] || budgetConfig.staffing.standard) * days * locationMultiplier;
   
   const subtotal = Object.values(costs).reduce((a, b) => a + b, 0);
-  const contingency = subtotal * BUDGET_CONFIG.contingency.percentage;
+  const contingencyRate = budgetConfig.contingency[scenario] || budgetConfig.contingency.standard;
+  const contingency = subtotal * contingencyRate;
   
   return { ...costs, subtotal, contingency, total: subtotal + contingency, attendance, days, location: locationKey, locationMultiplier, venueType, scenario };
 };
 
-const STORAGE_KEY = 'seedai-event-planner-save';
-
-// SOUND SYSTEM
+// Sound system
 class SoundSystem {
   constructor() { this.enabled = true; this.ctx = null; }
   init() { if (!this.ctx) this.ctx = new (window.AudioContext || window.webkitAudioContext)(); }
@@ -342,10 +293,9 @@ class SoundSystem {
     const sounds = {
       select: () => { osc.frequency.setValueAtTime(440, now); osc.frequency.setValueAtTime(880, now + 0.05); gain.gain.setValueAtTime(0.1, now); osc.start(now); osc.stop(now + 0.1); },
       navigate: () => { osc.frequency.setValueAtTime(330, now); gain.gain.setValueAtTime(0.08, now); osc.start(now); osc.stop(now + 0.05); },
-      complete: () => { osc.frequency.setValueAtTime(523, now); osc.frequency.setValueAtTime(659, now + 0.1); osc.frequency.setValueAtTime(784, now + 0.2); osc.frequency.setValueAtTime(1047, now + 0.3); gain.gain.setValueAtTime(0.1, now); osc.start(now); osc.stop(now + 0.4); },
-      start: () => { osc.frequency.setValueAtTime(262, now); osc.frequency.setValueAtTime(330, now + 0.1); osc.frequency.setValueAtTime(392, now + 0.2); gain.gain.setValueAtTime(0.1, now); osc.start(now); osc.stop(now + 0.3); },
+      complete: () => { osc.frequency.setValueAtTime(523, now); osc.frequency.setValueAtTime(659, now + 0.1); osc.frequency.setValueAtTime(784, now + 0.2); gain.gain.setValueAtTime(0.1, now); osc.start(now); osc.stop(now + 0.4); },
+      start: () => { osc.frequency.setValueAtTime(262, now); osc.frequency.setValueAtTime(330, now + 0.1); gain.gain.setValueAtTime(392, now + 0.2); gain.gain.setValueAtTime(0.1, now); osc.start(now); osc.stop(now + 0.3); },
       save: () => { osc.frequency.setValueAtTime(600, now); osc.frequency.setValueAtTime(800, now + 0.1); gain.gain.setValueAtTime(0.1, now); osc.start(now); osc.stop(now + 0.15); },
-      ai: () => { osc.frequency.setValueAtTime(800, now); osc.frequency.setValueAtTime(1000, now + 0.1); osc.frequency.setValueAtTime(1200, now + 0.2); gain.gain.setValueAtTime(0.1, now); osc.start(now); osc.stop(now + 0.3); },
     };
     sounds[type]?.();
   }
@@ -353,14 +303,14 @@ class SoundSystem {
 }
 const sound = new SoundSystem();
 
-// PIXEL CHARACTERS
+// Character SVGs
 const getCharacterSvg = (id, size = 48) => {
   const scale = size / 48;
   const chars = {
-    stuart: (<svg viewBox="0 0 16 20" width={48 * scale} height={60 * scale} style={{ imageRendering: 'pixelated' }}><rect x="4" y="0" width="2" height="1" fill="#2d2d2d"/><rect x="7" y="0" width="1" height="1" fill="#2d2d2d"/><rect x="10" y="0" width="2" height="1" fill="#2d2d2d"/><rect x="3" y="1" width="10" height="3" fill="#3d3d3d"/><rect x="4" y="4" width="8" height="6" fill="#E8C4A0"/><rect x="3" y="5" width="4" height="3" fill="#1a1a1a"/><rect x="9" y="5" width="4" height="3" fill="#1a1a1a"/><rect x="7" y="5" width="2" height="1" fill="#1a1a1a"/><rect x="4" y="6" width="2" height="1" fill="#87CEEB"/><rect x="10" y="6" width="2" height="1" fill="#87CEEB"/><rect x="5" y="8" width="6" height="2" fill="#9d8b7a"/><rect x="5" y="10" width="6" height="2" fill="#E8DCC8"/><rect x="3" y="12" width="10" height="4" fill="#1a1a1a"/><rect x="4" y="16" width="3" height="2" fill="#2d3748"/><rect x="9" y="16" width="3" height="2" fill="#2d3748"/><rect x="3" y="18" width="4" height="2" fill="#1a1a1a"/><rect x="9" y="18" width="4" height="2" fill="#1a1a1a"/></svg>),
-    austin: (<svg viewBox="0 0 16 20" width={48 * scale} height={60 * scale} style={{ imageRendering: 'pixelated' }}><rect x="3" y="0" width="10" height="4" fill="#5C4033"/><rect x="4" y="4" width="8" height="6" fill="#E8C4A0"/><rect x="4" y="5" width="3" height="2" fill="#CD853F"/><rect x="9" y="5" width="3" height="2" fill="#CD853F"/><rect x="7" y="5" width="2" height="1" fill="#CD853F"/><rect x="5" y="5" width="1" height="1" fill="#DEB887"/><rect x="10" y="5" width="1" height="1" fill="#DEB887"/><rect x="3" y="7" width="10" height="3" fill="#4A3728"/><rect x="5" y="10" width="6" height="1" fill="#FFFFFF"/><rect x="3" y="11" width="10" height="5" fill="#1e3a5f"/><rect x="4" y="16" width="3" height="2" fill="#2d3748"/><rect x="9" y="16" width="3" height="2" fill="#2d3748"/><rect x="3" y="18" width="4" height="2" fill="#1a1a1a"/><rect x="9" y="18" width="4" height="2" fill="#1a1a1a"/></svg>),
+    stuart: (<svg viewBox="0 0 16 20" width={48 * scale} height={60 * scale} style={{ imageRendering: 'pixelated' }}><rect x="4" y="0" width="2" height="1" fill="#2d2d2d"/><rect x="7" y="0" width="1" height="1" fill="#2d2d2d"/><rect x="10" y="0" width="2" height="1" fill="#2d2d2d"/><rect x="3" y="1" width="10" height="3" fill="#3d3d3d"/><rect x="4" y="4" width="8" height="6" fill="#E8C4A0"/><rect x="3" y="5" width="4" height="3" fill="#1a1a1a"/><rect x="9" y="5" width="4" height="3" fill="#1a1a1a"/><rect x="4" y="6" width="2" height="1" fill="#87CEEB"/><rect x="10" y="6" width="2" height="1" fill="#87CEEB"/><rect x="5" y="8" width="6" height="2" fill="#9d8b7a"/><rect x="5" y="10" width="6" height="2" fill="#E8DCC8"/><rect x="3" y="12" width="10" height="4" fill="#1a1a1a"/><rect x="4" y="16" width="3" height="2" fill="#2d3748"/><rect x="9" y="16" width="3" height="2" fill="#2d3748"/><rect x="3" y="18" width="4" height="2" fill="#1a1a1a"/><rect x="9" y="18" width="4" height="2" fill="#1a1a1a"/></svg>),
+    austin: (<svg viewBox="0 0 16 20" width={48 * scale} height={60 * scale} style={{ imageRendering: 'pixelated' }}><rect x="3" y="0" width="10" height="4" fill="#5C4033"/><rect x="4" y="4" width="8" height="6" fill="#E8C4A0"/><rect x="4" y="5" width="3" height="2" fill="#CD853F"/><rect x="9" y="5" width="3" height="2" fill="#CD853F"/><rect x="5" y="5" width="1" height="1" fill="#DEB887"/><rect x="10" y="5" width="1" height="1" fill="#DEB887"/><rect x="3" y="7" width="10" height="3" fill="#4A3728"/><rect x="5" y="10" width="6" height="1" fill="#FFFFFF"/><rect x="3" y="11" width="10" height="5" fill="#1e3a5f"/><rect x="4" y="16" width="3" height="2" fill="#2d3748"/><rect x="9" y="16" width="3" height="2" fill="#2d3748"/><rect x="3" y="18" width="4" height="2" fill="#1a1a1a"/><rect x="9" y="18" width="4" height="2" fill="#1a1a1a"/></svg>),
     anna: (<svg viewBox="0 0 16 20" width={48 * scale} height={60 * scale} style={{ imageRendering: 'pixelated' }}><rect x="6" y="0" width="4" height="3" fill="#6B4423"/><rect x="3" y="3" width="10" height="1" fill="#5C4033"/><rect x="3" y="4" width="2" height="3" fill="#6B4423"/><rect x="11" y="4" width="2" height="3" fill="#6B4423"/><rect x="5" y="4" width="6" height="6" fill="#F5D0B0"/><rect x="6" y="6" width="1" height="1" fill="#4A3728"/><rect x="9" y="6" width="1" height="1" fill="#4A3728"/><rect x="3" y="6" width="1" height="1" fill="#FFD700"/><rect x="12" y="6" width="1" height="1" fill="#FFD700"/><rect x="7" y="8" width="2" height="1" fill="#E8A090"/><rect x="3" y="11" width="10" height="5" fill="#E07B8B"/><rect x="6" y="11" width="4" height="1" fill="#F5D0B0"/><rect x="4" y="16" width="8" height="2" fill="#2d3748"/><rect x="4" y="18" width="3" height="2" fill="#1a1a1a"/><rect x="9" y="18" width="3" height="2" fill="#1a1a1a"/></svg>),
-    josh: (<svg viewBox="0 0 16 20" width={48 * scale} height={60 * scale} style={{ imageRendering: 'pixelated' }}><rect x="3" y="0" width="10" height="4" fill="#5C4033"/><rect x="5" y="1" width="2" height="1" fill="#6B4423"/><rect x="9" y="1" width="2" height="1" fill="#6B4423"/><rect x="4" y="4" width="8" height="6" fill="#E8C4A0"/><rect x="4" y="5" width="3" height="2" fill="#8B7355"/><rect x="9" y="5" width="3" height="2" fill="#8B7355"/><rect x="7" y="5" width="2" height="1" fill="#8B7355"/><rect x="4" y="8" width="8" height="1" fill="#3d3d3d"/><rect x="7" y="9" width="2" height="1" fill="#D4A090"/><rect x="5" y="10" width="6" height="1" fill="#FFFFFF"/><rect x="3" y="11" width="10" height="5" fill="#6B7280"/><rect x="4" y="16" width="3" height="2" fill="#2d3748"/><rect x="9" y="16" width="3" height="2" fill="#2d3748"/><rect x="3" y="18" width="4" height="2" fill="#1a1a1a"/><rect x="9" y="18" width="4" height="2" fill="#1a1a1a"/></svg>)
+    josh: (<svg viewBox="0 0 16 20" width={48 * scale} height={60 * scale} style={{ imageRendering: 'pixelated' }}><rect x="3" y="0" width="10" height="4" fill="#5C4033"/><rect x="5" y="1" width="2" height="1" fill="#6B4423"/><rect x="9" y="1" width="2" height="1" fill="#6B4423"/><rect x="4" y="4" width="8" height="6" fill="#E8C4A0"/><rect x="4" y="5" width="3" height="2" fill="#8B7355"/><rect x="9" y="5" width="3" height="2" fill="#8B7355"/><rect x="4" y="8" width="8" height="1" fill="#3d3d3d"/><rect x="7" y="9" width="2" height="1" fill="#D4A090"/><rect x="5" y="10" width="6" height="1" fill="#FFFFFF"/><rect x="3" y="11" width="10" height="5" fill="#6B7280"/><rect x="4" y="16" width="3" height="2" fill="#2d3748"/><rect x="9" y="16" width="3" height="2" fill="#2d3748"/><rect x="3" y="18" width="4" height="2" fill="#1a1a1a"/><rect x="9" y="18" width="4" height="2" fill="#1a1a1a"/></svg>)
   };
   return chars[id] || null;
 };
@@ -381,25 +331,20 @@ const PixelChar = ({ selected, onClick, id }) => {
 
 const charNames = { stuart: "Stuart", austin: "Austin", anna: "Anna", josh: "Josh" };
 
-// UI COMPONENTS
+// UI Components
 const Btn = ({ children, onClick, disabled, variant = "primary", className = "" }) => {
-  const v = { primary: "bg-blue-600 hover:bg-blue-500 border-blue-400 text-white", secondary: "bg-slate-700 hover:bg-slate-600 border-slate-500 text-slate-200",
-    success: "bg-green-600 hover:bg-green-500 border-green-400 text-white", warning: "bg-yellow-500 hover:bg-yellow-400 border-yellow-300 text-slate-900",
-    danger: "bg-red-600 hover:bg-red-500 border-red-400 text-white", ai: "bg-purple-600 hover:bg-purple-500 border-purple-400 text-white" };
-  return (<button onClick={(e) => { sound.play('navigate'); onClick?.(e); }} disabled={disabled}
-    className={`px-3 py-2 font-mono font-bold uppercase text-xs border-4 transition-all disabled:opacity-50 active:translate-y-1 ${v[variant]} ${className}`}
-    style={{ boxShadow: '3px 3px 0px rgba(0,0,0,0.5)' }}>{children}</button>);
+  const v = { primary: "bg-blue-600 hover:bg-blue-500 border-blue-400 text-white", secondary: "bg-slate-700 hover:bg-slate-600 border-slate-500 text-slate-200", success: "bg-green-600 hover:bg-green-500 border-green-400 text-white", warning: "bg-yellow-500 hover:bg-yellow-400 border-yellow-300 text-slate-900", danger: "bg-red-600 hover:bg-red-500 border-red-400 text-white" };
+  return (<button onClick={(e) => { sound.play('navigate'); onClick?.(e); }} disabled={disabled} className={`px-3 py-2 font-mono font-bold uppercase text-xs border-4 transition-all disabled:opacity-50 active:translate-y-1 ${v[variant]} ${className}`} style={{ boxShadow: '3px 3px 0px rgba(0,0,0,0.5)' }}>{children}</button>);
 };
 
 const ProgressWithCharacter = ({ current, total, label, characterId }) => {
   const percentage = Math.round((current / total) * 100);
-  const position = Math.min(percentage, 95);
   return (
     <div className="font-mono">
       <div className="flex justify-between text-xs text-slate-400 mb-1"><span>{label}</span><span>{percentage}%</span></div>
       <div className="relative">
         <div className="flex gap-1 h-6">{[...Array(10)].map((_, i) => (<div key={i} className={`flex-1 border-2 ${i < Math.round((current / total) * 10) ? 'bg-green-400 border-green-300' : 'bg-slate-800 border-slate-600'}`}/>))}</div>
-        <div className="absolute top-1/2 transition-all duration-300 ease-out" style={{ left: `${position}%`, transform: 'translate(-50%, -50%)' }}>{getCharacterSvg(characterId, 28)}</div>
+        <div className="absolute top-1/2 transition-all duration-300" style={{ left: `${Math.min(percentage, 95)}%`, transform: 'translate(-50%, -50%)' }}>{getCharacterSvg(characterId, 28)}</div>
       </div>
     </div>
   );
@@ -416,7 +361,7 @@ const Checkbox = ({ options, selected = [], onChange }) => (
   </div>
 );
 
-// DATA
+// Data
 const programs = [
   { id: 'ai-across-america', name: 'AI Across America', icon: '🇺🇸' },
   { id: 'accelerate-science', name: 'Accelerate Science Now', icon: '🔬' },
@@ -426,132 +371,93 @@ const programs = [
   { id: 'other', name: 'Other Initiative', icon: '✨' }
 ];
 
-const phases = [
-  { id: 1, name: "THE SPARK", icon: "💡", subtitle: "What's the big idea?", questions: [
-    { id: "event_name", label: "What would you call this event?", type: "text", placeholder: "Working title..." },
-    { id: "spark", label: "What's the spark? The problem or opportunity driving this?", type: "textarea", placeholder: "What made you think 'we need to do an event'?" },
-    { id: "success_headline", label: "Imagine wild success. What's the headline the day after?", type: "textarea", placeholder: "Dream big!" },
-    { id: "why_event", label: "Why is an event the right format?", type: "textarea", placeholder: "vs. a report, webinar, blog post, etc." },
-    { id: "seedai_alignment", label: "How does this connect to SeedAI's mission?", type: "textarea", placeholder: "Try It, Prove It, Scale It..." }
-  ]},
-  { id: 2, name: "THE PEOPLE", icon: "👥", subtitle: "Who needs to be there?", questions: [
-    { id: "target_audience", label: "Who is your target audience?", type: "checkbox", options: ["Policymakers", "Congressional Staffers", "Federal Agency Staff", "State/Local Officials", "Private Sector Executives", "SMB Owners/Leaders", "Researchers/Academics", "Students", "Nonprofit Leaders", "Media/Press", "General Public", "International Delegates"] },
-    { id: "audience_detail", label: "Be more specific: Who MUST be there for success?", type: "textarea", placeholder: "e.g., 'Senate Commerce staffers working on AI legislation'" },
-    { id: "attendance", label: "Expected attendance?", type: "select", options: Object.keys(BUDGET_CONFIG.attendanceDefaults) },
-    { id: "partners", label: "Target partners or co-hosts?", type: "textarea", placeholder: "Organizations to collaborate with..." },
-    { id: "vips", label: "Dream speakers or VIPs?", type: "textarea", placeholder: "Who would make this event amazing?" },
-    { id: "registration_type", label: "How will people get access?", type: "select", options: ["Open registration", "Invitation only", "Application/curated", "Ticketed (paid)", "Hybrid approach"] }
-  ]},
-  { id: 3, name: "THE EXPERIENCE", icon: "🎯", subtitle: "What will people do?", questions: [
-    { id: "event_type", label: "What type of event?", type: "select", options: Object.keys(SMART_DEFAULTS), triggersDefaults: true },
-    { id: "duration", label: "How long?", type: "select", options: Object.keys(BUDGET_CONFIG.durationMultipliers) },
-    { id: "format", label: "Format?", type: "select", options: ["In-person only", "Virtual only", "Hybrid (in-person + virtual)"] },
-    { id: "anchor_moments", label: "2-3 'anchor moments' that will define this event?", type: "textarea", placeholder: "The highlights people will talk about..." },
-    { id: "program_elements", label: "What program elements do you need?", type: "checkbox", options: ["Keynote speeches", "Panel discussions", "Breakout sessions", "Workshops/trainings", "Demos/showcases", "Networking time", "Fireside chats", "Q&A sessions", "Poster sessions", "Awards/recognition", "Entertainment", "Meals/receptions"] },
-    { id: "takeaway", label: "What should attendees walk away with?", type: "textarea", placeholder: "Knowledge, connections, inspiration, action items..." }
-  ]},
-  { id: 4, name: "THE DETAILS", icon: "📍", subtitle: "Where, when, and how?", questions: [
-    { id: "target_date", label: "Target date or timeframe?", type: "date", placeholder: "YYYY-MM-DD" },
-    { id: "date_drivers", label: "What's driving the date?", type: "textarea", placeholder: "Legislative calendar, announcement timing, partner availability..." },
-    { id: "location", label: "Where should this be held?", type: "select", options: Object.keys(BUDGET_CONFIG.locations) },
-    { id: "venue_type", label: "What type of venue?", type: "select", options: Object.keys(BUDGET_CONFIG.venueTypes) },
-    { id: "space_needs", label: "What spaces do you need?", type: "checkbox", options: ["Main plenary room", "Breakout rooms", "Demo/exhibit area", "VIP/green room", "Registration area", "Networking lounge", "Press room", "Dining space", "Outdoor area", "Storage/staging"] },
-    { id: "fnb_items", label: "Food & beverage needed?", type: "checkbox", options: Object.keys(BUDGET_CONFIG.foodAndBeverage) },
-    { id: "logistics_needs", label: "Other logistics?", type: "checkbox", options: ["Parking coordination", "Transportation/shuttles", "Hotel room block", "Security/access control", "Coat check", "Accessibility accommodations", "WiFi (dedicated)", "Charging stations", "Childcare", "Translation services"] }
-  ]},
-  { id: 5, name: "PRODUCTION", icon: "🎬", subtitle: "Tech, content & collateral", questions: [
-    { id: "av_needs", label: "AV & technical needs?", type: "checkbox", options: Object.keys(BUDGET_CONFIG.avTechnical) },
-    { id: "production_needs", label: "Production services?", type: "checkbox", options: Object.keys(BUDGET_CONFIG.production) },
-    { id: "collateral_needs", label: "Event collateral needed?", type: "checkbox", options: Object.keys(BUDGET_CONFIG.collateral) },
-    { id: "marketing_channels", label: "Marketing channels?", type: "checkbox", options: Object.keys(BUDGET_CONFIG.marketing) },
-    { id: "post_event", label: "Post-event plans?", type: "checkbox", options: ["Thank you emails", "Attendee survey", "Content repurposing", "Report/summary", "Follow-up convenings", "Media coverage tracking", "Impact assessment", "Lead nurturing"] }
-  ]},
-  { id: 6, name: "THE PLAN", icon: "🚀", subtitle: "Budget, team & timeline", questions: [
-    { id: "budget_known", label: "Do you have a budget in mind?", type: "select", options: ["Yes, I have a specific budget", "I have a rough range", "No, I need help estimating"] },
-    { id: "budget_range", label: "If known, what's your budget range?", type: "select", options: ["Under $10K", "$10-25K", "$25-50K", "$50-100K", "$100-250K", "$250K+", "TBD"] },
-    { id: "funding_sources", label: "Funding sources?", type: "checkbox", options: ["Organizational budget", "Sponsorships", "Grants", "Registration fees", "Partner contributions", "In-kind support", "TBD", "Other"] },
-    { id: "sponsor_targets", label: "Any target sponsors?", type: "textarea", placeholder: "Organizations that might fund or sponsor..." },
-    { id: "milestones", label: "Key milestones?", type: "textarea", placeholder: "Venue confirmed, speakers locked, registration opens..." },
-    { id: "risks", label: "What could go wrong? What are you worried about?", type: "textarea", placeholder: "Be honest! Early risk ID helps planning..." },
-    { id: "success_metrics", label: "How will you measure success?", type: "textarea", placeholder: "Attendance goals, feedback scores, follow-up actions..." }
-  ]}
-];
-
-// RISK FLAGS COMPONENT
-const RiskFlags = ({ responses }) => {
-  const risks = analyzeRisks(responses);
-  if (risks.length === 0) return null;
+// Vendor Recommendations Component
+const VendorRecommendations = ({ vendors, responses, budgetConfig, category }) => {
+  const [expanded, setExpanded] = useState(false);
+  const location = responses.location || "Washington DC";
+  const attendance = budgetConfig.attendanceDefaults[responses.attendance] || 75;
+  const venueType = responses.venue_type;
   
-  const severityColors = {
-    high: "border-red-500 bg-red-900/30 text-red-400",
-    medium: "border-yellow-500 bg-yellow-900/30 text-yellow-400",
-    low: "border-blue-500 bg-blue-900/30 text-blue-400"
-  };
+  let filteredVendors = [];
+  let title = "";
+  
+  if (category === 'venues') {
+    title = "🏛️ RECOMMENDED VENUES";
+    filteredVendors = (vendors.venues || [])
+      .filter(v => v.city === location)
+      .filter(v => !venueType || venueType === "Not sure yet" || v.type === venueType)
+      .filter(v => attendance >= (v.min_capacity || 0) && attendance <= (v.max_capacity || 9999))
+      .slice(0, 6);
+  } else if (category === 'caterers') {
+    title = "🍽️ RECOMMENDED CATERERS";
+    filteredVendors = (vendors.caterers || []).filter(v => v.city === location).slice(0, 4);
+  } else if (category === 'av') {
+    title = "🎤 RECOMMENDED AV COMPANIES";
+    filteredVendors = (vendors.av_companies || []).filter(v => v.city === location).slice(0, 4);
+  }
+  
+  if (filteredVendors.length === 0) return null;
+  
+  const formatMoney = (n) => '$' + Math.round(n).toLocaleString();
+  const tierColors = { Budget: 'text-green-400', Standard: 'text-blue-400', Premium: 'text-purple-400' };
   
   return (
-    <div className="border-4 border-orange-500 bg-slate-800 p-3 mb-3">
-      <div className="flex items-center gap-2 text-orange-400 text-sm mb-2">
-        <AlertTriangle size={16}/> RISK FLAGS ({risks.length})
-      </div>
-      <div className="space-y-2">
-        {risks.slice(0, 5).map((risk, i) => (
-          <div key={i} className={`p-2 border-2 text-xs ${severityColors[risk.severity]}`}>
-            <span className="mr-2">{risk.icon}</span>{risk.message}
+    <div className="border-2 border-slate-600 bg-slate-900 p-2 mb-2">
+      <button onClick={() => setExpanded(!expanded)} className="w-full flex justify-between items-center text-xs text-slate-400 hover:text-slate-200">
+        <span>{title}</span>
+        <span>{expanded ? '▼' : '▶'} {filteredVendors.length} options</span>
+      </button>
+      {expanded && (
+        <div className="mt-2 space-y-2">
+          {filteredVendors.map((v, i) => (
+            <div key={i} className="border border-slate-700 p-2 bg-slate-800">
+              <div className="flex justify-between items-start">
+                <div>
+                  <div className="text-xs font-bold text-slate-200">{v.name}</div>
+                  <div className={`text-xs ${tierColors[v.tier] || 'text-slate-400'}`}>{v.tier}</div>
+                </div>
+                {v.url && (
+                  <a href={v.url} target="_blank" rel="noopener noreferrer" className="text-blue-400 hover:text-blue-300">
+                    <ExternalLink size={12}/>
+                  </a>
+                )}
+              </div>
+              {category === 'venues' && (
+                <div className="text-xs text-slate-500 mt-1">
+                  {formatMoney(v.min_price)} - {formatMoney(v.max_price)} • {v.min_capacity}-{v.max_capacity} guests
+                </div>
+              )}
+              {category === 'caterers' && (
+                <div className="text-xs text-slate-500 mt-1">
+                  {formatMoney(v.budget_pp)}-{formatMoney(v.premium_pp)}/person
+                </div>
+              )}
+              {category === 'av' && (
+                <div className="text-xs text-slate-500 mt-1">
+                  {formatMoney(v.basic_day)}-{formatMoney(v.premium_day)}/day
+                </div>
+              )}
+              {v.notes && <div className="text-xs text-slate-600 mt-1">{v.notes}</div>}
+            </div>
+          ))}
+          <div className="text-xs text-slate-600 text-center pt-1">
+            💡 Data from vendor websites. Verify current pricing directly.
           </div>
-        ))}
-        {risks.length > 5 && (
-          <div className="text-xs text-slate-500">+{risks.length - 5} more warnings in export</div>
-        )}
-      </div>
+        </div>
+      )}
     </div>
   );
 };
 
-// TIMELINE COMPONENT
-const TimelineView = ({ responses }) => {
-  const timeline = generateTimeline(responses.target_date, responses);
-  if (timeline.length === 0) return null;
-  
-  return (
-    <div className="border-4 border-blue-500 bg-slate-800 p-3 mb-3">
-      <div className="flex items-center gap-2 text-blue-400 text-sm mb-2">
-        <Calendar size={16}/> AUTO-GENERATED TIMELINE
-      </div>
-      <div className="space-y-1 max-h-48 overflow-y-auto">
-        {timeline.map((m, i) => (
-          <div key={i} className={`flex items-center gap-2 text-xs p-1 rounded ${
-            m.isPast ? 'text-slate-600 line-through' : 
-            m.isUrgent ? 'text-yellow-400 bg-yellow-900/20' : 
-            m.weeksOut === 0 ? 'text-green-400 bg-green-900/20 font-bold' :
-            'text-slate-400'
-          }`}>
-            <span className="w-20 text-right text-slate-500">
-              {m.date.toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}
-            </span>
-            {m.isPast ? <CheckCircle size={12} className="text-green-600"/> : m.isUrgent ? <Clock size={12}/> : <span className="w-3"/>}
-            <span>{m.task}</span>
-            {m.weeksOut > 0 && !m.isPast && <span className="text-slate-600 ml-auto">{m.weeksOut}w</span>}
-          </div>
-        ))}
-      </div>
-      <div className="text-xs text-slate-500 mt-2 border-t border-slate-700 pt-2">
-        💡 Timeline auto-adjusts based on venue type and event date
-      </div>
-    </div>
-  );
-};
-
-// BUDGET ESTIMATOR WITH SCENARIOS
-const BudgetEstimator = ({ responses, onAiRefine, aiEstimate, aiLoading }) => {
+// Budget Estimator with Scenarios
+const BudgetEstimator = ({ responses, budgetConfig, vendors, onAiRefine, aiEstimate, aiLoading }) => {
   const [selectedScenario, setSelectedScenario] = useState('standard');
   const budgetScenarios = {
-    budget: calculateBudget(responses, 'budget'),
-    standard: calculateBudget(responses, 'standard'),
-    premium: calculateBudget(responses, 'premium')
+    budget: calculateBudget(responses, 'budget', budgetConfig),
+    standard: calculateBudget(responses, 'standard', budgetConfig),
+    premium: calculateBudget(responses, 'premium', budgetConfig)
   };
   const budget = budgetScenarios[selectedScenario];
-  const budgetMaxMap = { 'Under $10K': 10000, '$10-25K': 25000, '$25-50K': 50000, '$50-100K': 100000, '$100-250K': 250000, '$250K+': 500000 };
-  const statedMax = budgetMaxMap[responses.budget_range];
   const formatMoney = (n) => '$' + Math.round(n).toLocaleString();
   
   const categories = [
@@ -564,44 +470,35 @@ const BudgetEstimator = ({ responses, onAiRefine, aiEstimate, aiLoading }) => {
     { key: 'staffing', label: '👥 Staffing', budget: budgetScenarios.budget.staffing, standard: budgetScenarios.standard.staffing, premium: budgetScenarios.premium.staffing },
   ].filter(c => c.standard > 0);
   
-  const locationLabel = BUDGET_CONFIG.locations[budget.location]?.label || budget.location;
+  const locationLabel = budgetConfig.locations[budget.location]?.label || budget.location;
   const hasSelections = categories.length > 0;
   
   return (
     <div className="border-4 border-green-500 bg-slate-800 p-3 mb-3">
       <div className="flex items-center justify-between mb-2">
         <div className="flex items-center gap-2 text-green-400 text-sm"><Calculator size={16}/> BUDGET SCENARIOS</div>
-        {budget.locationMultiplier !== 1.0 && (
-          <span className="text-xs text-purple-400 bg-purple-900/30 px-2 py-1 rounded">{locationLabel}</span>
-        )}
+        <div className="flex items-center gap-1 text-xs text-slate-500">
+          <MapPin size={10}/> {locationLabel}
+        </div>
       </div>
       
       <div className="text-xs text-slate-500 mb-3">{budget.attendance} attendees × {budget.days} day(s)</div>
       
       {/* Scenario Tabs */}
       <div className="flex gap-1 mb-3">
-        {[
-          { id: 'budget', label: '💰 Budget', desc: 'Cost-conscious' },
-          { id: 'standard', label: '⭐ Standard', desc: 'Recommended' },
-          { id: 'premium', label: '✨ Premium', desc: 'High-end' }
-        ].map(s => (
+        {[{ id: 'budget', label: '💰 Budget' }, { id: 'standard', label: '⭐ Standard' }, { id: 'premium', label: '✨ Premium' }].map(s => (
           <button key={s.id} onClick={() => { sound.play('select'); setSelectedScenario(s.id); }}
             className={`flex-1 p-2 border-2 text-xs ${selectedScenario === s.id ? 'border-green-400 bg-green-900/30 text-green-400' : 'border-slate-600 bg-slate-900 text-slate-400'}`}>
-            <div className="font-bold">{s.label}</div>
-            <div className="text-xs opacity-75">{s.desc}</div>
+            {s.label}
           </button>
         ))}
       </div>
       
       {hasSelections ? (
         <>
-          {/* Comparison Table */}
           <div className="mb-3 text-xs">
             <div className="grid grid-cols-4 gap-1 mb-1 text-slate-500">
-              <div>Category</div>
-              <div className="text-center">Budget</div>
-              <div className="text-center">Standard</div>
-              <div className="text-center">Premium</div>
+              <div>Category</div><div className="text-center">Budget</div><div className="text-center">Standard</div><div className="text-center">Premium</div>
             </div>
             {categories.map(c => (
               <div key={c.key} className="grid grid-cols-4 gap-1 py-1 border-t border-slate-700">
@@ -619,71 +516,37 @@ const BudgetEstimator = ({ responses, onAiRefine, aiEstimate, aiLoading }) => {
             </div>
           </div>
           
-          {/* Budget fit indicator */}
-          {statedMax && (
-            <div className={`p-2 mb-3 border-2 text-xs ${
-              budgetScenarios.budget.total <= statedMax ? 'border-green-500 bg-green-900/30 text-green-400' :
-              budgetScenarios.standard.total <= statedMax ? 'border-yellow-500 bg-yellow-900/30 text-yellow-400' :
-              'border-red-500 bg-red-900/30 text-red-400'
-            }`}>
-              {budgetScenarios.budget.total <= statedMax && budgetScenarios.standard.total <= statedMax ? 
-                `✅ All scenarios fit within your ${responses.budget_range} budget` :
-                budgetScenarios.budget.total <= statedMax ?
-                `⚠️ Only Budget scenario fits within ${responses.budget_range}` :
-                `❌ All scenarios exceed ${responses.budget_range} — consider reducing scope`
-              }
-            </div>
-          )}
+          {/* Vendor Recommendations */}
+          <VendorRecommendations vendors={vendors} responses={responses} budgetConfig={budgetConfig} category="venues" />
+          <VendorRecommendations vendors={vendors} responses={responses} budgetConfig={budgetConfig} category="caterers" />
+          <VendorRecommendations vendors={vendors} responses={responses} budgetConfig={budgetConfig} category="av" />
           
           {/* AI Refinement */}
-          <div className="border-t border-slate-700 pt-3">
+          <div className="border-t border-slate-700 pt-3 mt-3">
             <button onClick={onAiRefine} disabled={aiLoading}
               className={`w-full p-2 border-2 text-xs flex items-center justify-center gap-2 transition-all ${aiLoading ? 'border-purple-500 bg-purple-900/30 text-purple-400' : 'border-purple-500 bg-slate-900 text-purple-400 hover:bg-purple-900/30'} disabled:opacity-50`}>
-              {aiLoading ? (<><Loader size={14} className="animate-spin"/> Researching...</>) : (<><Zap size={14}/> Refine with AI</>)}
+              {aiLoading ? (<><Loader size={14} className="animate-spin"/> Searching current market data...</>) : (<><Zap size={14}/> Refine with AI (live market data)</>)}
             </button>
             {aiEstimate && (
               <div className="mt-3 p-2 bg-purple-900/20 border-2 border-purple-500/50 text-xs">
-                <div className="text-purple-400 font-bold mb-2"><Sparkles size={12} className="inline mr-1"/> AI ANALYSIS</div>
+                <div className="text-purple-400 font-bold mb-2"><Sparkles size={12} className="inline mr-1"/> AI MARKET ANALYSIS</div>
                 <div className="text-slate-300 whitespace-pre-wrap">{aiEstimate}</div>
               </div>
             )}
           </div>
         </>
       ) : (
-        <div className="text-slate-500 text-xs text-center py-4">Select options in earlier phases to see budget estimates</div>
+        <div className="text-slate-500 text-xs text-center py-4">Select options to see budget estimates</div>
       )}
       
-      <div className="text-xs text-slate-500 border-t border-slate-700 pt-2 mt-3">
-        💡 Budget=70%, Standard=100%, Premium=150% of base costs. Includes 15% contingency.
+      <div className="text-xs text-slate-600 border-t border-slate-700 pt-2 mt-3">
+        💡 Estimates from curated vendor database. Click vendor names for direct links.
       </div>
     </div>
   );
 };
 
-// SMART DEFAULTS BANNER
-const SmartDefaultsBanner = ({ eventType, onApply, onDismiss }) => {
-  if (!eventType || !SMART_DEFAULTS[eventType]) return null;
-  
-  return (
-    <div className="border-4 border-purple-500 bg-purple-900/20 p-3 mb-3">
-      <div className="flex items-start justify-between">
-        <div className="flex items-center gap-2 text-purple-400 text-sm mb-2">
-          <Lightbulb size={16}/> SMART DEFAULTS AVAILABLE
-        </div>
-        <button onClick={onDismiss} className="text-slate-500 hover:text-slate-300"><X size={14}/></button>
-      </div>
-      <p className="text-xs text-slate-400 mb-3">
-        We have suggested settings for a typical <span className="text-purple-400 font-bold">{eventType}</span>. 
-        Apply them to save time, then customize as needed.
-      </p>
-      <Btn onClick={onApply} variant="ai" className="w-full">
-        <Sparkles size={12} className="inline mr-1"/> Apply {eventType} Defaults
-      </Btn>
-    </div>
-  );
-};
-
-// MAIN APP
+// Main App Component
 export default function App() {
   const [screen, setScreen] = useState('title');
   const [char, setChar] = useState(null);
@@ -704,6 +567,39 @@ export default function App() {
   const [aiLoading, setAiLoading] = useState(false);
   const [showSmartDefaults, setShowSmartDefaults] = useState(null);
   const [appliedDefaults, setAppliedDefaults] = useState(false);
+  const [budgetConfig, setBudgetConfig] = useState(DEFAULT_BUDGET_CONFIG);
+  const [vendors, setVendors] = useState(DEFAULT_VENDORS);
+  const [dataSource, setDataSource] = useState('default');
+
+  // Load vendor data from Google Sheets on mount
+  useEffect(() => {
+    const loadData = async () => {
+      if (SHEET_ID === 'YOUR_SHEET_ID_HERE') {
+        setDataSource('default');
+        return;
+      }
+      
+      try {
+        const [venuesData, caterersData, avData] = await Promise.all([
+          fetchSheetData('venues'),
+          fetchSheetData('caterers'),
+          fetchSheetData('av_companies'),
+        ]);
+        
+        if (venuesData || caterersData || avData) {
+          setVendors({
+            venues: venuesData || DEFAULT_VENDORS.venues,
+            caterers: caterersData || DEFAULT_VENDORS.caterers,
+            av_companies: avData || DEFAULT_VENDORS.av_companies,
+          });
+          setDataSource('sheets');
+        }
+      } catch (error) {
+        console.log('Using default vendor data');
+      }
+    };
+    loadData();
+  }, []);
 
   useEffect(() => {
     try {
@@ -724,29 +620,64 @@ export default function App() {
 
   useEffect(() => { const i = setInterval(() => setBlink(b => !b), 500); return () => clearInterval(i); }, []);
 
-  // Trigger smart defaults when event type changes
   useEffect(() => {
     if (responses.event_type && SMART_DEFAULTS[responses.event_type] && !appliedDefaults) {
       setShowSmartDefaults(responses.event_type);
     }
-  }, [responses.event_type]);
+  }, [responses.event_type, appliedDefaults]);
+
+  const phases = [
+    { id: 1, name: "THE SPARK", icon: "💡", subtitle: "What's the big idea?", questions: [
+      { id: "event_name", label: "What would you call this event?", type: "text", placeholder: "Working title..." },
+      { id: "spark", label: "What's the spark? The problem or opportunity?", type: "textarea", placeholder: "What made you think 'we need an event'?" },
+      { id: "success_headline", label: "Imagine success. What's the headline?", type: "textarea", placeholder: "Dream big!" },
+      { id: "why_event", label: "Why is an event the right format?", type: "textarea", placeholder: "vs. report, webinar, etc." },
+      { id: "seedai_alignment", label: "How does this connect to SeedAI's mission?", type: "textarea", placeholder: "Try It, Prove It, Scale It..." }
+    ]},
+    { id: 2, name: "THE PEOPLE", icon: "👥", subtitle: "Who needs to be there?", questions: [
+      { id: "target_audience", label: "Who is your target audience?", type: "checkbox", options: ["Policymakers", "Congressional Staffers", "Federal Agency Staff", "State/Local Officials", "Private Sector Executives", "Researchers/Academics", "Students", "Nonprofit Leaders", "Media/Press", "General Public"] },
+      { id: "audience_detail", label: "Who MUST be there for success?", type: "textarea", placeholder: "Be specific..." },
+      { id: "attendance", label: "Expected attendance?", type: "select", options: Object.keys(budgetConfig.attendanceDefaults) },
+      { id: "partners", label: "Target partners or co-hosts?", type: "textarea", placeholder: "Organizations..." },
+      { id: "vips", label: "Dream speakers or VIPs?", type: "textarea", placeholder: "Who would make this amazing?" },
+      { id: "registration_type", label: "How will people get access?", type: "select", options: ["Open registration", "Invitation only", "Application/curated", "Ticketed (paid)", "Hybrid approach"] }
+    ]},
+    { id: 3, name: "THE EXPERIENCE", icon: "🎯", subtitle: "What will people do?", questions: [
+      { id: "event_type", label: "What type of event?", type: "select", options: Object.keys(SMART_DEFAULTS) },
+      { id: "duration", label: "How long?", type: "select", options: Object.keys(budgetConfig.durationMultipliers) },
+      { id: "format", label: "Format?", type: "select", options: ["In-person only", "Virtual only", "Hybrid (in-person + virtual)"] },
+      { id: "anchor_moments", label: "2-3 'anchor moments' that define this event?", type: "textarea", placeholder: "The highlights..." },
+      { id: "program_elements", label: "What program elements?", type: "checkbox", options: ["Keynote speeches", "Panel discussions", "Breakout sessions", "Workshops/trainings", "Demos/showcases", "Networking time", "Fireside chats", "Q&A sessions", "Awards/recognition", "Entertainment"] },
+      { id: "takeaway", label: "What should attendees walk away with?", type: "textarea", placeholder: "Knowledge, connections..." }
+    ]},
+    { id: 4, name: "THE DETAILS", icon: "📍", subtitle: "Where, when, how?", questions: [
+      { id: "target_date", label: "Target date?", type: "date", placeholder: "YYYY-MM-DD" },
+      { id: "date_drivers", label: "What's driving the date?", type: "textarea", placeholder: "Calendar, timing..." },
+      { id: "location", label: "Where should this be held?", type: "select", options: Object.keys(budgetConfig.locations) },
+      { id: "venue_type", label: "What type of venue?", type: "select", options: Object.keys(budgetConfig.venueTypes) },
+      { id: "space_needs", label: "What spaces do you need?", type: "checkbox", options: ["Main plenary room", "Breakout rooms", "Demo/exhibit area", "VIP/green room", "Registration area", "Networking lounge", "Press room", "Dining space"] },
+      { id: "fnb_items", label: "Food & beverage needed?", type: "checkbox", options: Object.keys(budgetConfig.foodAndBeverage) },
+    ]},
+    { id: 5, name: "PRODUCTION", icon: "🎬", subtitle: "Tech & content", questions: [
+      { id: "av_needs", label: "AV & technical needs?", type: "checkbox", options: Object.keys(budgetConfig.avTechnical) },
+      { id: "production_needs", label: "Production services?", type: "checkbox", options: Object.keys(budgetConfig.production) },
+      { id: "collateral_needs", label: "Event collateral?", type: "checkbox", options: Object.keys(budgetConfig.collateral) },
+      { id: "marketing_channels", label: "Marketing channels?", type: "checkbox", options: Object.keys(budgetConfig.marketing) },
+    ]},
+    { id: 6, name: "THE PLAN", icon: "🚀", subtitle: "Budget & timeline", questions: [
+      { id: "budget_known", label: "Do you have a budget in mind?", type: "select", options: ["Yes, specific budget", "Rough range", "Need help estimating"] },
+      { id: "budget_range", label: "Budget range?", type: "select", options: ["Under $10K", "$10-25K", "$25-50K", "$50-100K", "$100-250K", "$250K+", "TBD"] },
+      { id: "funding_sources", label: "Funding sources?", type: "checkbox", options: ["Organizational budget", "Sponsorships", "Grants", "Registration fees", "Partner contributions", "In-kind support", "TBD"] },
+      { id: "risks", label: "What could go wrong?", type: "textarea", placeholder: "Be honest..." },
+      { id: "success_metrics", label: "How will you measure success?", type: "textarea", placeholder: "Goals, metrics..." }
+    ]}
+  ];
 
   const applySmartDefaults = () => {
     const defaults = SMART_DEFAULTS[responses.event_type];
     if (!defaults) return;
-    
     sound.play('complete');
-    setResponses(prev => ({
-      ...prev,
-      duration: defaults.duration,
-      attendance: defaults.attendance,
-      venue_type: defaults.venue_type,
-      program_elements: defaults.program_elements,
-      fnb_items: defaults.fnb_items,
-      av_needs: defaults.av_needs,
-      production_needs: defaults.production_needs,
-      collateral_needs: defaults.collateral_needs,
-    }));
+    setResponses(prev => ({ ...prev, ...defaults }));
     setAppliedDefaults(true);
     setShowSmartDefaults(null);
     setStatus('Smart defaults applied!');
@@ -754,25 +685,21 @@ export default function App() {
   };
 
   const handleAiRefine = async () => {
-    setAiLoading(true); setAiEstimate(null); sound.play('ai');
-    const budget = calculateBudget(responses, 'standard');
+    setAiLoading(true); setAiEstimate(null);
+    const budget = calculateBudget(responses, 'standard', budgetConfig);
     try {
       const response = await fetch('https://api.anthropic.com/v1/messages', {
         method: 'POST', headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           model: 'claude-sonnet-4-20250514', max_tokens: 1000,
           tools: [{ type: 'web_search_20250305', name: 'web_search' }],
-          messages: [{ role: 'user', content: `Research current event costs and provide a refined budget estimate:
-EVENT: ${responses.event_name || 'Untitled'} (${responses.event_type || 'Conference'})
-LOCATION: ${budget.location} | ATTENDANCE: ${budget.attendance} | DURATION: ${budget.days} day(s)
-VENUE: ${budget.venueType} | Current estimate: $${Math.round(budget.total).toLocaleString()}
-Provide: 1) Refined estimate with reasoning, 2) Specific venues to consider, 3) Cost-saving tips. Under 150 words.` }]
+          messages: [{ role: 'user', content: `Research current event costs for: ${responses.event_name || 'Conference'} in ${budget.location}, ${budget.attendance} attendees, ${budget.days} day(s), ${budget.venueType}. Current estimate: $${Math.round(budget.total).toLocaleString()}. Provide: 1) Refined estimate, 2) Specific venue suggestions with links, 3) Cost-saving tips. Under 150 words.` }]
         })
       });
       const data = await response.json();
       setAiEstimate(data.content?.map(c => c.type === 'text' ? c.text : '').join('') || 'Unable to get estimate.');
       sound.play('complete');
-    } catch (e) { setAiEstimate('⚠️ Could not connect. Using static estimates.'); }
+    } catch (e) { setAiEstimate('⚠️ Could not connect. Using database estimates.'); }
     setAiLoading(false);
   };
 
@@ -805,11 +732,7 @@ Provide: 1) Refined estimate with reasoning, 2) Specific venues to consider, 3) 
     setAppliedDefaults(false); setShowSmartDefaults(null);
   };
 
-  const update = (id, val) => { 
-    setResponses(p => ({ ...p, [id]: val })); 
-    setAiEstimate(null);
-    if (id === 'event_type') setAppliedDefaults(false);
-  };
+  const update = (id, val) => { setResponses(p => ({ ...p, [id]: val })); setAiEstimate(null); if (id === 'event_type') setAppliedDefaults(false); };
   const toggleInput = (id) => { sound.play('select'); setNeedsInput(p => ({ ...p, [id]: !p[id] })); };
   const addMember = () => { if (newMember.name) { sound.play('select'); setTeam([...team, { ...newMember, id: Date.now() }]); setNewMember({ name: '', role: '' }); }};
   const removeMember = (id) => { sound.play('navigate'); setTeam(team.filter(m => m.id !== id)); };
@@ -825,78 +748,48 @@ Provide: 1) Refined estimate with reasoning, 2) Specific venues to consider, 3) 
     return { done: d, total: t };
   };
 
+  const formatMoney = (n) => '$' + Math.round(n).toLocaleString();
+
   const exportText = () => {
-    const budgetStandard = calculateBudget(responses, 'standard');
-    const budgetLow = calculateBudget(responses, 'budget');
-    const budgetHigh = calculateBudget(responses, 'premium');
+    const budgetStandard = calculateBudget(responses, 'standard', budgetConfig);
+    const budgetLow = calculateBudget(responses, 'budget', budgetConfig);
+    const budgetHigh = calculateBudget(responses, 'premium', budgetConfig);
     const total = totalProgress();
     const isPartial = total.done < total.total;
-    const locationLabel = BUDGET_CONFIG.locations[budgetStandard.location]?.label || budgetStandard.location;
-    const timeline = generateTimeline(responses.target_date, responses);
-    const risks = analyzeRisks(responses);
+    const locationLabel = budgetConfig.locations[budgetStandard.location]?.label || budgetStandard.location;
+    const timeline = generateTimeline(responses.target_date, responses, budgetConfig);
+    const risks = analyzeRisks(responses, budgetConfig);
     
     let t = `# EVENT PROPOSAL: ${responses.event_name || 'Untitled'}\n\n`;
     if (isPartial) t += `**⚠️ DRAFT — ${total.done}/${total.total} questions completed**\n\n`;
-    t += `**Program:** ${programs.find(p => p.id === program)?.name || 'Not selected'}\n**Event Owner:** ${charNames[char] || 'Not selected'}\n**Date Created:** ${new Date().toLocaleDateString()}\n**Location:** ${locationLabel}\n**Target Date:** ${responses.target_date || 'TBD'}\n`;
-    t += `**Budget Range:** ${formatMoney(budgetLow.total)} - ${formatMoney(budgetHigh.total)}\n\n`;
+    t += `**Program:** ${programs.find(p => p.id === program)?.name || 'Not selected'}\n**Owner:** ${charNames[char] || 'Not selected'}\n**Location:** ${locationLabel}\n**Date:** ${responses.target_date || 'TBD'}\n**Budget Range:** ${formatMoney(budgetLow.total)} - ${formatMoney(budgetHigh.total)}\n\n`;
     
     if (team.length) { t += `## Team\n`; team.forEach(m => t += `- **${m.name}** — ${m.role || 'TBD'}\n`); t += '\n'; }
+    if (risks.length) { t += `## ⚠️ Risk Flags\n`; risks.forEach(r => t += `- ${r.icon} ${r.message}\n`); t += '\n'; }
+    if (timeline.length) { t += `## 📅 Timeline\n`; timeline.filter(m => !m.isPast).slice(0, 8).forEach(m => t += `- **${m.date.toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}** — ${m.task}\n`); t += '\n'; }
     
-    // Risk Flags
-    if (risks.length) {
-      t += `## ⚠️ RISK FLAGS\n`;
-      risks.forEach(r => t += `- ${r.icon} **[${r.severity.toUpperCase()}]** ${r.message}\n`);
-      t += '\n';
-    }
-    
-    // Timeline
-    if (timeline.length) {
-      t += `## 📅 PLANNING TIMELINE\n`;
-      timeline.filter(m => !m.isPast).forEach(m => {
-        t += `- **${m.date.toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}** — ${m.task}${m.isUrgent ? ' ⚡' : ''}\n`;
-      });
-      t += '\n';
-    }
-    
-    const needsList = [];
     phases.forEach(p => {
-      const phaseProgress = getProgress(p.id - 1);
-      t += `## ${p.icon} ${p.name}${phaseProgress.done < phaseProgress.total ? ` *(${phaseProgress.done}/${phaseProgress.total})*` : ''}\n`;
+      t += `## ${p.icon} ${p.name}\n`;
       p.questions.forEach(q => {
         const r = q.type === 'checkbox' ? responses[q.id]?.join(', ') : responses[q.id];
-        if (r?.trim?.() || (q.type === 'checkbox' && r?.length)) { 
-          t += `**${q.label}**\n${r}\n${notes[q.id] ? `> Note: ${notes[q.id]}\n` : ''}\n`; 
-        } else if (needsInput[q.id]) { 
-          t += `**${q.label}**\n⚠️ NEEDS TEAM INPUT\n${notes[q.id] ? `> Note: ${notes[q.id]}\n` : ''}\n`; 
-          needsList.push({ phase: p.name, q: q.label, note: notes[q.id] }); 
-        }
+        if (r?.trim?.() || (q.type === 'checkbox' && r?.length)) t += `**${q.label}**\n${r}\n\n`;
+        else if (needsInput[q.id]) t += `**${q.label}**\n⚠️ NEEDS INPUT\n\n`;
       });
     });
     
-    // Budget with scenarios
-    t += `## 💰 BUDGET ESTIMATE (3 SCENARIOS)\n`;
-    t += `*${budgetStandard.attendance} attendees × ${budgetStandard.days} day(s) in ${locationLabel}*\n\n`;
-    t += `| Category | Budget | Standard | Premium |\n|----------|--------|----------|--------|\n`;
+    t += `## 💰 Budget (3 Scenarios)\n| Category | Budget | Standard | Premium |\n|----------|--------|----------|--------|\n`;
     if (budgetStandard.venue > 0) t += `| Venue | ${formatMoney(budgetLow.venue)} | ${formatMoney(budgetStandard.venue)} | ${formatMoney(budgetHigh.venue)} |\n`;
     if (budgetStandard.foodBeverage > 0) t += `| F&B | ${formatMoney(budgetLow.foodBeverage)} | ${formatMoney(budgetStandard.foodBeverage)} | ${formatMoney(budgetHigh.foodBeverage)} |\n`;
     if (budgetStandard.avTechnical > 0) t += `| AV | ${formatMoney(budgetLow.avTechnical)} | ${formatMoney(budgetStandard.avTechnical)} | ${formatMoney(budgetHigh.avTechnical)} |\n`;
     if (budgetStandard.production > 0) t += `| Production | ${formatMoney(budgetLow.production)} | ${formatMoney(budgetStandard.production)} | ${formatMoney(budgetHigh.production)} |\n`;
-    if (budgetStandard.collateral > 0) t += `| Collateral | ${formatMoney(budgetLow.collateral)} | ${formatMoney(budgetStandard.collateral)} | ${formatMoney(budgetHigh.collateral)} |\n`;
-    if (budgetStandard.marketing > 0) t += `| Marketing | ${formatMoney(budgetLow.marketing)} | ${formatMoney(budgetStandard.marketing)} | ${formatMoney(budgetHigh.marketing)} |\n`;
-    if (budgetStandard.staffing > 0) t += `| Staffing | ${formatMoney(budgetLow.staffing)} | ${formatMoney(budgetStandard.staffing)} | ${formatMoney(budgetHigh.staffing)} |\n`;
     t += `| **TOTAL** | **${formatMoney(budgetLow.total)}** | **${formatMoney(budgetStandard.total)}** | **${formatMoney(budgetHigh.total)}** |\n\n`;
-    
     if (aiEstimate) t += `### AI Analysis\n${aiEstimate}\n\n`;
-    
-    if (needsList.length) { t += `---\n\n## ⚠️ NEEDS TEAM INPUT (${needsList.length} items)\n`; needsList.forEach(i => t += `- [${i.phase}] ${i.q}${i.note ? ` — *${i.note}*` : ''}\n`); }
-    t += `\n---\n*Paste into Claude to generate: Event Planning Doc, Detailed Budget, Timeline*`;
+    t += `---\n*Data source: ${dataSource === 'sheets' ? 'Google Sheets database' : 'Built-in defaults'}*`;
     return t;
   };
-  
-  const formatMoney = (n) => '$' + Math.round(n).toLocaleString();
 
   const copy = async () => { await navigator.clipboard.writeText(exportText()); sound.play('complete'); setStatus('Copied!'); setTimeout(() => setStatus(''), 2000); };
-  const email = () => { window.open(`mailto:operations@seedai.org?subject=${encodeURIComponent(`${responses.event_name || 'New Event'} - Event Proposal`)}&body=${encodeURIComponent(exportText())}`); };
+  const email = () => { window.open(`mailto:operations@seedai.org?subject=${encodeURIComponent(`${responses.event_name || 'Event'} - Proposal`)}&body=${encodeURIComponent(exportText())}`); };
   const download = () => { const a = document.createElement('a'); a.href = URL.createObjectURL(new Blob([exportText()], { type: 'text/plain' })); a.download = `${responses.event_name || 'event'}-proposal.md`; a.click(); sound.play('complete'); };
 
   // SCREENS
@@ -906,7 +799,8 @@ Provide: 1) Refined estimate with reasoning, 2) Specific venues to consider, 3) 
       <div className="text-center">
         <h1 className="text-5xl font-bold text-blue-400 mb-2" style={{ textShadow: '4px 4px 0 #1e3a8a' }}>SeedAI</h1>
         <h2 className="text-2xl text-yellow-400 mb-4" style={{ textShadow: '2px 2px 0 #92400e' }}>EVENT PLANNER</h2>
-        <p className="text-slate-400 text-xs mb-6 max-w-xs mx-auto">From spark to comprehensive proposal—one phase at a time</p>
+        <p className="text-slate-400 text-xs mb-2 max-w-xs mx-auto">Smart defaults • Budget scenarios • Vendor recommendations</p>
+        <p className="text-slate-600 text-xs mb-6">Data: {dataSource === 'sheets' ? '📊 Google Sheets' : '💾 Built-in'}</p>
         <div className={`text-white text-sm mb-6 ${blink ? '' : 'opacity-0'}`}>PRESS START</div>
         <div className="flex flex-col gap-2 items-center">
           <Btn onClick={() => { sound.play('start'); clearSave(); setScreen('character'); }} variant="warning">NEW EVENT</Btn>
@@ -918,10 +812,8 @@ Provide: 1) Refined estimate with reasoning, 2) Specific venues to consider, 3) 
 
   if (screen === 'character') return (
     <div className="min-h-screen bg-slate-900 p-4 font-mono">
-      <button onClick={() => { sound.toggle(); setSoundOn(!soundOn); }} className="absolute top-4 right-4 text-slate-500 hover:text-slate-300">{soundOn ? <Volume2 size={20}/> : <VolumeX size={20}/>}</button>
       <div className="max-w-md mx-auto text-center">
-        <h2 className="text-xl text-yellow-400 mb-1">WHO'S LEADING THIS?</h2>
-        <p className="text-slate-400 text-xs mb-4">Select yourself as Event Owner</p>
+        <h2 className="text-xl text-yellow-400 mb-4">WHO'S LEADING THIS?</h2>
         <div className="flex justify-center gap-3 flex-wrap mb-6">{['stuart', 'austin', 'anna', 'josh'].map(c => (<PixelChar key={c} id={c} selected={char === c} onClick={() => { sound.play('select'); setChar(c); }}/>))}</div>
         <div className="flex justify-center gap-3">
           <Btn onClick={() => setScreen('title')} variant="secondary">← BACK</Btn>
@@ -948,22 +840,16 @@ Provide: 1) Refined estimate with reasoning, 2) Specific venues to consider, 3) 
 
   if (screen === 'export') {
     const total = totalProgress();
-    const needsCount = Object.keys(needsInput).filter(k => needsInput[k] && !responses[k]?.length && !responses[k]?.trim?.()).length;
-    const isPartial = total.done < total.total;
-    
     return (
       <div className="min-h-screen bg-slate-900 p-4 font-mono overflow-auto">
         <div className="max-w-lg mx-auto">
           <div className="text-center mb-4">
-            <div className="text-4xl mb-2">{isPartial ? '📝' : '🎉'}</div>
-            <h2 className="text-xl text-yellow-400">{isPartial ? 'DRAFT PROPOSAL' : 'PROPOSAL READY!'}</h2>
+            <div className="text-4xl mb-2">🎉</div>
+            <h2 className="text-xl text-yellow-400">PROPOSAL READY</h2>
+            <p className="text-slate-500 text-xs mt-1">{total.done}/{total.total} completed</p>
           </div>
           
-          <RiskFlags responses={responses} />
-          <TimelineView responses={responses} />
-          <BudgetEstimator responses={responses} onAiRefine={handleAiRefine} aiEstimate={aiEstimate} aiLoading={aiLoading} />
-          
-          {needsCount > 0 && (<div className="border-4 border-yellow-500 bg-yellow-900/30 p-3 mb-3 text-yellow-400 text-xs"><Users size={14} className="inline mr-2"/>{needsCount} items need team input</div>)}
+          <BudgetEstimator responses={responses} budgetConfig={budgetConfig} vendors={vendors} onAiRefine={handleAiRefine} aiEstimate={aiEstimate} aiLoading={aiLoading} />
           
           <div className="border-4 border-blue-500 bg-slate-800 p-3 mb-3">
             <div className="text-blue-400 text-sm mb-2">SHARE PROPOSAL</div>
@@ -1016,9 +902,15 @@ Provide: 1) Refined estimate with reasoning, 2) Specific venues to consider, 3) 
           })}
         </div>
 
-        {/* Smart Defaults Banner */}
         {showSmartDefaults && phase === 2 && (
-          <SmartDefaultsBanner eventType={showSmartDefaults} onApply={applySmartDefaults} onDismiss={() => setShowSmartDefaults(null)} />
+          <div className="border-4 border-purple-500 bg-purple-900/20 p-3 mb-3">
+            <div className="flex items-center gap-2 text-purple-400 text-sm mb-2"><Lightbulb size={16}/> SMART DEFAULTS</div>
+            <p className="text-xs text-slate-400 mb-3">Apply typical settings for <span className="text-purple-400 font-bold">{responses.event_type}</span>?</p>
+            <div className="flex gap-2">
+              <Btn onClick={applySmartDefaults} variant="primary" className="flex-1"><Sparkles size={12} className="inline mr-1"/> Apply</Btn>
+              <Btn onClick={() => setShowSmartDefaults(null)} variant="secondary" className="flex-1">Skip</Btn>
+            </div>
+          </div>
         )}
 
         <div className="border-4 border-blue-500 bg-slate-800 mb-3">
@@ -1030,7 +922,7 @@ Provide: 1) Refined estimate with reasoning, 2) Specific venues to consider, 3) 
 
           {phase === 0 && (
             <div className="p-3 border-b-4 border-slate-700">
-              <div className="text-yellow-400 text-xs mb-2 flex items-center gap-2"><Users size={12}/> PLANNING TEAM</div>
+              <div className="text-yellow-400 text-xs mb-2 flex items-center gap-2"><Users size={12}/> TEAM</div>
               <div className="text-slate-500 text-xs mb-2">Owner: <span className="text-yellow-400">{charNames[char]}</span></div>
               {team.length > 0 && (<div className="space-y-1 mb-2">{team.map(m => (<div key={m.id} className="flex justify-between items-center bg-slate-900 p-2 border-2 border-slate-700 text-xs text-slate-300">{m.name} {m.role && `— ${m.role}`}<button onClick={() => removeMember(m.id)} className="text-red-400"><X size={12}/></button></div>))}</div>)}
               <div className="flex gap-2">
@@ -1043,9 +935,7 @@ Provide: 1) Refined estimate with reasoning, 2) Specific venues to consider, 3) 
 
           {phase === phases.length - 1 && (
             <div className="p-3 border-b-4 border-slate-700">
-              <RiskFlags responses={responses} />
-              <TimelineView responses={responses} />
-              <BudgetEstimator responses={responses} onAiRefine={handleAiRefine} aiEstimate={aiEstimate} aiLoading={aiLoading} />
+              <BudgetEstimator responses={responses} budgetConfig={budgetConfig} vendors={vendors} onAiRefine={handleAiRefine} aiEstimate={aiEstimate} aiLoading={aiLoading} />
             </div>
           )}
 
@@ -1055,11 +945,11 @@ Provide: 1) Refined estimate with reasoning, 2) Specific venues to consider, 3) 
                 <div className="flex justify-between items-start mb-1">
                   <label className="text-yellow-400 text-xs flex-1">{i+1}. {q.label}</label>
                   <div className="flex gap-1 ml-2">
-                    <button onClick={() => setShowNote(showNote === q.id ? null : q.id)} className={notes[q.id] ? 'text-blue-400' : 'text-slate-600'} title="Add note"><MessageSquare size={12}/></button>
-                    <button onClick={() => toggleInput(q.id)} className={needsInput[q.id] ? 'text-yellow-400' : 'text-slate-600'} title="I don't know yet"><HelpCircle size={12}/></button>
+                    <button onClick={() => setShowNote(showNote === q.id ? null : q.id)} className={notes[q.id] ? 'text-blue-400' : 'text-slate-600'}><MessageSquare size={12}/></button>
+                    <button onClick={() => toggleInput(q.id)} className={needsInput[q.id] ? 'text-yellow-400' : 'text-slate-600'}><HelpCircle size={12}/></button>
                   </div>
                 </div>
-                {showNote === q.id && (<input value={notes[q.id] || ''} onChange={e => setNotes({ ...notes, [q.id]: e.target.value })} className="w-full p-2 mb-1 bg-slate-700 border-2 border-slate-600 text-slate-300 text-xs" placeholder="Note for team..."/>)}
+                {showNote === q.id && (<input value={notes[q.id] || ''} onChange={e => setNotes({ ...notes, [q.id]: e.target.value })} className="w-full p-2 mb-1 bg-slate-700 border-2 border-slate-600 text-slate-300 text-xs" placeholder="Note..."/>)}
                 {q.type === 'checkbox' ? (<Checkbox options={q.options} selected={responses[q.id] || []} onChange={(val) => update(q.id, val)} />)
                   : q.type === 'textarea' ? (<textarea value={responses[q.id] || ''} onChange={e => update(q.id, e.target.value)} rows={2} className="w-full p-2 bg-slate-900 border-4 border-slate-600 text-slate-200 text-xs focus:border-yellow-400 focus:outline-none resize-none" placeholder={q.placeholder}/>)
                   : q.type === 'select' ? (<select value={responses[q.id] || ''} onChange={e => { sound.play('select'); update(q.id, e.target.value); }} className="w-full p-2 bg-slate-900 border-4 border-slate-600 text-slate-200 text-xs focus:border-yellow-400 focus:outline-none"><option value="">-- SELECT --</option>{q.options.map(o => <option key={o} value={o}>{o}</option>)}</select>)
