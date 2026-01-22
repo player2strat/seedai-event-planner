@@ -1071,13 +1071,20 @@ export default function App() {
               <RiskFlags responses={responses} budgetConfig={budgetConfig} />
               <BudgetScenarios responses={responses} budgetConfig={budgetConfig} vendors={vendors} onAiRefine={handleAiRefine} aiEstimate={aiEstimate} aiLoading={aiLoading} />
               
-              {/* Funding Sources in Phase 6 */}
+              {/* Phase 6 Questions (Funding Sources, Risks) */}
               {p.questions.length > 0 && (
-                <div className="border-t border-slate-700 pt-3 mt-3">
+                <div className="border-t border-slate-700 pt-3 mt-3 space-y-3">
                   {p.questions.map((q, i) => (
-                    <div key={q.id} className="mb-3">
-                      <label className="text-yellow-400 text-xs font-bold block mb-2">{q.label}</label>
-                      <Checkbox options={q.options} selected={responses[q.id] || []} onChange={(val) => update(q.id, val)} />
+                    <div key={q.id}>
+                      <label className="text-yellow-400 text-xs font-bold block mb-1">{q.label}</label>
+                      {q.tip && !responses[q.id] && <div className="text-slate-500 text-xs mb-1 italic">💡 {q.tip}</div>}
+                      {q.type === 'checkbox' ? (
+                        <Checkbox options={q.options} selected={responses[q.id] || []} onChange={(val) => update(q.id, val)} />
+                      ) : q.type === 'textarea' ? (
+                        <textarea value={responses[q.id] || ''} onChange={e => update(q.id, e.target.value)} rows={2} className="w-full p-2 bg-slate-900 border-2 border-slate-600 text-slate-200 text-xs focus:border-yellow-400 focus:outline-none resize-none" placeholder={q.placeholder}/>
+                      ) : (
+                        <input type="text" value={responses[q.id] || ''} onChange={e => update(q.id, e.target.value)} className="w-full p-2 bg-slate-900 border-2 border-slate-600 text-slate-200 text-xs focus:border-yellow-400 focus:outline-none" placeholder={q.placeholder}/>
+                      )}
                     </div>
                   ))}
                 </div>
