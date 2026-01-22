@@ -5,7 +5,7 @@ import { Share2, Mail, Download, Users, MessageSquare, HelpCircle, Trophy, Volum
 // ║                    GOOGLE SHEETS CONFIGURATION                              ║
 // ╚════════════════════════════════════════════════════════════════════════════╝
 
-const SHEET_ID = process.env.REACT_APP_SHEET_ID || 'YOUR_SHEET_ID_HERE';
+const SHEET_ID = process.env.REACT_APP_SHEET_ID || '16-es1Gxv-oaG7MgtH6-ZqrGwgPl-Ly3Q_fXaYFc3AAs';
 
 const fetchSheetData = async (sheetName) => {
   try {
