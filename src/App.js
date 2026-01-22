@@ -5,7 +5,7 @@ import { Share2, Mail, Download, Users, MessageSquare, HelpCircle, Trophy, Volum
 // ║                    GOOGLE SHEETS CONFIGURATION                              ║
 // ╚════════════════════════════════════════════════════════════════════════════╝
 
-const SHEET_ID = process.env.REACT_APP_SHEET_ID || '16-es1Gxv-oaG7MgtH6-ZqrGwgPl-Ly3Q_fXaYFc3AAs';
+const SHEET_ID = process.env.REACT_APP_SHEET_ID || 'YOUR_SHEET_ID_HERE';
 
 const fetchSheetData = async (sheetName) => {
   try {
@@ -167,53 +167,94 @@ const getVenueCostFromData = (vendors, location, venueType, attendance, scenario
 };
 
 const calculateBudget = (responses, scenario, config, vendors = {}) => {
-  const attendance = config.attendanceDefaults[responses.attendance] || 75;
-  const baseDays = config.durationMultipliers[responses.duration] || 1;
-  const venueDays = baseDays * getSetupMultiplier(responses.duration);
-  const locationMult = config.locations[responses.location]?.multiplier || 1.0;
+  // Only calculate if user has made relevant selections
+  const hasAttendance = !!responses.attendance;
+  const hasDuration = !!responses.duration;
+  const hasLocation = !!responses.location;
+  const hasVenueType = !!responses.venue_type;
+  
+  const attendance = hasAttendance ? config.attendanceDefaults[responses.attendance] : 0;
+  const baseDays = hasDuration ? (config.durationMultipliers[responses.duration] || 1) : 0;
+  const venueDays = baseDays > 0 ? baseDays * getSetupMultiplier(responses.duration) : 0;
+  const locationMult = hasLocation ? (config.locations[responses.location]?.multiplier || 1.0) : 1.0;
   const venueType = responses.venue_type || "Not sure yet";
   
   let costs = { venue: 0, foodBeverage: 0, avTechnical: 0, production: 0, collateral: 0, marketing: 0, staffing: 0 };
   
-  const venueFromData = getVenueCostFromData(vendors, responses.location || "Washington DC", venueType, attendance, scenario);
-  if (venueFromData) {
-    costs.venue = venueFromData * venueDays * locationMult;
-  } else {
-    const vc = config.venueTypes[venueType] || config.venueTypes["Not sure yet"];
-    costs.venue = Math.max((vc.perPerson[scenario] || 75) * attendance, vc.minSpend || 0) * venueDays * locationMult;
+  // Only calculate venue if we have attendance, duration, location, AND venue type
+  if (hasAttendance && hasDuration && hasLocation && hasVenueType) {
+    const venueFromData = getVenueCostFromData(vendors, responses.location, venueType, attendance, scenario);
+    if (venueFromData) {
+      costs.venue = venueFromData * venueDays * locationMult;
+    } else {
+      const vc = config.venueTypes[venueType] || config.venueTypes["Not sure yet"];
+      costs.venue = Math.max((vc.perPerson[scenario] || 75) * attendance, vc.minSpend || 0) * venueDays * locationMult;
+    }
   }
   
-  (responses.fnb_items || []).forEach(item => {
-    const c = config.foodAndBeverage[item];
-    if (c) costs.foodBeverage += (c[scenario] || c.standard) * attendance * baseDays * locationMult;
-  });
+  // F&B only if items selected AND we have attendance/duration
+  if (hasAttendance && hasDuration) {
+    (responses.fnb_items || []).forEach(item => {
+      const c = config.foodAndBeverage[item];
+      if (c) costs.foodBeverage += (c[scenario] || c.standard) * attendance * baseDays * locationMult;
+    });
+  }
   
-  (responses.av_needs || []).forEach(item => {
-    const c = config.avTechnical[item];
-    if (c) costs.avTechnical += (c[scenario] || c.standard) * Math.ceil(baseDays * 1.25) * locationMult;
-  });
+  // AV only if items selected AND we have duration
+  if (hasDuration) {
+    (responses.av_needs || []).forEach(item => {
+      const c = config.avTechnical[item];
+      if (c) costs.avTechnical += (c[scenario] || c.standard) * Math.ceil(baseDays * 1.25) * locationMult;
+    });
+  }
   
+  // Production only if items selected
   (responses.production_needs || []).forEach(item => {
     const c = config.production[item];
-    if (c) costs.production += (c.perDay ? (c[scenario] || c.standard) * baseDays : (c[scenario] || c.standard)) * locationMult;
+    if (c) costs.production += (c.perDay ? (c[scenario] || c.standard) * (baseDays || 1) : (c[scenario] || c.standard)) * locationMult;
   });
   
+  // Collateral - some are per-person, some are flat
   (responses.collateral_needs || []).forEach(item => {
     const c = config.collateral[item];
-    if (c) costs.collateral += c.perPerson ? (c[scenario] || c.standard) * attendance : (c[scenario] || c.standard);
+    if (c) {
+      if (c.perPerson && hasAttendance) {
+        costs.collateral += (c[scenario] || c.standard) * attendance;
+      } else if (!c.perPerson) {
+        costs.collateral += c[scenario] || c.standard;
+      }
+    }
   });
   
+  // Marketing - flat costs
   (responses.marketing_channels || []).forEach(item => {
     const c = config.marketing[item];
     if (c) costs.marketing += c[scenario] || c.standard;
   });
   
-  costs.staffing = (config.staffing[scenario] || 2500) * venueDays * locationMult;
+  // Staffing only if we have duration
+  if (hasDuration && venueDays > 0) {
+    costs.staffing = (config.staffing[scenario] || 2500) * venueDays * locationMult;
+  }
   
   const subtotal = Object.values(costs).reduce((a, b) => a + b, 0);
-  const contingency = subtotal * (config.contingency[scenario] || 0.15);
+  const contingency = subtotal > 0 ? subtotal * (config.contingency[scenario] || 0.15) : 0;
   
-  return { ...costs, subtotal, contingency, total: subtotal + contingency, attendance, baseDays, venueDays, location: responses.location || "Washington DC", locationMult, venueType, scenario, usedVenueData: !!venueFromData };
+  return { 
+    ...costs, 
+    subtotal, 
+    contingency, 
+    total: subtotal + contingency, 
+    attendance: attendance || 0, 
+    baseDays: baseDays || 0, 
+    venueDays: venueDays || 0, 
+    location: responses.location || "Not selected", 
+    locationMult, 
+    venueType, 
+    scenario, 
+    usedVenueData: !!(hasAttendance && hasDuration && hasLocation && hasVenueType && getVenueCostFromData(vendors, responses.location, venueType, attendance, scenario)),
+    hasMinimumData: hasAttendance && hasDuration
+  };
 };
 
 const generateTimeline = (eventDate, responses, config) => {
@@ -352,22 +393,22 @@ const ProgressBar = ({ current, total, label, characterId }) => {
   const pct = Math.round((current / total) * 100);
   return (
     <div className="font-mono">
-      <div className="flex justify-between text-sm text-slate-400 mb-2"><span>{label}</span><span>{pct}%</span></div>
+      <div className="flex justify-between text-xs text-slate-400 mb-1"><span>{label}</span><span>{pct}%</span></div>
       <div className="relative">
-        <div className="flex gap-1 h-8">{[...Array(10)].map((_, i) => (<div key={i} className={`flex-1 border-2 ${i < Math.round((current / total) * 10) ? 'bg-green-400 border-green-300' : 'bg-slate-800 border-slate-600'}`}/>))}</div>
-        <div className="absolute top-1/2 transition-all duration-300" style={{ left: `${Math.min(pct, 95)}%`, transform: 'translate(-50%, -50%)' }}>{getCharacterSvg(characterId, 32)}</div>
+        <div className="flex gap-0.5 h-5">{[...Array(10)].map((_, i) => (<div key={i} className={`flex-1 border ${i < Math.round((current / total) * 10) ? 'bg-green-400 border-green-300' : 'bg-slate-800 border-slate-600'}`}/>))}</div>
+        <div className="absolute top-1/2 transition-all duration-300" style={{ left: `${Math.min(pct, 95)}%`, transform: 'translate(-50%, -50%)' }}>{getCharacterSvg(characterId, 24)}</div>
       </div>
     </div>
   );
 };
 
 const Checkbox = ({ options, selected = [], onChange }) => (
-  <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+  <div className="grid grid-cols-1 sm:grid-cols-2 gap-1">
     {options.map(o => (
       <button key={o} onClick={() => { sound.play('select'); onChange(selected.includes(o) ? selected.filter(x => x !== o) : [...selected, o]); }}
-        className={`p-3 sm:p-4 text-left border-4 flex items-center gap-2 transition-all ${selected.includes(o) ? 'border-yellow-400 bg-slate-700 text-yellow-400' : 'border-slate-600 bg-slate-800 text-slate-300 hover:border-slate-500'}`}>
-        <span className="text-lg">{selected.includes(o) ? '☑' : '☐'}</span>
-        <span className="flex-1">{o}</span>
+        className={`p-2 text-xs text-left border-2 flex items-center gap-2 ${selected.includes(o) ? 'border-yellow-400 bg-slate-700 text-yellow-400' : 'border-slate-600 bg-slate-800 text-slate-300'}`}>
+        <span>{selected.includes(o) ? '☑' : '☐'}</span>
+        <span className="flex-1 truncate">{o}</span>
       </button>
     ))}
   </div>
@@ -382,17 +423,17 @@ const programs = [
   { id: 'other', name: 'Other Initiative', icon: '✨' }
 ];
 
-// Timeline Component - More prominent display
+// Timeline Component - Compact display
 const TimelineView = ({ responses, budgetConfig }) => {
   const timeline = generateTimeline(responses.target_date, responses, budgetConfig);
   
   if (timeline.length === 0) {
     return (
-      <div className="border-4 border-slate-600 bg-slate-800 p-5 mb-5 rounded">
-        <div className="flex items-center gap-3 text-slate-400 mb-3">
-          <Calendar size={24}/> <span className="text-lg font-bold">PLANNING TIMELINE</span>
+      <div className="border-2 border-slate-600 bg-slate-800 p-3 mb-3 rounded">
+        <div className="flex items-center gap-2 text-slate-400 mb-2">
+          <Calendar size={16}/> <span className="text-sm font-bold">TIMELINE</span>
         </div>
-        <p className="text-slate-500">Set a target date in Phase 4 to generate your planning timeline with key milestones.</p>
+        <p className="text-slate-500 text-xs">Set a target date in Phase 4 to generate your planning timeline.</p>
       </div>
     );
   }
@@ -402,32 +443,28 @@ const TimelineView = ({ responses, budgetConfig }) => {
   const daysUntil = Math.ceil((eventDate - today) / (24 * 60 * 60 * 1000));
   
   return (
-    <div className="border-4 border-cyan-500 bg-slate-800 p-5 mb-5 rounded">
-      <div className="flex items-center justify-between mb-4">
-        <div className="flex items-center gap-3 text-cyan-400">
-          <Calendar size={24}/> <span className="text-lg font-bold">PLANNING TIMELINE</span>
+    <div className="border-2 border-cyan-500 bg-slate-800 p-3 mb-3 rounded">
+      <div className="flex items-center justify-between mb-2">
+        <div className="flex items-center gap-2 text-cyan-400">
+          <Calendar size={16}/> <span className="text-sm font-bold">TIMELINE</span>
         </div>
         <div className="text-right">
-          <div className="text-lg font-bold text-white">{eventDate.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}</div>
-          <div className="text-sm text-cyan-300">{daysUntil > 0 ? `${daysUntil} days away` : daysUntil === 0 ? "TODAY!" : `${Math.abs(daysUntil)} days ago`}</div>
+          <div className="text-sm font-bold text-white">{eventDate.toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}</div>
+          <div className="text-xs text-cyan-300">{daysUntil > 0 ? `${daysUntil} days` : daysUntil === 0 ? "TODAY!" : `${Math.abs(daysUntil)} days ago`}</div>
         </div>
       </div>
-      <div className="space-y-2 max-h-72 overflow-y-auto pr-2">
+      <div className="space-y-1 max-h-48 overflow-y-auto">
         {timeline.map((m, i) => (
-          <div key={i} className={`flex items-center gap-4 p-3 rounded border-l-4 ${
-            m.isPast ? 'bg-green-900/30 border-green-500 text-green-400' : 
-            m.weeksOut === 0 ? 'bg-yellow-900/40 border-yellow-400 text-yellow-300 font-bold text-lg' :
-            m.isUrgent ? 'bg-orange-900/30 border-orange-500 text-orange-300' : 
-            'bg-slate-700/50 border-slate-500 text-slate-200'
+          <div key={i} className={`flex items-center gap-2 p-2 rounded text-xs ${
+            m.isPast ? 'bg-green-900/30 text-green-400' : 
+            m.weeksOut === 0 ? 'bg-yellow-900/40 text-yellow-300 font-bold' :
+            m.isUrgent ? 'bg-orange-900/30 text-orange-300' : 
+            'bg-slate-700/50 text-slate-300'
           }`}>
-            <span className="text-xl w-8">{m.icon}</span>
+            <span>{m.icon}</span>
             <span className="flex-1">{m.task}</span>
-            <span className={`text-sm w-24 text-right ${m.isPast ? 'text-green-500' : 'text-slate-400'}`}>
-              {m.isPast ? (
-                <span className="flex items-center justify-end gap-1"><CheckCircle size={16}/> Done</span>
-              ) : (
-                m.date.toLocaleDateString('en-US', { month: 'short', day: 'numeric' })
-              )}
+            <span className="text-slate-500 w-16 text-right">
+              {m.isPast ? <CheckCircle size={12} className="inline text-green-500"/> : m.date.toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}
             </span>
           </div>
         ))}
@@ -442,21 +479,21 @@ const RiskFlags = ({ responses, budgetConfig }) => {
   if (risks.length === 0) return null;
   
   const colors = { 
-    high: "border-red-500 bg-red-900/30 text-red-300", 
-    medium: "border-yellow-500 bg-yellow-900/30 text-yellow-300", 
-    low: "border-blue-500 bg-blue-900/30 text-blue-300" 
+    high: "border-red-500 bg-red-900/20 text-red-400", 
+    medium: "border-yellow-500 bg-yellow-900/20 text-yellow-400", 
+    low: "border-blue-500 bg-blue-900/20 text-blue-400" 
   };
   
   return (
-    <div className="border-4 border-orange-500 bg-slate-800 p-5 mb-5 rounded">
-      <div className="flex items-center gap-3 text-orange-400 mb-4">
-        <AlertTriangle size={24}/> <span className="text-lg font-bold">RISK FLAGS</span>
-        <span className="text-sm bg-orange-600 px-2 py-1 rounded text-white">{risks.length}</span>
+    <div className="border-2 border-orange-500 bg-slate-800 p-3 mb-3 rounded">
+      <div className="flex items-center gap-2 text-orange-400 mb-2">
+        <AlertTriangle size={16}/> <span className="text-sm font-bold">RISK FLAGS</span>
+        <span className="text-xs bg-orange-600 px-1.5 py-0.5 rounded text-white">{risks.length}</span>
       </div>
-      <div className="space-y-3">
+      <div className="space-y-2">
         {risks.map((r, i) => (
-          <div key={i} className={`p-4 border-l-4 rounded ${colors[r.severity]}`}>
-            <span className="mr-3 text-lg">{r.icon}</span>{r.message}
+          <div key={i} className={`p-2 border-l-2 text-xs ${colors[r.severity]}`}>
+            <span className="mr-2">{r.icon}</span>{r.message}
           </div>
         ))}
       </div>
@@ -464,49 +501,44 @@ const RiskFlags = ({ responses, budgetConfig }) => {
   );
 };
 
-// Venue Recommendations (Inline, prominent)
+// Venue Recommendations (Inline, compact)
 const VenueRecommendations = ({ vendors, responses, budgetConfig }) => {
   const location = responses.location || "Washington DC";
   const attendance = budgetConfig.attendanceDefaults[responses.attendance] || 75;
   const venueType = responses.venue_type;
   
+  // Only show if venue type is selected
+  if (!venueType || venueType === "Not sure yet") return null;
+  
   const venues = (vendors.venues || [])
     .filter(v => v.city === location)
-    .filter(v => !venueType || venueType === "Not sure yet" || v.type === venueType)
+    .filter(v => v.type === venueType)
     .filter(v => attendance >= (v.min_capacity || 0) && attendance <= (v.max_capacity || 9999))
-    .slice(0, 4);
+    .slice(0, 3);
   
   if (venues.length === 0) return null;
   
   const formatMoney = (n) => '$' + Math.round(n).toLocaleString();
-  const tierColors = { Budget: 'bg-green-600', Standard: 'bg-blue-600', Premium: 'bg-purple-600' };
+  const tierColors = { Budget: 'text-green-400', Standard: 'text-blue-400', Premium: 'text-purple-400' };
   
   return (
-    <div className="mb-5">
-      <div className="text-slate-300 mb-3 font-bold flex items-center gap-2">
-        🏛️ RECOMMENDED VENUES
-        <span className="text-sm text-slate-500 font-normal">({venues.length} matches)</span>
-      </div>
-      <div className="space-y-3">
+    <div className="mb-3">
+      <div className="text-xs text-slate-400 mb-2 font-bold">🏛️ MATCHING VENUES ({venues.length})</div>
+      <div className="space-y-1">
         {venues.map((v, i) => (
-          <div key={i} className="border-2 border-slate-600 bg-slate-900 p-4 rounded flex justify-between items-start hover:border-slate-500 transition-all">
-            <div className="flex-1">
-              <div className="flex items-center gap-2 mb-1">
-                <span className="font-bold text-slate-200">{v.name}</span>
-                <span className={`text-xs px-2 py-0.5 rounded ${tierColors[v.tier]} text-white`}>{v.tier}</span>
-              </div>
-              <div className="text-sm text-slate-400">{formatMoney(v.min_price)} - {formatMoney(v.max_price)}/day</div>
-              {v.notes && <div className="text-sm text-slate-500 mt-1">{v.notes}</div>}
+          <div key={i} className="border border-slate-600 bg-slate-900 p-2 rounded flex justify-between items-center text-xs">
+            <div className="flex-1 min-w-0">
+              <div className="font-bold text-slate-200 truncate">{v.name}</div>
+              <div className={`${tierColors[v.tier]}`}>{v.tier} • {formatMoney(v.min_price)}-{formatMoney(v.max_price)}/day</div>
             </div>
             {v.url && (
-              <a href={v.url} target="_blank" rel="noopener noreferrer" className="text-blue-400 hover:text-blue-300 p-2 ml-2">
-                <ExternalLink size={20}/>
+              <a href={v.url} target="_blank" rel="noopener noreferrer" className="text-blue-400 hover:text-blue-300 p-1 ml-2 flex-shrink-0">
+                <ExternalLink size={14}/>
               </a>
             )}
           </div>
         ))}
       </div>
-      <div className="text-sm text-slate-600 mt-3">💡 Prices are daily rates. Always verify directly with venues.</div>
     </div>
   );
 };
@@ -520,97 +552,116 @@ const BudgetScenarios = ({ responses, budgetConfig, vendors, onAiRefine, aiEstim
     premium: calculateBudget(responses, 'premium', budgetConfig, vendors)
   };
   const b = scenarios[selected];
-  const fmt = (n) => '$' + Math.round(n).toLocaleString();
+  const fmt = (n) => n > 0 ? '$' + Math.round(n).toLocaleString() : '-';
+  
+  // Only show categories that have actual selections
+  const hasVenue = responses.venue_type && responses.venue_type !== "Not sure yet" && responses.location && responses.attendance && responses.duration;
+  const hasFnb = responses.fnb_items?.length > 0;
+  const hasAv = responses.av_needs?.length > 0;
+  const hasProduction = responses.production_needs?.length > 0;
+  const hasCollateral = responses.collateral_needs?.length > 0;
+  const hasMarketing = responses.marketing_channels?.length > 0;
+  const hasStaffing = (hasVenue || hasFnb || hasAv) && responses.duration;
   
   const cats = [
-    { key: 'venue', label: 'Venue', icon: '🏛️' },
-    { key: 'foodBeverage', label: 'Food & Bev', icon: '🍽️' },
-    { key: 'avTechnical', label: 'AV/Tech', icon: '🎤' },
-    { key: 'production', label: 'Production', icon: '📸' },
-    { key: 'collateral', label: 'Collateral', icon: '📦' },
-    { key: 'marketing', label: 'Marketing', icon: '📣' },
-    { key: 'staffing', label: 'Staffing', icon: '👥' },
-  ].filter(c => scenarios.standard[c.key] > 0);
+    hasVenue && { key: 'venue', label: 'Venue', icon: '🏛️' },
+    hasFnb && { key: 'foodBeverage', label: 'F&B', icon: '🍽️' },
+    hasAv && { key: 'avTechnical', label: 'AV', icon: '🎤' },
+    hasProduction && { key: 'production', label: 'Production', icon: '📸' },
+    hasCollateral && { key: 'collateral', label: 'Collateral', icon: '📦' },
+    hasMarketing && { key: 'marketing', label: 'Marketing', icon: '📣' },
+    hasStaffing && { key: 'staffing', label: 'Staffing', icon: '👥' },
+  ].filter(Boolean);
   
   const hasData = cats.length > 0;
+  const total = scenarios[selected].total;
   
   return (
-    <div className="border-4 border-green-500 bg-slate-800 p-5 mb-5 rounded">
-      <div className="flex items-center justify-between mb-3">
-        <div className="flex items-center gap-3 text-green-400">
-          <Calculator size={24}/> <span className="text-lg font-bold">BUDGET ESTIMATE</span>
+    <div className="border-2 border-green-500 bg-slate-800 p-3 mb-3 rounded">
+      <div className="flex items-center justify-between mb-2">
+        <div className="flex items-center gap-2 text-green-400">
+          <Calculator size={16}/> <span className="text-sm font-bold">BUDGET ESTIMATE</span>
         </div>
-        <div className="flex items-center gap-2 text-slate-400">
-          <MapPin size={16}/> {budgetConfig.locations[b.location]?.label || b.location}
-        </div>
+        {responses.location && (
+          <div className="flex items-center gap-1 text-xs text-slate-400">
+            <MapPin size={12}/> {responses.location}
+          </div>
+        )}
       </div>
       
-      <div className="text-slate-300 mb-2">{b.attendance} attendees • {b.baseDays} event day(s)</div>
-      <div className="text-sm text-slate-500 mb-4">⏱️ Includes {(b.venueDays - b.baseDays).toFixed(1)} day(s) for setup/breakdown</div>
-      
-      {b.usedVenueData && (
-        <div className="text-sm text-green-400 bg-green-900/30 p-3 rounded mb-4 flex items-center gap-2">
-          <CheckCircle size={16}/> Using real venue pricing data
+      {!hasData ? (
+        <div className="text-slate-500 text-xs py-4 text-center">
+          <div className="mb-2">📊 No budget items yet</div>
+          <div className="text-slate-600">Complete Phases 2-5 to build your estimate:</div>
+          <div className="text-slate-600 mt-1">• Attendance & duration → Venue costs</div>
+          <div className="text-slate-600">• F&B, AV, production → Line items</div>
         </div>
-      )}
-      
-      {/* Scenario Tabs - Larger tap targets */}
-      <div className="grid grid-cols-3 gap-3 mb-5">
-        {[
-          { id: 'budget', label: '💰 Budget', desc: 'Value tier' }, 
-          { id: 'standard', label: '⭐ Standard', desc: 'Mid-tier' }, 
-          { id: 'premium', label: '✨ Premium', desc: 'Top-tier' }
-        ].map(s => (
-          <button key={s.id} onClick={() => { sound.play('select'); setSelected(s.id); }}
-            className={`p-4 border-4 text-center transition-all ${selected === s.id ? 'border-green-400 bg-green-900/40 text-green-300 scale-105' : 'border-slate-600 bg-slate-900 text-slate-400 hover:border-slate-500'}`}>
-            <div className="text-base font-bold">{s.label}</div>
-            <div className="text-xs opacity-70 mt-1">{s.desc}</div>
-          </button>
-        ))}
-      </div>
-      
-      {hasData ? (
+      ) : (
         <>
-          {/* Budget Table - Improved readability */}
-          <div className="mb-5 bg-slate-900 rounded p-4">
-            <div className="grid grid-cols-4 gap-3 mb-3 text-slate-500 text-sm font-bold">
-              <div>Category</div><div className="text-right">Budget</div><div className="text-right">Standard</div><div className="text-right">Premium</div>
+          <div className="text-xs text-slate-400 mb-2">
+            {b.attendance} attendees • {b.baseDays} day(s) {b.venueDays > b.baseDays && `(+${(b.venueDays - b.baseDays).toFixed(1)} setup)`}
+          </div>
+          
+          {b.usedVenueData && (
+            <div className="text-xs text-green-500 bg-green-900/20 p-1.5 rounded mb-2">
+              ✓ Using real venue data
             </div>
+          )}
+          
+          {/* Scenario Tabs */}
+          <div className="grid grid-cols-3 gap-1 mb-3">
+            {[
+              { id: 'budget', label: '💰 Budget' }, 
+              { id: 'standard', label: '⭐ Standard' }, 
+              { id: 'premium', label: '✨ Premium' }
+            ].map(s => (
+              <button key={s.id} onClick={() => { sound.play('select'); setSelected(s.id); }}
+                className={`p-2 border-2 text-xs text-center ${selected === s.id ? 'border-green-400 bg-green-900/30 text-green-400' : 'border-slate-600 bg-slate-900 text-slate-400'}`}>
+                {s.label}
+              </button>
+            ))}
+          </div>
+          
+          {/* Budget Items - Mobile friendly list */}
+          <div className="mb-3 text-xs space-y-1">
             {cats.map(c => (
-              <div key={c.key} className="grid grid-cols-4 gap-3 py-3 border-t border-slate-700">
-                <div className="text-slate-200 flex items-center gap-2"><span>{c.icon}</span> {c.label}</div>
-                <div className={`text-right ${selected === 'budget' ? 'text-green-400 font-bold' : 'text-slate-500'}`}>{fmt(scenarios.budget[c.key])}</div>
-                <div className={`text-right ${selected === 'standard' ? 'text-green-400 font-bold' : 'text-slate-500'}`}>{fmt(scenarios.standard[c.key])}</div>
-                <div className={`text-right ${selected === 'premium' ? 'text-green-400 font-bold' : 'text-slate-500'}`}>{fmt(scenarios.premium[c.key])}</div>
+              <div key={c.key} className="flex justify-between items-center py-1.5 border-b border-slate-700">
+                <div className="text-slate-300">{c.icon} {c.label}</div>
+                <div className="text-green-400 font-bold">{fmt(scenarios[selected][c.key])}</div>
               </div>
             ))}
-            <div className="grid grid-cols-4 gap-3 py-4 border-t-2 border-green-500 mt-2">
-              <div className="text-green-400 font-bold text-lg">TOTAL</div>
-              <div className={`text-right text-lg ${selected === 'budget' ? 'text-green-400 font-bold' : 'text-slate-400'}`}>{fmt(scenarios.budget.total)}</div>
-              <div className={`text-right text-lg ${selected === 'standard' ? 'text-green-400 font-bold' : 'text-slate-400'}`}>{fmt(scenarios.standard.total)}</div>
-              <div className={`text-right text-lg ${selected === 'premium' ? 'text-green-400 font-bold' : 'text-slate-400'}`}>{fmt(scenarios.premium.total)}</div>
+            <div className="flex justify-between items-center py-1.5 border-b border-slate-700 text-slate-500">
+              <div>📋 Contingency ({Math.round((budgetConfig.contingency[selected] || 0.15) * 100)}%)</div>
+              <div>{fmt(scenarios[selected].contingency)}</div>
             </div>
+            <div className="flex justify-between items-center py-2 font-bold text-sm">
+              <div className="text-green-400">TOTAL</div>
+              <div className="text-green-400">{fmt(total)}</div>
+            </div>
+          </div>
+          
+          {/* Range summary */}
+          <div className="text-xs text-slate-500 text-center mb-3 p-2 bg-slate-900 rounded">
+            Range: {fmt(scenarios.budget.total)} – {fmt(scenarios.premium.total)}
           </div>
           
           {/* Venue Recommendations */}
           <VenueRecommendations vendors={vendors} responses={responses} budgetConfig={budgetConfig} />
           
           {/* AI Refinement */}
-          <div className="border-t-2 border-slate-700 pt-5 mt-5">
+          <div className="border-t border-slate-700 pt-3">
             <button onClick={onAiRefine} disabled={aiLoading}
-              className={`w-full p-4 border-4 flex items-center justify-center gap-3 transition-all ${aiLoading ? 'border-purple-500 bg-purple-900/40 text-purple-300' : 'border-purple-500 bg-slate-900 text-purple-400 hover:bg-purple-900/30'} disabled:opacity-50`}>
-              {aiLoading ? (<><Loader size={20} className="animate-spin"/> Searching live market data...</>) : (<><Zap size={20}/> Refine with AI (live web search)</>)}
+              className={`w-full p-2 border-2 text-xs flex items-center justify-center gap-2 ${aiLoading ? 'border-purple-500 bg-purple-900/30 text-purple-400' : 'border-purple-500 bg-slate-900 text-purple-400'} disabled:opacity-50`}>
+              {aiLoading ? (<><Loader size={14} className="animate-spin"/> Searching...</>) : (<><Zap size={14}/> Refine with AI</>)}
             </button>
             {aiEstimate && (
-              <div className="mt-4 p-4 bg-purple-900/30 border-2 border-purple-500/50 rounded">
-                <div className="text-purple-400 font-bold mb-3 flex items-center gap-2"><Sparkles size={18}/> AI INSIGHTS</div>
-                <div className="text-slate-200 whitespace-pre-wrap leading-relaxed">{aiEstimate}</div>
+              <div className="mt-2 p-2 bg-purple-900/20 border border-purple-500/50 rounded text-xs">
+                <div className="text-purple-400 font-bold mb-1"><Sparkles size={12} className="inline mr-1"/> AI INSIGHTS</div>
+                <div className="text-slate-300 whitespace-pre-wrap">{aiEstimate}</div>
               </div>
             )}
           </div>
         </>
-      ) : (
-        <div className="text-slate-400 text-center py-8">Complete earlier phases to see budget estimates</div>
       )}
     </div>
   );
@@ -683,33 +734,32 @@ export default function App() {
 
   const phases = [
     { id: 1, name: "THE SPARK", icon: "💡", subtitle: "What's the big idea?", questions: [
-      { id: "event_name", label: "What would you call this event?", type: "text", placeholder: "Working title..." },
-      { id: "spark", label: "What's the spark? The problem or opportunity?", type: "textarea", placeholder: "What made you think 'we need an event'?" },
-      { id: "success_headline", label: "Imagine success. What's the headline?", type: "textarea", placeholder: "Dream big!" },
-      { id: "why_event", label: "Why is an event the right format?", type: "textarea", placeholder: "vs. report, webinar, etc." },
-      { id: "seedai_alignment", label: "How does this connect to SeedAI's mission?", type: "textarea", placeholder: "Try It, Prove It, Scale It..." },
-      { id: "success_metrics", label: "How will you measure success?", type: "textarea", placeholder: "Goals, metrics..." },
-      { id: "funding_sources", label: "Potential funding sources?", type: "checkbox", options: ["Organizational budget", "Sponsorships", "Grants", "Registration fees", "Partner contributions", "In-kind support", "TBD"] },
+      { id: "event_name", label: "What would you call this event?", type: "text", placeholder: "Working title...", tip: "A catchy name helps rally the team" },
+      { id: "spark", label: "What's the spark? The problem or opportunity?", type: "textarea", placeholder: "What made you think 'we need an event'?", tip: "What's the driving force behind this?" },
+      { id: "success_headline", label: "Imagine success. What's the headline?", type: "textarea", placeholder: "Dream big!", tip: "If this event made news, what would it say?" },
+      { id: "why_event", label: "Why is an event the right format?", type: "textarea", placeholder: "vs. report, webinar, etc.", tip: "Consider alternatives: report, webinar, roundtable" },
+      { id: "seedai_alignment", label: "How does this connect to SeedAI's mission?", type: "textarea", placeholder: "Try It, Prove It, Scale It...", tip: "Which pillar does this support?" },
+      { id: "success_metrics", label: "How will you measure success?", type: "textarea", placeholder: "Goals, metrics...", tip: "Attendees? Media hits? Policy outcomes?" },
     ]},
     { id: 2, name: "THE PEOPLE", icon: "👥", subtitle: "Who needs to be there?", questions: [
       { id: "target_audience", label: "Who is your target audience?", type: "checkbox", options: ["Policymakers", "Congressional Staffers", "Federal Agency Staff", "State/Local Officials", "Private Sector Executives", "Researchers/Academics", "Students", "Nonprofit Leaders", "Media/Press", "General Public"] },
-      { id: "audience_detail", label: "Who MUST be there for success?", type: "textarea", placeholder: "Be specific..." },
+      { id: "audience_detail", label: "Who MUST be there for success?", type: "textarea", placeholder: "Be specific...", tip: "Name specific people or roles if possible" },
       { id: "attendance", label: "Expected attendance?", type: "select", options: Object.keys(budgetConfig.attendanceDefaults) },
-      { id: "partners", label: "Target partners or co-hosts?", type: "textarea", placeholder: "Organizations..." },
-      { id: "vips", label: "Dream speakers or VIPs?", type: "textarea", placeholder: "Who would make this amazing?" },
+      { id: "partners", label: "Target partners or co-hosts?", type: "textarea", placeholder: "Organizations...", tip: "Who could add credibility or resources?" },
+      { id: "vips", label: "Dream speakers or VIPs?", type: "textarea", placeholder: "Who would make this amazing?", tip: "Reach for the stars here" },
       { id: "registration_type", label: "How will people get access?", type: "select", options: ["Open registration", "Invitation only", "Application/curated", "Ticketed (paid)", "Hybrid approach"] }
     ]},
     { id: 3, name: "THE EXPERIENCE", icon: "🎯", subtitle: "What will people do?", questions: [
       { id: "event_type", label: "What type of event?", type: "select", options: Object.keys(SMART_DEFAULTS) },
       { id: "duration", label: "How long?", type: "select", options: Object.keys(budgetConfig.durationMultipliers) },
       { id: "format", label: "Format?", type: "select", options: ["In-person only", "Virtual only", "Hybrid (in-person + virtual)"] },
-      { id: "anchor_moments", label: "2-3 'anchor moments' that define this event?", type: "textarea", placeholder: "The highlights..." },
+      { id: "anchor_moments", label: "2-3 'anchor moments' that define this event?", type: "textarea", placeholder: "The highlights...", tip: "What will people remember?" },
       { id: "program_elements", label: "What program elements?", type: "checkbox", options: ["Keynote speeches", "Panel discussions", "Breakout sessions", "Workshops/trainings", "Demos/showcases", "Networking time", "Fireside chats", "Q&A sessions", "Awards/recognition", "Entertainment"] },
-      { id: "takeaway", label: "What should attendees walk away with?", type: "textarea", placeholder: "Knowledge, connections..." }
+      { id: "takeaway", label: "What should attendees walk away with?", type: "textarea", placeholder: "Knowledge, connections...", tip: "New skills? Contacts? Motivation?" }
     ]},
     { id: 4, name: "THE DETAILS", icon: "📍", subtitle: "Where, when, how?", questions: [
       { id: "target_date", label: "Target date?", type: "date", placeholder: "YYYY-MM-DD" },
-      { id: "date_drivers", label: "What's driving the date?", type: "textarea", placeholder: "Calendar, timing..." },
+      { id: "date_drivers", label: "What's driving the date?", type: "textarea", placeholder: "Calendar, timing...", tip: "Policy deadlines? Seasonal factors?" },
       { id: "location", label: "Where should this be held?", type: "select", options: Object.keys(budgetConfig.locations) },
       { id: "venue_type", label: "What type of venue?", type: "select", options: Object.keys(budgetConfig.venueTypes) },
       { id: "space_needs", label: "What spaces do you need?", type: "checkbox", options: ["Main plenary room", "Breakout rooms", "Demo/exhibit area", "VIP/green room", "Registration area", "Networking lounge", "Press room", "Dining space"] },
@@ -721,7 +771,10 @@ export default function App() {
       { id: "collateral_needs", label: "Event collateral?", type: "checkbox", options: Object.keys(budgetConfig.collateral) },
       { id: "marketing_channels", label: "Marketing channels?", type: "checkbox", options: Object.keys(budgetConfig.marketing) },
     ]},
-    { id: 6, name: "THE PLAN", icon: "🚀", subtitle: "Budget & timeline", questions: [], isOutputPhase: true }
+    { id: 6, name: "THE PLAN", icon: "🚀", subtitle: "Budget & timeline", questions: [
+      { id: "funding_sources", label: "Potential funding sources?", type: "checkbox", options: ["Organizational budget", "Sponsorships", "Grants", "Registration fees", "Partner contributions", "In-kind support", "TBD"] },
+      { id: "risks", label: "What could go wrong?", type: "textarea", placeholder: "Be honest about risks...", tip: "Speaker cancels? Low turnout? Budget overrun? Have a backup plan." }
+    ], isOutputPhase: true }
   ];
 
   const applySmartDefaults = () => {
@@ -908,31 +961,31 @@ export default function App() {
   if (screen === 'export') {
     const total = totalProgress();
     return (
-      <div className="min-h-screen bg-slate-900 p-4 sm:p-6 font-mono overflow-auto">
-        <div className="max-w-2xl mx-auto">
-          <div className="text-center mb-6">
-            <div className="text-5xl mb-2">🎉</div>
-            <h2 className="text-2xl text-yellow-400">PROPOSAL READY</h2>
-            <p className="text-slate-400 text-sm mt-1">{total.done}/{total.total} questions completed</p>
+      <div className="min-h-screen bg-slate-900 p-3 font-mono overflow-auto">
+        <div className="max-w-lg mx-auto">
+          <div className="text-center mb-4">
+            <div className="text-3xl mb-1">🎉</div>
+            <h2 className="text-xl text-yellow-400">PROPOSAL READY</h2>
+            <p className="text-slate-400 text-xs">{total.done}/{total.total} questions completed</p>
           </div>
           
           <TimelineView responses={responses} budgetConfig={budgetConfig} />
           <RiskFlags responses={responses} budgetConfig={budgetConfig} />
           <BudgetScenarios responses={responses} budgetConfig={budgetConfig} vendors={vendors} onAiRefine={handleAiRefine} aiEstimate={aiEstimate} aiLoading={aiLoading} />
           
-          <div className="border-4 border-blue-500 bg-slate-800 p-4 mb-4">
-            <div className="text-blue-400 text-base font-bold mb-3">SHARE PROPOSAL</div>
-            <div className="grid grid-cols-3 gap-3">
-              <Btn onClick={copy} variant="primary" className="w-full"><Share2 size={14} className="inline mr-1"/>COPY</Btn>
-              <Btn onClick={email} variant="warning" className="w-full"><Mail size={14} className="inline mr-1"/>EMAIL</Btn>
-              <Btn onClick={download} variant="success" className="w-full"><Download size={14} className="inline mr-1"/>SAVE</Btn>
+          <div className="border-2 border-blue-500 bg-slate-800 p-3 mb-3 rounded">
+            <div className="text-blue-400 text-sm font-bold mb-2">SHARE PROPOSAL</div>
+            <div className="grid grid-cols-3 gap-2">
+              <Btn onClick={copy} variant="primary" className="w-full text-xs py-2"><Share2 size={12} className="inline mr-1"/>COPY</Btn>
+              <Btn onClick={email} variant="warning" className="w-full text-xs py-2"><Mail size={12} className="inline mr-1"/>EMAIL</Btn>
+              <Btn onClick={download} variant="success" className="w-full text-xs py-2"><Download size={12} className="inline mr-1"/>SAVE</Btn>
             </div>
-            {status && <div className="text-center text-green-400 text-sm mt-3">{status}</div>}
+            {status && <div className="text-center text-green-400 text-xs mt-2">{status}</div>}
           </div>
           
-          <div className="flex justify-center gap-4">
-            <Btn onClick={() => setScreen('play')} variant="secondary">← EDIT</Btn>
-            <Btn onClick={() => { clearSave(); setScreen('title'); }} variant="primary">NEW EVENT</Btn>
+          <div className="flex justify-center gap-2">
+            <Btn onClick={() => setScreen('play')} variant="secondary" className="text-xs py-2 px-3">← EDIT</Btn>
+            <Btn onClick={() => { clearSave(); setScreen('title'); }} variant="primary" className="text-xs py-2 px-3">NEW EVENT</Btn>
           </div>
         </div>
       </div>
@@ -948,32 +1001,32 @@ export default function App() {
   return (
     <div className="min-h-screen bg-slate-900 font-mono">
       {/* Header */}
-      <div className="bg-slate-800 border-b-4 border-slate-700 p-3 sm:p-4">
-        <div className="max-w-2xl mx-auto">
-          <div className="flex justify-between items-center mb-3">
-            <div className="flex items-center gap-3">
-              <span className="text-2xl">{programs.find(x => x.id === program)?.icon}</span>
+      <div className="bg-slate-800 border-b-2 border-slate-700 p-2">
+        <div className="max-w-lg mx-auto">
+          <div className="flex justify-between items-center mb-2">
+            <div className="flex items-center gap-2">
+              <span className="text-xl">{programs.find(x => x.id === program)?.icon}</span>
               <div>
-                <div className="text-blue-400 text-sm font-bold">EVENT PLANNER</div>
+                <div className="text-blue-400 text-xs font-bold">EVENT PLANNER</div>
                 <div className="text-slate-500 text-xs">{charNames[char]}</div>
               </div>
             </div>
-            <div className="flex gap-2 items-center">
-              <button onClick={() => { sound.toggle(); setSoundOn(!soundOn); }} className="text-slate-500 hover:text-slate-300 p-2">{soundOn ? <Volume2 size={18}/> : <VolumeX size={18}/>}</button>
-              <Btn onClick={() => saveProgress()} variant="secondary" className="text-xs py-2 px-3"><Save size={12} className="inline mr-1"/>SAVE</Btn>
-              <Btn onClick={() => { sound.play('complete'); setScreen('export'); }} variant="success" className="text-xs py-2 px-3"><Sparkles size={12} className="inline mr-1"/>EXPORT</Btn>
+            <div className="flex gap-1 items-center">
+              <button onClick={() => { sound.toggle(); setSoundOn(!soundOn); }} className="text-slate-500 hover:text-slate-300 p-1">{soundOn ? <Volume2 size={14}/> : <VolumeX size={14}/>}</button>
+              <Btn onClick={() => saveProgress()} variant="secondary" className="text-xs py-1 px-2"><Save size={10} className="inline mr-1"/>SAVE</Btn>
+              <Btn onClick={() => { sound.play('complete'); setScreen('export'); }} variant="success" className="text-xs py-1 px-2"><Sparkles size={10} className="inline mr-1"/>EXPORT</Btn>
             </div>
           </div>
           <ProgressBar current={total.done} total={total.total} label="PROGRESS" characterId={char} />
         </div>
       </div>
 
-      <div className="max-w-2xl mx-auto p-4 sm:p-6">
+      <div className="max-w-lg mx-auto p-3">
         {/* Phase Tabs */}
-        <div className="flex gap-2 mb-4 overflow-x-auto pb-2">
+        <div className="flex gap-1 mb-3 overflow-x-auto pb-1">
           {phases.map((x, i) => {
             const pr = getProgress(i);
-            return (<button key={x.id} onClick={() => { sound.play('navigate'); setPhase(i); }} className={`px-3 py-2 border-4 text-sm whitespace-nowrap flex-shrink-0 ${i === phase ? 'border-yellow-400 bg-slate-700 text-yellow-400' : pr.done === pr.total && pr.total > 0 ? 'border-green-500 bg-slate-800 text-green-400' : 'border-slate-600 bg-slate-800 text-slate-400'}`}>{x.icon} <span className="hidden sm:inline ml-1">{x.name}</span></button>);
+            return (<button key={x.id} onClick={() => { sound.play('navigate'); setPhase(i); }} className={`px-2 py-1 border-2 text-xs whitespace-nowrap flex-shrink-0 ${i === phase ? 'border-yellow-400 bg-slate-700 text-yellow-400' : pr.done === pr.total && pr.total > 0 ? 'border-green-500 bg-slate-800 text-green-400' : 'border-slate-600 bg-slate-800 text-slate-400'}`}>{x.icon}</button>);
           })}
         </div>
 
@@ -990,71 +1043,83 @@ export default function App() {
         )}
 
         {/* Main Content Card */}
-        <div className="border-4 border-blue-500 bg-slate-800 mb-4 rounded">
-          <div className="bg-blue-600 p-4 sm:p-5 border-b-4 border-blue-500">
-            <div className="text-sm text-blue-200">PHASE {p.id} OF {phases.length}</div>
-            <h2 className="text-xl sm:text-2xl text-white">{p.icon} {p.name}</h2>
-            <div className="text-sm sm:text-base text-blue-200">{p.subtitle}</div>
+        <div className="border-2 border-blue-500 bg-slate-800 mb-4 rounded">
+          <div className="bg-blue-600 p-3 border-b-2 border-blue-500">
+            <div className="text-xs text-blue-200">PHASE {p.id} OF {phases.length}</div>
+            <h2 className="text-lg text-white">{p.icon} {p.name}</h2>
+            <div className="text-xs text-blue-200">{p.subtitle}</div>
           </div>
 
           {/* Team Section (Phase 1) */}
           {phase === 0 && (
-            <div className="p-4 sm:p-5 border-b-4 border-slate-700">
-              <div className="text-yellow-400 mb-3 flex items-center gap-2"><Users size={18}/> <span className="font-bold">PLANNING TEAM</span></div>
-              <div className="text-slate-400 mb-3">Owner: <span className="text-yellow-400 font-bold">{charNames[char]}</span></div>
-              {team.length > 0 && (<div className="space-y-2 mb-3">{team.map(m => (<div key={m.id} className="flex justify-between items-center bg-slate-900 p-3 border-2 border-slate-700 text-slate-300">{m.name} {m.role && `— ${m.role}`}<button onClick={() => setTeam(team.filter(x => x.id !== m.id))} className="text-red-400 p-1"><X size={16}/></button></div>))}</div>)}
-              <div className="flex gap-2">
-                <input value={newMember.name} onChange={e => setNewMember({ ...newMember, name: e.target.value })} className="flex-1 p-3 bg-slate-900 border-2 border-slate-600 text-slate-200" placeholder="Name"/>
-                <input value={newMember.role} onChange={e => setNewMember({ ...newMember, role: e.target.value })} className="flex-1 p-3 bg-slate-900 border-2 border-slate-600 text-slate-200" placeholder="Role"/>
-                <button onClick={addMember} className="px-4 bg-green-600 border-2 border-green-400 text-white"><Plus size={18}/></button>
+            <div className="p-3 border-b-2 border-slate-700">
+              <div className="text-yellow-400 text-xs mb-2 flex items-center gap-2"><Users size={14}/> <span className="font-bold">PLANNING TEAM</span></div>
+              <div className="text-slate-400 text-xs mb-2">Owner: <span className="text-yellow-400 font-bold">{charNames[char]}</span></div>
+              {team.length > 0 && (<div className="space-y-1 mb-2">{team.map(m => (<div key={m.id} className="flex justify-between items-center bg-slate-900 p-2 border border-slate-700 text-xs text-slate-300">{m.name} {m.role && `— ${m.role}`}<button onClick={() => setTeam(team.filter(x => x.id !== m.id))} className="text-red-400 p-1"><X size={12}/></button></div>))}</div>)}
+              <div className="flex gap-1">
+                <input value={newMember.name} onChange={e => setNewMember({ ...newMember, name: e.target.value })} className="flex-1 p-2 bg-slate-900 border border-slate-600 text-slate-200 text-xs" placeholder="Name"/>
+                <input value={newMember.role} onChange={e => setNewMember({ ...newMember, role: e.target.value })} className="flex-1 p-2 bg-slate-900 border border-slate-600 text-slate-200 text-xs" placeholder="Role"/>
+                <button onClick={addMember} className="px-3 bg-green-600 border border-green-400 text-white text-xs"><Plus size={14}/></button>
               </div>
             </div>
           )}
 
           {/* Phase 6: Budget & Timeline Output Screen */}
           {isLastPhase ? (
-            <div className="p-4 sm:p-6">
+            <div className="p-3">
               <TimelineView responses={responses} budgetConfig={budgetConfig} />
               <RiskFlags responses={responses} budgetConfig={budgetConfig} />
               <BudgetScenarios responses={responses} budgetConfig={budgetConfig} vendors={vendors} onAiRefine={handleAiRefine} aiEstimate={aiEstimate} aiLoading={aiLoading} />
               
-              <div className="text-center text-slate-500 text-sm mt-4 p-4 border-2 border-dashed border-slate-700 rounded">
-                💡 These estimates are based on your selections in Phases 1-5.<br/>
-                Go back to adjust details and see how the budget changes.
+              {/* Funding Sources in Phase 6 */}
+              {p.questions.length > 0 && (
+                <div className="border-t border-slate-700 pt-3 mt-3">
+                  {p.questions.map((q, i) => (
+                    <div key={q.id} className="mb-3">
+                      <label className="text-yellow-400 text-xs font-bold block mb-2">{q.label}</label>
+                      <Checkbox options={q.options} selected={responses[q.id] || []} onChange={(val) => update(q.id, val)} />
+                    </div>
+                  ))}
+                </div>
+              )}
+              
+              <div className="text-center text-slate-600 text-xs mt-3 p-2 border border-dashed border-slate-700 rounded">
+                💡 Estimates based on Phases 1-5. Go back to adjust.
               </div>
             </div>
           ) : (
             /* Questions (Phases 1-5) */
-            <div className="p-4 sm:p-5 space-y-5">
+            <div className="p-3 space-y-4">
               {p.questions.map((q, i) => (
                 <div key={q.id}>
-                  <div className="flex justify-between items-start mb-2">
-                    <label className="text-yellow-400 font-bold">{i+1}. {q.label}</label>
+                  <div className="flex justify-between items-start mb-1">
+                    <label className="text-yellow-400 text-xs font-bold">{i+1}. {q.label}</label>
                     <div className="flex gap-1 ml-2">
-                      <button onClick={() => setShowNote(showNote === q.id ? null : q.id)} className={`p-1 ${notes[q.id] ? 'text-blue-400' : 'text-slate-600'}`}><MessageSquare size={16}/></button>
-                      <button onClick={() => { sound.play('select'); setNeedsInput(p => ({ ...p, [q.id]: !p[q.id] })); }} className={`p-1 ${needsInput[q.id] ? 'text-yellow-400' : 'text-slate-600'}`}><HelpCircle size={16}/></button>
+                      <button onClick={() => setShowNote(showNote === q.id ? null : q.id)} className={`p-1 ${notes[q.id] ? 'text-blue-400' : 'text-slate-600'}`}><MessageSquare size={12}/></button>
+                      <button onClick={() => { sound.play('select'); setNeedsInput(pr => ({ ...pr, [q.id]: !pr[q.id] })); }} className={`p-1 ${needsInput[q.id] ? 'text-yellow-400' : 'text-slate-600'}`}><HelpCircle size={12}/></button>
                     </div>
                   </div>
-                  {showNote === q.id && (<input value={notes[q.id] || ''} onChange={e => setNotes({ ...notes, [q.id]: e.target.value })} className="w-full p-3 mb-2 bg-slate-700 border-2 border-slate-600 text-slate-300" placeholder="Add a note..."/>)}
+                  {q.tip && !responses[q.id] && <div className="text-slate-500 text-xs mb-1 italic">💡 {q.tip}</div>}
+                  {showNote === q.id && (<input value={notes[q.id] || ''} onChange={e => setNotes({ ...notes, [q.id]: e.target.value })} className="w-full p-2 mb-2 bg-slate-700 border border-slate-600 text-slate-300 text-xs" placeholder="Add a note..."/>)}
                   {q.type === 'checkbox' ? (<Checkbox options={q.options} selected={responses[q.id] || []} onChange={(val) => update(q.id, val)} />)
-                    : q.type === 'textarea' ? (<textarea value={responses[q.id] || ''} onChange={e => update(q.id, e.target.value)} rows={3} className="w-full p-3 bg-slate-900 border-4 border-slate-600 text-slate-200 focus:border-yellow-400 focus:outline-none resize-none" placeholder={q.placeholder}/>)
-                    : q.type === 'select' ? (<select value={responses[q.id] || ''} onChange={e => { sound.play('select'); update(q.id, e.target.value); }} className="w-full p-3 bg-slate-900 border-4 border-slate-600 text-slate-200 focus:border-yellow-400 focus:outline-none"><option value="">-- SELECT --</option>{q.options.map(o => <option key={o} value={o}>{o}</option>)}</select>)
-                    : q.type === 'date' ? (<input type="date" value={responses[q.id] || ''} onChange={e => update(q.id, e.target.value)} className="w-full p-3 bg-slate-900 border-4 border-slate-600 text-slate-200 focus:border-yellow-400 focus:outline-none"/>)
-                    : (<input type="text" value={responses[q.id] || ''} onChange={e => update(q.id, e.target.value)} className="w-full p-3 bg-slate-900 border-4 border-slate-600 text-slate-200 focus:border-yellow-400 focus:outline-none" placeholder={q.placeholder}/>)}
-                  {needsInput[q.id] && !(q.type === 'checkbox' ? responses[q.id]?.length : responses[q.id]?.toString().trim()) && (<div className="text-yellow-400 text-sm mt-1 flex items-center gap-1"><HelpCircle size={14}/> Flagged for team input</div>)}
+                    : q.type === 'textarea' ? (<textarea value={responses[q.id] || ''} onChange={e => update(q.id, e.target.value)} rows={2} className="w-full p-2 bg-slate-900 border-2 border-slate-600 text-slate-200 text-xs focus:border-yellow-400 focus:outline-none resize-none" placeholder={q.placeholder}/>)
+                    : q.type === 'select' ? (<select value={responses[q.id] || ''} onChange={e => { sound.play('select'); update(q.id, e.target.value); }} className="w-full p-2 bg-slate-900 border-2 border-slate-600 text-slate-200 text-xs focus:border-yellow-400 focus:outline-none"><option value="">-- SELECT --</option>{q.options.map(o => <option key={o} value={o}>{o}</option>)}</select>)
+                    : q.type === 'date' ? (<input type="date" value={responses[q.id] || ''} onChange={e => update(q.id, e.target.value)} className="w-full p-2 bg-slate-900 border-2 border-slate-600 text-slate-200 text-xs focus:border-yellow-400 focus:outline-none"/>)
+                    : (<input type="text" value={responses[q.id] || ''} onChange={e => update(q.id, e.target.value)} className="w-full p-2 bg-slate-900 border-2 border-slate-600 text-slate-200 text-xs focus:border-yellow-400 focus:outline-none" placeholder={q.placeholder}/>)}
+                  {needsInput[q.id] && !(q.type === 'checkbox' ? responses[q.id]?.length : responses[q.id]?.toString().trim()) && (<div className="text-yellow-400 text-xs mt-1 flex items-center gap-1"><HelpCircle size={10}/> Flagged for team input</div>)}
                 </div>
               ))}
             </div>
           )}
 
           {/* Navigation */}
-          <div className="border-t-4 border-slate-700 p-4 flex justify-between items-center">
-            <Btn onClick={() => setPhase(Math.max(0, phase - 1))} disabled={phase === 0} variant="secondary">← PREV</Btn>
-            <span className="text-slate-500 text-sm">{prog.done}/{prog.total}</span>
-            {phase < phases.length - 1 ? (<Btn onClick={() => setPhase(phase + 1)} variant="primary">NEXT →</Btn>) : (<Btn onClick={() => { sound.play('complete'); setScreen('export'); }} variant="success"><Trophy size={16} className="inline mr-2"/>FINISH</Btn>)}
+          <div className="border-t-2 border-slate-700 p-3 flex justify-between items-center">
+            <Btn onClick={() => setPhase(Math.max(0, phase - 1))} disabled={phase === 0} variant="secondary" className="text-xs py-2 px-3">← PREV</Btn>
+            <span className="text-slate-500 text-xs">{prog.done}/{prog.total}</span>
+            {phase < phases.length - 1 ? (<Btn onClick={() => setPhase(phase + 1)} variant="primary" className="text-xs py-2 px-3">NEXT →</Btn>) : (<Btn onClick={() => { sound.play('complete'); setScreen('export'); }} variant="success" className="text-xs py-2 px-3"><Trophy size={12} className="inline mr-1"/>FINISH</Btn>)}
           </div>
         </div>
-        {status && <div className="text-center text-green-400 text-sm">{status}</div>}
+        {status && <div className="text-center text-green-400 text-xs">{status}</div>}
       </div>
     </div>
   );
