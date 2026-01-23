@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Share2, Mail, Download, Users, MessageSquare, HelpCircle, Trophy, Volume2, VolumeX, Plus, X, Sparkles, Calculator, AlertTriangle, Save, RotateCcw, Zap, Loader, Calendar, Clock, CheckCircle, Lightbulb, ExternalLink, MapPin } from 'lucide-react';
+import { Share2, Mail, Download, Users, MessageSquare, HelpCircle, Trophy, Volume2, VolumeX, Plus, X, Sparkles, Calculator, AlertTriangle, Save, RotateCcw, Zap, Loader, Calendar, Clock, CheckCircle, Lightbulb, ExternalLink, MapPin, Building, ChevronDown, Link2, Copy, FileText } from 'lucide-react';
 
 // ╔════════════════════════════════════════════════════════════════════════════╗
 // ║                    GOOGLE SHEETS CONFIGURATION                              ║
@@ -502,43 +502,395 @@ const RiskFlags = ({ responses, budgetConfig }) => {
 };
 
 // Venue Recommendations (Inline, compact)
-const VenueRecommendations = ({ vendors, responses, budgetConfig }) => {
+// Enhanced Vendor Matching Panel
+const VendorMatching = ({ vendors, responses, budgetConfig }) => {
+  const [expanded, setExpanded] = useState(true);
   const location = responses.location || "Washington DC";
-  const attendance = budgetConfig.attendanceDefaults[responses.attendance] || 75;
+  const attendance = budgetConfig.attendanceDefaults[responses.attendance] || 0;
   const venueType = responses.venue_type;
+  const hasFnb = responses.fnb_items?.length > 0;
+  const hasAv = responses.av_needs?.length > 0;
+  const duration = budgetConfig.durationMultipliers[responses.duration] || 1;
   
-  // Only show if venue type is selected
-  if (!venueType || venueType === "Not sure yet") return null;
+  // Don't show if no relevant selections
+  if (!venueType && !hasFnb && !hasAv) return null;
+  if (venueType === "Not sure yet" && !hasFnb && !hasAv) return null;
   
-  const venues = (vendors.venues || [])
+  const formatMoney = (n) => '$' + Math.round(n).toLocaleString();
+  const tierColors = { Budget: 'bg-green-900/50 text-green-400 border-green-600', Standard: 'bg-blue-900/50 text-blue-400 border-blue-600', Premium: 'bg-purple-900/50 text-purple-400 border-purple-600' };
+  const tierBadge = { Budget: 'bg-green-600', Standard: 'bg-blue-600', Premium: 'bg-purple-600' };
+  
+  // Match venues
+  const matchedVenues = venueType && venueType !== "Not sure yet" ? (vendors.venues || [])
     .filter(v => v.city === location)
     .filter(v => v.type === venueType)
     .filter(v => attendance >= (v.min_capacity || 0) && attendance <= (v.max_capacity || 9999))
-    .slice(0, 3);
+    .slice(0, 4) : [];
   
-  if (venues.length === 0) return null;
+  // Match caterers based on attendance and location
+  const matchedCaterers = hasFnb && attendance > 0 ? (vendors.caterers || [])
+    .filter(c => c.city === location)
+    .filter(c => attendance >= (c.min_guests || 0) && attendance <= (c.max_guests || 9999))
+    .slice(0, 3) : [];
   
-  const formatMoney = (n) => '$' + Math.round(n).toLocaleString();
-  const tierColors = { Budget: 'text-green-400', Standard: 'text-blue-400', Premium: 'text-purple-400' };
+  // Match AV companies based on needs
+  const matchedAV = hasAv ? (vendors.av_companies || [])
+    .filter(av => av.city === location)
+    .slice(0, 3) : [];
+  
+  const totalMatches = matchedVenues.length + matchedCaterers.length + matchedAV.length;
+  if (totalMatches === 0) return null;
+  
+  // Estimate costs from matched vendors
+  const venueEstimate = matchedVenues.length > 0 ? {
+    low: Math.min(...matchedVenues.map(v => v.min_price || 0)) * duration,
+    high: Math.max(...matchedVenues.map(v => v.max_price || 0)) * duration
+  } : null;
+  
+  const cateringEstimate = matchedCaterers.length > 0 && attendance > 0 ? {
+    low: Math.min(...matchedCaterers.map(c => c.min_per_person || 0)) * attendance * duration,
+    high: Math.max(...matchedCaterers.map(c => c.max_per_person || 0)) * attendance * duration
+  } : null;
   
   return (
-    <div className="mb-3">
-      <div className="text-xs text-slate-400 mb-2 font-bold">🏛️ MATCHING VENUES ({venues.length})</div>
-      <div className="space-y-1">
-        {venues.map((v, i) => (
-          <div key={i} className="border border-slate-600 bg-slate-900 p-2 rounded flex justify-between items-center text-xs">
-            <div className="flex-1 min-w-0">
-              <div className="font-bold text-slate-200 truncate">{v.name}</div>
-              <div className={`${tierColors[v.tier]}`}>{v.tier} • {formatMoney(v.min_price)}-{formatMoney(v.max_price)}/day</div>
+    <div className="border-2 border-amber-500 bg-slate-800 p-3 mb-3 rounded">
+      <button onClick={() => setExpanded(!expanded)} className="w-full flex items-center justify-between mb-2">
+        <div className="flex items-center gap-2 text-amber-400">
+          <Building size={16}/> <span className="text-sm font-bold">VENDOR MATCHES</span>
+          <span className="text-xs bg-amber-600 text-white px-1.5 py-0.5 rounded">{totalMatches}</span>
+        </div>
+        <ChevronDown size={16} className={`text-slate-400 transition-transform ${expanded ? 'rotate-180' : ''}`}/>
+      </button>
+      
+      {expanded && (
+        <div className="space-y-3">
+          {/* Summary Estimate */}
+          {(venueEstimate || cateringEstimate) && (
+            <div className="bg-slate-900 p-2 rounded text-xs">
+              <div className="text-slate-400 mb-1">Based on matched vendors:</div>
+              <div className="grid grid-cols-2 gap-2">
+                {venueEstimate && (
+                  <div>
+                    <span className="text-slate-500">Venue:</span>{' '}
+                    <span className="text-amber-400">{formatMoney(venueEstimate.low)} - {formatMoney(venueEstimate.high)}</span>
+                  </div>
+                )}
+                {cateringEstimate && (
+                  <div>
+                    <span className="text-slate-500">Catering:</span>{' '}
+                    <span className="text-amber-400">{formatMoney(cateringEstimate.low)} - {formatMoney(cateringEstimate.high)}</span>
+                  </div>
+                )}
+              </div>
             </div>
-            {v.url && (
-              <a href={v.url} target="_blank" rel="noopener noreferrer" className="text-blue-400 hover:text-blue-300 p-1 ml-2 flex-shrink-0">
-                <ExternalLink size={14}/>
-              </a>
-            )}
+          )}
+          
+          {/* Matched Venues */}
+          {matchedVenues.length > 0 && (
+            <div>
+              <div className="text-xs text-slate-500 mb-1 flex items-center gap-1">
+                <span>🏛️</span> VENUES ({matchedVenues.length} match {venueType})
+              </div>
+              <div className="space-y-1">
+                {matchedVenues.map((v, i) => (
+                  <div key={i} className={`border p-2 rounded text-xs ${tierColors[v.tier] || 'border-slate-600 bg-slate-900'}`}>
+                    <div className="flex justify-between items-start">
+                      <div className="flex-1 min-w-0">
+                        <div className="font-bold truncate">{v.name}</div>
+                        <div className="text-slate-400">
+                          {formatMoney(v.min_price)}-{formatMoney(v.max_price)}/day • {v.min_capacity}-{v.max_capacity} guests
+                        </div>
+                      </div>
+                      <div className="flex items-center gap-1 ml-2">
+                        <span className={`text-xs px-1.5 py-0.5 rounded text-white ${tierBadge[v.tier] || 'bg-slate-600'}`}>{v.tier}</span>
+                        {v.url && (
+                          <a href={v.url} target="_blank" rel="noopener noreferrer" className="text-blue-400 hover:text-blue-300 p-1">
+                            <ExternalLink size={12}/>
+                          </a>
+                        )}
+                      </div>
+                    </div>
+                    {v.notes && <div className="text-slate-500 mt-1 text-xs">{v.notes}</div>}
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+          
+          {/* Matched Caterers */}
+          {matchedCaterers.length > 0 && (
+            <div>
+              <div className="text-xs text-slate-500 mb-1 flex items-center gap-1">
+                <span>🍽️</span> CATERERS ({matchedCaterers.length} in {location})
+              </div>
+              <div className="space-y-1">
+                {matchedCaterers.map((c, i) => (
+                  <div key={i} className={`border p-2 rounded text-xs ${tierColors[c.tier] || 'border-slate-600 bg-slate-900'}`}>
+                    <div className="flex justify-between items-start">
+                      <div className="flex-1 min-w-0">
+                        <div className="font-bold truncate">{c.name}</div>
+                        <div className="text-slate-400">
+                          {formatMoney(c.min_per_person)}-{formatMoney(c.max_per_person)}/person • {c.min_guests}-{c.max_guests} guests
+                        </div>
+                      </div>
+                      <div className="flex items-center gap-1 ml-2">
+                        <span className={`text-xs px-1.5 py-0.5 rounded text-white ${tierBadge[c.tier] || 'bg-slate-600'}`}>{c.tier}</span>
+                        {c.url && (
+                          <a href={c.url} target="_blank" rel="noopener noreferrer" className="text-blue-400 hover:text-blue-300 p-1">
+                            <ExternalLink size={12}/>
+                          </a>
+                        )}
+                      </div>
+                    </div>
+                    {c.cuisine && <div className="text-slate-500 mt-1">{c.cuisine}</div>}
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+          
+          {/* Matched AV Companies */}
+          {matchedAV.length > 0 && (
+            <div>
+              <div className="text-xs text-slate-500 mb-1 flex items-center gap-1">
+                <span>🎤</span> AV COMPANIES ({matchedAV.length} in {location})
+              </div>
+              <div className="space-y-1">
+                {matchedAV.map((av, i) => (
+                  <div key={i} className={`border p-2 rounded text-xs ${tierColors[av.tier] || 'border-slate-600 bg-slate-900'}`}>
+                    <div className="flex justify-between items-start">
+                      <div className="flex-1 min-w-0">
+                        <div className="font-bold truncate">{av.name}</div>
+                        {av.services && <div className="text-slate-400">{av.services}</div>}
+                      </div>
+                      <div className="flex items-center gap-1 ml-2">
+                        <span className={`text-xs px-1.5 py-0.5 rounded text-white ${tierBadge[av.tier] || 'bg-slate-600'}`}>{av.tier}</span>
+                        {av.url && (
+                          <a href={av.url} target="_blank" rel="noopener noreferrer" className="text-blue-400 hover:text-blue-300 p-1">
+                            <ExternalLink size={12}/>
+                          </a>
+                        )}
+                      </div>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+          
+          <div className="text-xs text-slate-600 text-center pt-2 border-t border-slate-700">
+            💡 Vendor data from local database. Prices are estimates — request quotes for accuracy.
           </div>
-        ))}
+          
+          {/* Generate RFP Email Button */}
+          <div className="mt-3 pt-3 border-t border-slate-700">
+            <RfpGenerator responses={responses} budgetConfig={budgetConfig} matchedVenues={matchedVenues} matchedCaterers={matchedCaterers} matchedAV={matchedAV} />
+          </div>
+        </div>
+      )}
+    </div>
+  );
+};
+
+// RFP Email Generator
+const RfpGenerator = ({ responses, budgetConfig, matchedVenues, matchedCaterers, matchedAV }) => {
+  const [showRfp, setShowRfp] = useState(null);
+  const [copied, setCopied] = useState(false);
+  
+  const eventName = responses.event_name || '[Event Name]';
+  const eventDate = responses.target_date ? new Date(responses.target_date).toLocaleDateString('en-US', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' }) : '[Date TBD]';
+  const attendance = budgetConfig.attendanceDefaults[responses.attendance] || '[TBD]';
+  const duration = responses.duration || '[TBD]';
+  const location = responses.location || '[Location TBD]';
+  const format = responses.format || 'In-person';
+  
+  const generateVenueRfp = (venue = null) => {
+    const venueName = venue ? venue.name : '[Venue Name]';
+    const spaces = responses.space_needs?.join(', ') || 'Main event space';
+    const fnbItems = responses.fnb_items?.join(', ') || 'TBD';
+    
+    return `Subject: RFP - ${eventName} | ${eventDate}
+
+Dear ${venueName} Events Team,
+
+I am writing to request a proposal for an upcoming event:
+
+EVENT OVERVIEW
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+Event Name: ${eventName}
+Date: ${eventDate}
+Duration: ${duration}
+Expected Attendance: ${attendance} guests
+Format: ${format}
+
+SPACE REQUIREMENTS
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+${spaces}
+
+${responses.program_elements?.length > 0 ? `Program Elements: ${responses.program_elements.join(', ')}` : ''}
+
+FOOD & BEVERAGE NEEDS
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+${fnbItems}
+
+AV/TECHNICAL REQUIREMENTS
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+${responses.av_needs?.length > 0 ? responses.av_needs.join(', ') : 'Basic AV (screen, projector, microphones)'}
+
+Please provide:
+1. Venue rental cost (with any minimum spend requirements)
+2. In-house catering options and pricing
+3. AV package options
+4. Available setup/breakdown windows
+5. Parking and accessibility information
+6. Any date holds or booking requirements
+
+Our budget range for venue and catering is approximately $${Math.round(budgetConfig.attendanceDefaults[responses.attendance] * 100).toLocaleString()} - $${Math.round(budgetConfig.attendanceDefaults[responses.attendance] * 200).toLocaleString()}.
+
+Please let me know your availability to discuss. We'd like to make a decision within the next two weeks.
+
+Best regards,
+[Your Name]
+[Organization]
+[Phone/Email]`;
+  };
+
+  const generateCateringRfp = (caterer = null) => {
+    const catererName = caterer ? caterer.name : '[Caterer Name]';
+    const fnbItems = responses.fnb_items || [];
+    
+    return `Subject: Catering RFP - ${eventName} | ${eventDate}
+
+Dear ${catererName} Team,
+
+We are seeking catering proposals for an upcoming event:
+
+EVENT DETAILS
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+Event: ${eventName}
+Date: ${eventDate}
+Location: ${location}
+Expected Guests: ${attendance}
+Duration: ${duration}
+
+SERVICE REQUIREMENTS
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+${fnbItems.map(item => `• ${item}`).join('\n') || '• TBD'}
+
+DIETARY CONSIDERATIONS
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+Please include vegetarian, vegan, and gluten-free options.
+
+Please provide:
+1. Menu options at different price points (per person)
+2. Service staff requirements and costs
+3. Equipment/rental needs
+4. Setup and breakdown timeline
+5. Minimum order requirements
+6. Deposit and payment terms
+
+Our target budget is approximately $${Math.round(attendance * 50).toLocaleString()} - $${Math.round(attendance * 100).toLocaleString()} for catering.
+
+Best regards,
+[Your Name]
+[Organization]
+[Phone/Email]`;
+  };
+
+  const generateAVRfp = (avCompany = null) => {
+    const avName = avCompany ? avCompany.name : '[AV Company Name]';
+    const avNeeds = responses.av_needs || [];
+    
+    return `Subject: AV Services RFP - ${eventName} | ${eventDate}
+
+Dear ${avName} Team,
+
+We need AV support for an upcoming event:
+
+EVENT DETAILS
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+Event: ${eventName}
+Date: ${eventDate}
+Location: ${location}
+Attendance: ${attendance}
+Duration: ${duration}
+Format: ${format}
+
+AV REQUIREMENTS
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+${avNeeds.map(item => `• ${item}`).join('\n') || '• Basic presentation setup'}
+
+${format === 'Hybrid (in-person + virtual)' ? `
+LIVESTREAM REQUIREMENTS
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+• Live streaming capability
+• Platform integration (Zoom/Teams/YouTube)
+• Remote speaker integration
+` : ''}
+
+SPACES TO COVER
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+${responses.space_needs?.map(s => `• ${s}`).join('\n') || '• Main event space'}
+
+Please provide:
+1. Equipment list and rental costs
+2. Technical staff requirements (setup, event, breakdown)
+3. Setup timeline needs
+4. Recording options if applicable
+5. Backup equipment policy
+
+Best regards,
+[Your Name]
+[Organization]
+[Phone/Email]`;
+  };
+
+  const copyToClipboard = (text) => {
+    navigator.clipboard.writeText(text);
+    setCopied(true);
+    sound.play('complete');
+    setTimeout(() => setCopied(false), 2000);
+  };
+
+  return (
+    <div>
+      <div className="text-xs text-amber-400 font-bold mb-2">📧 GENERATE RFP EMAILS</div>
+      <div className="grid grid-cols-3 gap-1">
+        <button onClick={() => setShowRfp(showRfp === 'venue' ? null : 'venue')}
+          className={`p-2 border text-xs rounded ${showRfp === 'venue' ? 'border-amber-400 bg-amber-900/30 text-amber-400' : 'border-slate-600 bg-slate-900 text-slate-400'}`}>
+          🏛️ Venue
+        </button>
+        <button onClick={() => setShowRfp(showRfp === 'catering' ? null : 'catering')}
+          className={`p-2 border text-xs rounded ${showRfp === 'catering' ? 'border-amber-400 bg-amber-900/30 text-amber-400' : 'border-slate-600 bg-slate-900 text-slate-400'}`}>
+          🍽️ Catering
+        </button>
+        <button onClick={() => setShowRfp(showRfp === 'av' ? null : 'av')}
+          className={`p-2 border text-xs rounded ${showRfp === 'av' ? 'border-amber-400 bg-amber-900/30 text-amber-400' : 'border-slate-600 bg-slate-900 text-slate-400'}`}>
+          🎤 AV
+        </button>
       </div>
+      
+      {showRfp && (
+        <div className="mt-2 bg-slate-900 border border-slate-700 rounded p-2">
+          <div className="flex justify-between items-center mb-2">
+            <span className="text-xs text-slate-400">
+              {showRfp === 'venue' ? 'Venue RFP' : showRfp === 'catering' ? 'Catering RFP' : 'AV RFP'}
+            </span>
+            <button onClick={() => copyToClipboard(
+              showRfp === 'venue' ? generateVenueRfp() : 
+              showRfp === 'catering' ? generateCateringRfp() : 
+              generateAVRfp()
+            )} className="text-xs bg-amber-600 text-white px-2 py-1 rounded flex items-center gap-1">
+              {copied ? <><CheckCircle size={12}/> Copied!</> : <><Copy size={12}/> Copy</>}
+            </button>
+          </div>
+          <pre className="text-xs text-slate-300 whitespace-pre-wrap max-h-48 overflow-y-auto bg-slate-950 p-2 rounded">
+            {showRfp === 'venue' ? generateVenueRfp() : 
+             showRfp === 'catering' ? generateCateringRfp() : 
+             generateAVRfp()}
+          </pre>
+        </div>
+      )}
     </div>
   );
 };
@@ -645,9 +997,6 @@ const BudgetScenarios = ({ responses, budgetConfig, vendors, onAiRefine, aiEstim
             Range: {fmt(scenarios.budget.total)} – {fmt(scenarios.premium.total)}
           </div>
           
-          {/* Venue Recommendations */}
-          <VenueRecommendations vendors={vendors} responses={responses} budgetConfig={budgetConfig} />
-          
           {/* AI Refinement */}
           <div className="border-t border-slate-700 pt-3">
             <button onClick={onAiRefine} disabled={aiLoading}
@@ -663,6 +1012,465 @@ const BudgetScenarios = ({ responses, budgetConfig, vendors, onAiRefine, aiEstim
           </div>
         </>
       )}
+    </div>
+  );
+};
+
+// Event Checklist Component - Smart checklist based on selections
+const EventChecklist = ({ responses, checkedItems, onToggle }) => {
+  // Build dynamic checklist based on selections
+  const generateChecklist = () => {
+    const items = [];
+    
+    // DOCUMENTS - Always needed
+    items.push({ id: 'doc_ros', category: '📄 Documents', label: 'Run of Show / Agenda', always: true });
+    items.push({ id: 'doc_contacts', category: '📄 Documents', label: 'Emergency contact list', always: true });
+    items.push({ id: 'doc_venue', category: '📄 Documents', label: 'Venue contract & floor plan', always: true });
+    
+    // Vendor docs
+    if (responses.fnb_items?.length > 0) {
+      items.push({ id: 'doc_caterer_w9', category: '📄 Documents', label: 'Caterer W9 & contract', always: false });
+      items.push({ id: 'doc_menu', category: '📄 Documents', label: 'Final menu & dietary list', always: false });
+    }
+    if (responses.av_needs?.length > 0) {
+      items.push({ id: 'doc_av_w9', category: '📄 Documents', label: 'AV vendor W9 & contract', always: false });
+      items.push({ id: 'doc_av_specs', category: '📄 Documents', label: 'AV tech specs & cue sheet', always: false });
+    }
+    if (responses.production_needs?.length > 0) {
+      items.push({ id: 'doc_photo_w9', category: '📄 Documents', label: 'Photo/video vendor W9', always: false });
+    }
+    if (responses.vips) {
+      items.push({ id: 'doc_speaker_bios', category: '📄 Documents', label: 'Speaker bios & headshots', always: false });
+      items.push({ id: 'doc_speaker_release', category: '📄 Documents', label: 'Speaker release forms', always: false });
+    }
+    
+    // MATERIALS - Based on collateral selections
+    if (responses.collateral_needs?.includes('Name badges')) {
+      items.push({ id: 'mat_badges', category: '📦 Materials', label: 'Name badges printed', always: false });
+      items.push({ id: 'mat_lanyards', category: '📦 Materials', label: 'Lanyards / badge holders', always: false });
+    }
+    if (responses.collateral_needs?.includes('Printed programs')) {
+      items.push({ id: 'mat_programs', category: '📦 Materials', label: 'Programs printed', always: false });
+    }
+    if (responses.collateral_needs?.includes('Signage/banners')) {
+      items.push({ id: 'mat_signage', category: '📦 Materials', label: 'Signage & banners', always: false });
+      items.push({ id: 'mat_easels', category: '📦 Materials', label: 'Easels / sign stands', always: false });
+    }
+    if (responses.collateral_needs?.includes('Swag/giveaways')) {
+      items.push({ id: 'mat_swag', category: '📦 Materials', label: 'Swag bags packed', always: false });
+    }
+    
+    // Registration materials
+    if (responses.space_needs?.includes('Registration area')) {
+      items.push({ id: 'mat_reg_table', category: '📦 Materials', label: 'Registration table supplies', always: false });
+      items.push({ id: 'mat_checkin_list', category: '📦 Materials', label: 'Printed check-in list (backup)', always: false });
+    }
+    
+    // Breakout/workshop materials
+    if (responses.space_needs?.includes('Breakout rooms') || responses.program_elements?.includes('Workshops/trainings')) {
+      items.push({ id: 'mat_table_numbers', category: '📦 Materials', label: 'Table numbers / tent cards', always: false });
+      items.push({ id: 'mat_notebooks', category: '📦 Materials', label: 'Notebooks & pens', always: false });
+      items.push({ id: 'mat_flipcharts', category: '📦 Materials', label: 'Flip charts & markers', always: false });
+    }
+    
+    // Common materials always good to have
+    items.push({ id: 'mat_tape', category: '📦 Materials', label: 'Tape, scissors, markers', always: true });
+    items.push({ id: 'mat_extension', category: '📦 Materials', label: 'Extension cords & power strips', always: true });
+    
+    // DAY-OF LOGISTICS
+    items.push({ id: 'day_walkthrough', category: '🎯 Day-Of', label: 'Final venue walkthrough done', always: true });
+    items.push({ id: 'day_staff_brief', category: '🎯 Day-Of', label: 'Staff/volunteer briefing scheduled', always: true });
+    
+    if (responses.vips) {
+      items.push({ id: 'day_speaker_confirm', category: '🎯 Day-Of', label: 'Speaker confirmations sent', always: false });
+      items.push({ id: 'day_green_room', category: '🎯 Day-Of', label: 'Green room / speaker holding area ready', always: false });
+    }
+    if (responses.fnb_items?.length > 0) {
+      items.push({ id: 'day_final_count', category: '🎯 Day-Of', label: 'Final headcount to caterer', always: false });
+    }
+    if (responses.format === 'Hybrid (in-person + virtual)') {
+      items.push({ id: 'day_stream_test', category: '🎯 Day-Of', label: 'Livestream tech check', always: false });
+    }
+    
+    // POST-EVENT - Based on post_event selections
+    if (responses.post_event?.includes('Attendee survey')) {
+      items.push({ id: 'post_survey', category: '📬 Post-Event', label: 'Attendee survey created & ready', always: false });
+    }
+    if (responses.post_event?.includes('Post-event report/summary')) {
+      items.push({ id: 'post_report_template', category: '📬 Post-Event', label: 'Report template prepared', always: false });
+      items.push({ id: 'post_report_data', category: '📬 Post-Event', label: 'Data collection plan in place', always: false });
+    }
+    if (responses.post_event?.includes('Video recording distribution')) {
+      items.push({ id: 'post_video_edit', category: '📬 Post-Event', label: 'Video editing timeline confirmed', always: false });
+      items.push({ id: 'post_video_platform', category: '📬 Post-Event', label: 'Video hosting platform ready', always: false });
+    }
+    if (responses.post_event?.includes('Photo gallery/highlights')) {
+      items.push({ id: 'post_photo_gallery', category: '📬 Post-Event', label: 'Photo gallery platform ready', always: false });
+    }
+    if (responses.post_event?.includes('Press release/media outreach')) {
+      items.push({ id: 'post_press_draft', category: '📬 Post-Event', label: 'Press release draft ready', always: false });
+      items.push({ id: 'post_media_list', category: '📬 Post-Event', label: 'Media contact list prepared', always: false });
+    }
+    if (responses.post_event?.includes('Social media recap')) {
+      items.push({ id: 'post_social_plan', category: '📬 Post-Event', label: 'Social media recap plan', always: false });
+    }
+    if (responses.post_event?.includes('Follow-up emails to attendees')) {
+      items.push({ id: 'post_email_draft', category: '📬 Post-Event', label: 'Follow-up email drafted', always: false });
+    }
+    if (responses.post_event?.includes('Policy brief or recommendations')) {
+      items.push({ id: 'post_policy_brief', category: '📬 Post-Event', label: 'Policy brief outline ready', always: false });
+    }
+    if (responses.production_needs?.includes('Photographer') || responses.production_needs?.includes('Videographer')) {
+      items.push({ id: 'post_media_delivery', category: '📬 Post-Event', label: 'Photo/video delivery timeline confirmed', always: false });
+    }
+    items.push({ id: 'post_thankyou', category: '📬 Post-Event', label: 'Thank you emails drafted', always: true });
+    items.push({ id: 'post_debrief', category: '📬 Post-Event', label: 'Team debrief scheduled', always: true });
+    
+    return items;
+  };
+  
+  const items = generateChecklist();
+  const categories = [...new Set(items.map(i => i.category))];
+  const checkedCount = items.filter(i => checkedItems[i.id]).length;
+  
+  return (
+    <div className="border-2 border-yellow-500 bg-slate-800 p-3 mb-3 rounded">
+      <div className="flex items-center justify-between mb-2">
+        <div className="flex items-center gap-2 text-yellow-400">
+          <CheckCircle size={16}/> <span className="text-sm font-bold">EVENT CHECKLIST</span>
+        </div>
+        <span className="text-xs text-slate-400">{checkedCount}/{items.length} done</span>
+      </div>
+      
+      {/* Progress bar */}
+      <div className="h-2 bg-slate-700 rounded mb-3">
+        <div className="h-2 bg-yellow-500 rounded transition-all" style={{ width: `${(checkedCount / items.length) * 100}%` }}/>
+      </div>
+      
+      <div className="space-y-3 max-h-64 overflow-y-auto">
+        {categories.map(cat => (
+          <div key={cat}>
+            <div className="text-xs text-slate-500 font-bold mb-1">{cat}</div>
+            <div className="space-y-1">
+              {items.filter(i => i.category === cat).map(item => (
+                <button key={item.id} onClick={() => onToggle(item.id)}
+                  className={`w-full text-left p-2 text-xs flex items-center gap-2 rounded transition-all ${
+                    checkedItems[item.id] 
+                      ? 'bg-green-900/30 text-green-400 line-through' 
+                      : 'bg-slate-900 text-slate-300 hover:bg-slate-700'
+                  }`}>
+                  <span>{checkedItems[item.id] ? '☑' : '☐'}</span>
+                  <span className="flex-1">{item.label}</span>
+                </button>
+              ))}
+            </div>
+          </div>
+        ))}
+      </div>
+      
+      <div className="text-xs text-slate-600 mt-2 text-center">
+        💡 Checklist updates based on your selections
+      </div>
+    </div>
+  );
+};
+
+// Document Templates Component
+const DocumentTemplates = ({ responses, team, budgetConfig }) => {
+  const [showTemplate, setShowTemplate] = useState(null);
+  const [copied, setCopied] = useState(false);
+  
+  const eventName = responses.event_name || '[Event Name]';
+  const eventDate = responses.target_date ? new Date(responses.target_date).toLocaleDateString('en-US', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' }) : '[Date TBD]';
+  const attendance = budgetConfig.attendanceDefaults[responses.attendance] || '[TBD]';
+  const duration = responses.duration || '[TBD]';
+  const location = responses.location || '[Location TBD]';
+  const venueType = responses.venue_type || '[Venue TBD]';
+  
+  const templates = {
+    speaker_invite: {
+      name: '📨 Speaker Invitation',
+      content: `Subject: Speaker Invitation - ${eventName} | ${eventDate}
+
+Dear [Speaker Name],
+
+On behalf of SeedAI, I am pleased to invite you to speak at ${eventName}.
+
+EVENT DETAILS
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+Date: ${eventDate}
+Location: ${location}
+Expected Audience: ${attendance} attendees
+Format: ${responses.format || 'In-person'}
+
+AUDIENCE
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+${responses.target_audience?.join(', ') || 'Policy professionals, researchers, and practitioners'}
+
+EVENT DESCRIPTION
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+${responses.spark || '[Event description]'}
+
+WHAT WE'RE ASKING
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+• Speaking slot: [Duration, e.g., 20-minute keynote / 45-minute panel]
+• Topic: [Suggested topic based on their expertise]
+• Timing: [Specific time slot if known]
+
+We would be honored to have your insights on this important topic. SeedAI will cover [travel/accommodation if applicable] and provide full AV support.
+
+Please let me know if you're available and interested. I'm happy to schedule a call to discuss further.
+
+Best regards,
+[Your Name]
+[Title]
+SeedAI
+[Phone] | [Email]`
+    },
+    
+    run_of_show: {
+      name: '📋 Run of Show',
+      content: `${eventName.toUpperCase()}
+RUN OF SHOW
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+Date: ${eventDate}
+Location: ${location} | ${venueType}
+Expected Attendance: ${attendance}
+
+CONTACTS
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+Event Lead: [Name] | [Phone] | [Email]
+Venue Contact: [Name] | [Phone]
+AV Lead: [Name] | [Phone]
+Catering: [Name] | [Phone]
+${team.length > 0 ? '\nTeam:\n' + team.map(m => `• ${m.name}${m.role ? ` - ${m.role}` : ''}`).join('\n') : ''}
+
+SETUP DAY (Day Before)
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+[ ] __:__ AM  Venue access / Load-in begins
+[ ] __:__ AM  AV setup and testing
+[ ] __:__ PM  Registration area setup
+[ ] __:__ PM  Signage placement
+[ ] __:__ PM  Final walkthrough
+
+EVENT DAY
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+[ ] __:__ AM  Staff arrival / Final prep
+[ ] __:__ AM  AV check with speakers
+[ ] __:__ AM  Registration opens
+${responses.fnb_items?.includes('Breakfast/brunch') ? '[ ] __:__ AM  Breakfast service\n' : ''}
+[ ] __:__ AM  Program begins
+              Welcome & Opening Remarks
+              [Speaker/Session 1]
+              
+${responses.fnb_items?.includes('AM break service') ? '[ ] __:__ AM  Morning break\n' : ''}
+              [Speaker/Session 2]
+              
+${responses.fnb_items?.includes('Lunch') ? '[ ] __:__ PM  Lunch\n' : ''}
+${responses.program_elements?.includes('Panel discussions') ? '              Panel Discussion: [Topic]\n' : ''}
+${responses.program_elements?.includes('Breakout sessions') ? '              Breakout Sessions\n' : ''}
+${responses.program_elements?.includes('Workshops/trainings') ? '              Workshop: [Topic]\n' : ''}
+${responses.fnb_items?.includes('PM break service') ? '[ ] __:__ PM  Afternoon break\n' : ''}
+              [Closing Session]
+              
+${responses.fnb_items?.includes('Reception/cocktails') ? '[ ] __:__ PM  Reception\n' : ''}
+[ ] __:__ PM  Event concludes
+[ ] __:__ PM  Breakdown begins
+
+NOTES
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+${responses.anchor_moments || '[Key moments and special instructions]'}
+
+EMERGENCY INFO
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+Venue Emergency Contact: [Phone]
+Nearest Hospital: [Name & Address]
+`
+    },
+    
+    contact_sheet: {
+      name: '📞 Day-Of Contacts',
+      content: `${eventName.toUpperCase()}
+DAY-OF CONTACT SHEET
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+Date: ${eventDate}
+Venue: ${venueType} | ${location}
+
+SEEDAI TEAM
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+Event Lead:      [Name]         [Phone]
+Day-of Manager:  [Name]         [Phone]
+Registration:    [Name]         [Phone]
+Speaker Liaison: [Name]         [Phone]
+${team.length > 0 ? team.map(m => `${m.role || 'Team'}:`.padEnd(17) + `${m.name}`.padEnd(16) + '[Phone]').join('\n') : ''}
+
+VENDORS
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+Venue Contact:   [Name]         [Phone]
+Catering:        [Name]         [Phone]
+AV Company:      [Name]         [Phone]
+${responses.production_needs?.includes('Photographer') ? 'Photographer:    [Name]         [Phone]\n' : ''}${responses.production_needs?.includes('Videographer') ? 'Videographer:    [Name]         [Phone]\n' : ''}
+
+SPEAKERS / VIPs
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+${responses.vips ? responses.vips.split('\n').map(v => `[Name]          [Phone]         [Arrival Time]`).join('\n') : '[Speaker 1]     [Phone]         [Arrival Time]\n[Speaker 2]     [Phone]         [Arrival Time]'}
+
+EMERGENCY CONTACTS
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+Venue Security:  [Phone]
+Building Mgmt:   [Phone]
+Local Emergency: 911
+Nearest Hospital: [Name]        [Address]
+
+LOGISTICS
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+Wifi Network: [Network Name]
+Wifi Password: [Password]
+Parking: [Instructions]
+Loading Dock: [Location/Access]
+`
+    },
+    
+    attendee_followup: {
+      name: '✉️ Attendee Follow-up',
+      content: `Subject: Thank you for attending ${eventName}!
+
+Dear [First Name],
+
+Thank you for joining us at ${eventName} on ${eventDate}. We hope you found the event valuable and engaging.
+
+EVENT HIGHLIGHTS
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+${responses.anchor_moments || '• [Key moment 1]\n• [Key moment 2]\n• [Key moment 3]'}
+
+RESOURCES
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+${responses.post_event?.includes('Video recording distribution') ? '• Event recording: [Link]\n' : ''}${responses.post_event?.includes('Photo gallery/highlights') ? '• Photo gallery: [Link]\n' : ''}• Presentation slides: [Link]
+• Speaker contact info: [Link]
+${responses.post_event?.includes('Post-event report/summary') ? '• Event summary report: [Link]\n' : ''}
+
+${responses.post_event?.includes('Attendee survey') ? `YOUR FEEDBACK MATTERS
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+Please take 2 minutes to share your thoughts:
+[Survey Link]
+
+` : ''}STAY CONNECTED
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+• Subscribe to our newsletter: [Link]
+• Follow us: [Social media links]
+• Upcoming events: [Link]
+
+Thank you again for being part of this important conversation. We look forward to seeing you at future SeedAI events.
+
+Best regards,
+[Your Name]
+[Title]
+SeedAI`
+    },
+    
+    budget_summary: {
+      name: '💰 Budget Summary',
+      content: `${eventName.toUpperCase()}
+BUDGET SUMMARY
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+Event Date: ${eventDate}
+Location: ${location}
+Attendance: ${attendance}
+Duration: ${duration}
+
+ESTIMATED COSTS
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+Category                Budget      Standard    Premium
+────────────────────────────────────────────────────────
+Venue                   $____       $____       $____
+Food & Beverage         $____       $____       $____
+AV / Technical          $____       $____       $____
+Production              $____       $____       $____
+Collateral              $____       $____       $____
+Marketing               $____       $____       $____
+Staffing                $____       $____       $____
+────────────────────────────────────────────────────────
+Subtotal                $____       $____       $____
+Contingency (15%)       $____       $____       $____
+────────────────────────────────────────────────────────
+TOTAL                   $____       $____       $____
+
+FUNDING SOURCES
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+${responses.funding_sources?.map(f => `☐ ${f}`).join('\n') || '☐ TBD'}
+
+NOTES
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+• All estimates based on ${location} market rates
+• Venue costs ${responses.venue_type ? `assume ${responses.venue_type}` : 'TBD'}
+• F&B includes: ${responses.fnb_items?.join(', ') || 'TBD'}
+• AV includes: ${responses.av_needs?.join(', ') || 'TBD'}
+
+Prepared: ${new Date().toLocaleDateString()}
+`
+    }
+  };
+
+  const copyToClipboard = (text) => {
+    navigator.clipboard.writeText(text);
+    setCopied(true);
+    sound.play('complete');
+    setTimeout(() => setCopied(false), 2000);
+  };
+
+  const downloadTemplate = (name, content) => {
+    const blob = new Blob([content], { type: 'text/plain' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `${eventName.replace(/[^a-z0-9]/gi, '_')}_${name}.txt`;
+    a.click();
+    URL.revokeObjectURL(url);
+    sound.play('complete');
+  };
+
+  return (
+    <div className="border-2 border-indigo-500 bg-slate-800 p-3 mb-3 rounded">
+      <div className="flex items-center gap-2 text-indigo-400 mb-3">
+        <FileText size={16}/> <span className="text-sm font-bold">DOCUMENT TEMPLATES</span>
+      </div>
+      
+      <div className="grid grid-cols-2 gap-1 mb-2">
+        {Object.entries(templates).map(([key, tmpl]) => (
+          <button key={key} onClick={() => setShowTemplate(showTemplate === key ? null : key)}
+            className={`p-2 border text-xs rounded text-left ${showTemplate === key ? 'border-indigo-400 bg-indigo-900/30 text-indigo-400' : 'border-slate-600 bg-slate-900 text-slate-400'}`}>
+            {tmpl.name}
+          </button>
+        ))}
+      </div>
+      
+      {showTemplate && templates[showTemplate] && (
+        <div className="bg-slate-900 border border-slate-700 rounded p-2">
+          <div className="flex justify-between items-center mb-2">
+            <span className="text-xs text-slate-400">{templates[showTemplate].name}</span>
+            <div className="flex gap-1">
+              <button onClick={() => copyToClipboard(templates[showTemplate].content)} 
+                className="text-xs bg-indigo-600 text-white px-2 py-1 rounded flex items-center gap-1">
+                {copied ? <><CheckCircle size={12}/> Copied!</> : <><Copy size={12}/> Copy</>}
+              </button>
+              <button onClick={() => downloadTemplate(showTemplate, templates[showTemplate].content)}
+                className="text-xs bg-slate-600 text-white px-2 py-1 rounded flex items-center gap-1">
+                <Download size={12}/> Save
+              </button>
+            </div>
+          </div>
+          <pre className="text-xs text-slate-300 whitespace-pre-wrap max-h-64 overflow-y-auto bg-slate-950 p-2 rounded">
+            {templates[showTemplate].content}
+          </pre>
+        </div>
+      )}
+      
+      <div className="text-xs text-slate-600 mt-2 text-center">
+        💡 Templates auto-fill with your event details
+      </div>
     </div>
   );
 };
@@ -693,6 +1501,12 @@ export default function App() {
   const [budgetConfig] = useState(DEFAULT_BUDGET_CONFIG);
   const [vendors, setVendors] = useState(DEFAULT_VENDORS);
   const [dataSource, setDataSource] = useState('default');
+  const [checkedItems, setCheckedItems] = useState({});
+
+  const toggleChecklistItem = (id) => {
+    sound.play('select');
+    setCheckedItems(prev => ({ ...prev, [id]: !prev[id] }));
+  };
 
   // Load from Google Sheets
   useEffect(() => {
@@ -707,6 +1521,31 @@ export default function App() {
       } catch (e) { console.log('Using defaults'); }
     };
     loadData();
+  }, []);
+
+  // Load from shared URL
+  useEffect(() => {
+    try {
+      const params = new URLSearchParams(window.location.search);
+      const eventData = params.get('event');
+      if (eventData) {
+        const decoded = JSON.parse(decodeURIComponent(atob(eventData)));
+        if (decoded.responses) {
+          setChar(decoded.char || null);
+          setProgram(decoded.program || null);
+          setResponses(decoded.responses || {});
+          setNeedsInput(decoded.needsInput || {});
+          setNotes(decoded.notes || {});
+          setTeam(decoded.team || []);
+          setCheckedItems(decoded.checkedItems || {});
+          setScreen('play');
+          // Clear URL params after loading
+          window.history.replaceState({}, '', window.location.pathname);
+          setStatus('Loaded from shared link!');
+          setTimeout(() => setStatus(''), 3000);
+        }
+      }
+    } catch (e) { console.log('No shared link data'); }
   }, []);
 
   useEffect(() => {
@@ -724,7 +1563,7 @@ export default function App() {
       const timer = setTimeout(() => saveProgress(true), 2000);
       return () => clearTimeout(timer);
     }
-  }, [responses, needsInput, notes, team, char, program, phase, screen]);
+  }, [responses, needsInput, notes, team, char, program, phase, screen, checkedItems]);
 
   useEffect(() => { const i = setInterval(() => setBlink(b => !b), 500); return () => clearInterval(i); }, []);
 
@@ -740,6 +1579,7 @@ export default function App() {
       { id: "why_event", label: "Why is an event the right format?", type: "textarea", placeholder: "vs. report, webinar, etc.", tip: "Consider alternatives: report, webinar, roundtable" },
       { id: "seedai_alignment", label: "How does this connect to SeedAI's mission?", type: "textarea", placeholder: "Try It, Prove It, Scale It...", tip: "Which pillar does this support?" },
       { id: "success_metrics", label: "How will you measure success?", type: "textarea", placeholder: "Goals, metrics...", tip: "Attendees? Media hits? Policy outcomes?" },
+      { id: "post_event", label: "What happens after the event?", type: "checkbox", options: ["Post-event report/summary", "Video recording distribution", "Photo gallery/highlights", "Attendee survey", "Follow-up emails to attendees", "Press release/media outreach", "Social media recap", "Follow-up meetings with key contacts", "Community/network building", "Policy brief or recommendations", "Blog post or article", "Nothing planned yet"] },
     ]},
     { id: 2, name: "THE PEOPLE", icon: "👥", subtitle: "Who needs to be there?", questions: [
       { id: "target_audience", label: "Who is your target audience?", type: "checkbox", options: ["Policymakers", "Congressional Staffers", "Federal Agency Staff", "State/Local Officials", "Private Sector Executives", "Researchers/Academics", "Students", "Nonprofit Leaders", "Media/Press", "General Public"] },
@@ -771,7 +1611,7 @@ export default function App() {
       { id: "collateral_needs", label: "Event collateral?", type: "checkbox", options: Object.keys(budgetConfig.collateral) },
       { id: "marketing_channels", label: "Marketing channels?", type: "checkbox", options: Object.keys(budgetConfig.marketing) },
     ]},
-    { id: 6, name: "THE PLAN", icon: "🚀", subtitle: "Budget & timeline", questions: [
+    { id: 6, name: "THE PLAN", icon: "🚀", subtitle: "Budget & checklist", questions: [
       { id: "funding_sources", label: "Potential funding sources?", type: "checkbox", options: ["Organizational budget", "Sponsorships", "Grants", "Registration fees", "Partner contributions", "In-kind support", "TBD"] },
       { id: "risks", label: "What could go wrong?", type: "textarea", placeholder: "Be honest about risks...", tip: "Speaker cancels? Low turnout? Budget overrun? Have a backup plan." }
     ], isOutputPhase: true }
@@ -830,7 +1670,7 @@ export default function App() {
 
   const saveProgress = (silent = false) => {
     try {
-      localStorage.setItem(STORAGE_KEY, JSON.stringify({ char, program, phase, responses, needsInput, notes, team, appliedDefaults, savedAt: new Date().toISOString() }));
+      localStorage.setItem(STORAGE_KEY, JSON.stringify({ char, program, phase, responses, needsInput, notes, team, appliedDefaults, checkedItems, savedAt: new Date().toISOString() }));
       if (!silent) { sound.play('select'); setStatus('Saved!'); setTimeout(() => setStatus(''), 2000); }
     } catch (e) {}
   };
@@ -842,7 +1682,7 @@ export default function App() {
         const d = JSON.parse(saved);
         setChar(d.char); setProgram(d.program); setPhase(d.phase || 0);
         setResponses(d.responses || {}); setNeedsInput(d.needsInput || {}); setNotes(d.notes || {}); setTeam(d.team || []);
-        setAppliedDefaults(d.appliedDefaults || false);
+        setAppliedDefaults(d.appliedDefaults || false); setCheckedItems(d.checkedItems || {});
         sound.play('start'); setScreen('play');
       }
     } catch (e) {}
@@ -850,7 +1690,7 @@ export default function App() {
 
   const clearSave = () => {
     localStorage.removeItem(STORAGE_KEY); setHasSave(false);
-    setResponses({}); setNeedsInput({}); setNotes({}); setTeam([]);
+    setResponses({}); setNeedsInput({}); setNotes({}); setTeam([]); setCheckedItems({});
     setChar(null); setProgram(null); setPhase(0); setAiEstimate(null);
     setAppliedDefaults(false); setShowSmartDefaults(null);
   };
@@ -960,6 +1800,23 @@ export default function App() {
 
   if (screen === 'export') {
     const total = totalProgress();
+    
+    // Generate shareable link
+    const generateShareLink = () => {
+      try {
+        const data = { char, program, responses, needsInput, notes, team, checkedItems };
+        const encoded = btoa(encodeURIComponent(JSON.stringify(data)));
+        const url = `${window.location.origin}${window.location.pathname}?event=${encoded}`;
+        navigator.clipboard.writeText(url);
+        sound.play('complete');
+        setStatus('Link copied! Share to let others view/edit.');
+        setTimeout(() => setStatus(''), 3000);
+      } catch (e) {
+        setStatus('Could not generate link');
+        setTimeout(() => setStatus(''), 2000);
+      }
+    };
+    
     return (
       <div className="min-h-screen bg-slate-900 p-3 font-mono overflow-auto">
         <div className="max-w-lg mx-auto">
@@ -972,15 +1829,26 @@ export default function App() {
           <TimelineView responses={responses} budgetConfig={budgetConfig} />
           <RiskFlags responses={responses} budgetConfig={budgetConfig} />
           <BudgetScenarios responses={responses} budgetConfig={budgetConfig} vendors={vendors} onAiRefine={handleAiRefine} aiEstimate={aiEstimate} aiLoading={aiLoading} />
+          <VendorMatching vendors={vendors} responses={responses} budgetConfig={budgetConfig} />
+          <EventChecklist responses={responses} checkedItems={checkedItems} onToggle={toggleChecklistItem} />
+          <DocumentTemplates responses={responses} team={team} budgetConfig={budgetConfig} />
           
+          {/* Share Section */}
           <div className="border-2 border-blue-500 bg-slate-800 p-3 mb-3 rounded">
             <div className="text-blue-400 text-sm font-bold mb-2">SHARE PROPOSAL</div>
-            <div className="grid grid-cols-3 gap-2">
-              <Btn onClick={copy} variant="primary" className="w-full text-xs py-2"><Share2 size={12} className="inline mr-1"/>COPY</Btn>
+            <div className="grid grid-cols-2 gap-2 mb-2">
+              <Btn onClick={copy} variant="primary" className="w-full text-xs py-2"><Share2 size={12} className="inline mr-1"/>COPY TEXT</Btn>
               <Btn onClick={email} variant="warning" className="w-full text-xs py-2"><Mail size={12} className="inline mr-1"/>EMAIL</Btn>
-              <Btn onClick={download} variant="success" className="w-full text-xs py-2"><Download size={12} className="inline mr-1"/>SAVE</Btn>
+            </div>
+            <div className="grid grid-cols-2 gap-2">
+              <Btn onClick={download} variant="success" className="w-full text-xs py-2"><Download size={12} className="inline mr-1"/>DOWNLOAD</Btn>
+              <Btn onClick={generateShareLink} variant="secondary" className="w-full text-xs py-2"><Link2 size={12} className="inline mr-1"/>SHARE LINK</Btn>
             </div>
             {status && <div className="text-center text-green-400 text-xs mt-2">{status}</div>}
+          </div>
+          
+          <div className="text-xs text-slate-600 text-center mb-3 p-2 border border-dashed border-slate-700 rounded">
+            💡 Share Link lets others view and edit their own copy of this event plan
           </div>
           
           <div className="flex justify-center gap-2">
@@ -1070,6 +1938,9 @@ export default function App() {
               <TimelineView responses={responses} budgetConfig={budgetConfig} />
               <RiskFlags responses={responses} budgetConfig={budgetConfig} />
               <BudgetScenarios responses={responses} budgetConfig={budgetConfig} vendors={vendors} onAiRefine={handleAiRefine} aiEstimate={aiEstimate} aiLoading={aiLoading} />
+              <VendorMatching vendors={vendors} responses={responses} budgetConfig={budgetConfig} />
+              <EventChecklist responses={responses} checkedItems={checkedItems} onToggle={toggleChecklistItem} />
+              <DocumentTemplates responses={responses} team={team} budgetConfig={budgetConfig} />
               
               {/* Phase 6 Questions (Funding Sources, Risks) */}
               {p.questions.length > 0 && (
