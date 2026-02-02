@@ -1,2004 +1,2124 @@
-import React, { useState, useEffect } from 'react';
-import { Share2, Mail, Download, Users, MessageSquare, HelpCircle, Trophy, Volume2, VolumeX, Plus, X, Sparkles, Calculator, AlertTriangle, Save, RotateCcw, Zap, Loader, Calendar, Clock, CheckCircle, Lightbulb, ExternalLink, MapPin, Building, ChevronDown, Link2, Copy, FileText } from 'lucide-react';
+import React, { useState, useEffect, useCallback, useRef } from 'react';
 
-// ╔════════════════════════════════════════════════════════════════════════════╗
-// ║                    GOOGLE SHEETS CONFIGURATION                              ║
-// ╚════════════════════════════════════════════════════════════════════════════╝
+// ============================================================================
+// SEEDAI EVENT PLANNER V7
+// Added: Congressional calendar, .ics export, smart sharing, rule-based hints
+// ============================================================================
 
-const SHEET_ID = process.env.REACT_APP_SHEET_ID || 'YOUR_SHEET_ID_HERE';
+// ============================================================================
+// CONFIGURATION
+// ============================================================================
 
-const fetchSheetData = async (sheetName) => {
-  try {
-    const url = `https://docs.google.com/spreadsheets/d/${SHEET_ID}/gviz/tq?tqx=out:json&sheet=${sheetName}`;
-    const response = await fetch(url);
-    const text = await response.text();
-    const json = JSON.parse(text.substring(47).slice(0, -2));
-    const headers = json.table.cols.map(col => col.label);
-    return json.table.rows.map(row => {
-      const obj = {};
-      row.c.forEach((cell, i) => { obj[headers[i]] = cell ? cell.v : ''; });
-      return obj;
-    });
-  } catch (error) {
-    console.log(`Could not fetch ${sheetName}, using defaults`);
-    return null;
-  }
+const REGIONS = {
+  'dc-metro': { name: 'Washington, DC Metro', multiplier: 1.0 },
+  'nyc': { name: 'New York City', multiplier: 1.35 },
+  'sf-bay': { name: 'San Francisco Bay Area', multiplier: 1.30 },
+  'la': { name: 'Los Angeles', multiplier: 1.15 },
+  'boston': { name: 'Boston', multiplier: 1.10 },
+  'seattle': { name: 'Seattle', multiplier: 1.05 },
+  'chicago': { name: 'Chicago', multiplier: 0.95 },
+  'miami': { name: 'Miami', multiplier: 0.95 },
+  'denver': { name: 'Denver', multiplier: 0.90 },
+  'austin': { name: 'Austin', multiplier: 0.85 },
+  'atlanta': { name: 'Atlanta', multiplier: 0.85 },
+  'other': { name: 'Other / Smaller Market', multiplier: 0.75 }
 };
 
-// ╔════════════════════════════════════════════════════════════════════════════╗
-// ║                         DEFAULT CONFIGURATION                               ║
-// ╚════════════════════════════════════════════════════════════════════════════╝
-
-const DEFAULT_BUDGET_CONFIG = {
-  locations: {
-    "Washington DC": { multiplier: 1.0, label: "Washington DC", peakMonths: [3, 4, 5, 9, 10] },
-    "New York City": { multiplier: 1.35, label: "New York City", peakMonths: [5, 6, 9, 10, 12] },
-    "San Francisco": { multiplier: 1.4, label: "San Francisco", peakMonths: [5, 6, 9, 10] },
-    "Los Angeles": { multiplier: 1.2, label: "Los Angeles", peakMonths: [1, 2, 3, 10, 11] },
-    "Chicago": { multiplier: 0.95, label: "Chicago", peakMonths: [6, 7, 8, 9] },
-    "Boston": { multiplier: 1.15, label: "Boston", peakMonths: [5, 6, 9, 10] },
-    "Seattle": { multiplier: 1.1, label: "Seattle", peakMonths: [6, 7, 8, 9] },
-    "Austin": { multiplier: 0.85, label: "Austin", peakMonths: [3, 10, 11] },
-    "Denver": { multiplier: 0.9, label: "Denver", peakMonths: [6, 7, 8, 9] },
-    "Atlanta": { multiplier: 0.85, label: "Atlanta", peakMonths: [3, 4, 9, 10] },
-    "Miami": { multiplier: 1.0, label: "Miami", peakMonths: [1, 2, 3, 12] },
-    "Regional/Rural": { multiplier: 0.7, label: "Regional / Smaller City", peakMonths: [] },
-  },
-  venueTypes: {
-    "Conference center": { perPerson: { budget: 50, standard: 75, premium: 110 }, minSpend: 2000, leadTime: 12 },
-    "Hotel": { perPerson: { budget: 60, standard: 85, premium: 130 }, minSpend: 3000, leadTime: 8 },
-    "University/campus": { perPerson: { budget: 25, standard: 35, premium: 55 }, minSpend: 500, leadTime: 16 },
-    "Government building": { perPerson: { budget: 0, standard: 0, premium: 0 }, minSpend: 0, leadTime: 20 },
-    "Museum/unique venue": { perPerson: { budget: 70, standard: 100, premium: 160 }, minSpend: 5000, leadTime: 16 },
-    "Corporate office": { perPerson: { budget: 15, standard: 25, premium: 40 }, minSpend: 0, leadTime: 4 },
-    "Not sure yet": { perPerson: { budget: 50, standard: 75, premium: 110 }, minSpend: 2000, leadTime: 12 },
-  },
-  foodAndBeverage: {
-    "Coffee/Light Snacks": { budget: 12, standard: 18, premium: 28 },
-    "Breakfast": { budget: 22, standard: 32, premium: 50 },
-    "Lunch": { budget: 32, standard: 45, premium: 70 },
-    "Reception/Appetizers": { budget: 40, standard: 55, premium: 85 },
-    "Dinner": { budget: 65, standard: 95, premium: 150 },
-    "Special dietary options": { budget: 8, standard: 12, premium: 18 },
-    "Alcohol service": { budget: 25, standard: 35, premium: 55 },
-  },
-  avTechnical: {
-    "Basic (mics, projector)": { budget: 1500, standard: 2500, premium: 4000 },
-    "Professional staging": { budget: 4000, standard: 6000, premium: 12000 },
-    "Multiple screens": { budget: 2500, standard: 3500, premium: 6000 },
-    "Livestream": { budget: 3500, standard: 5000, premium: 10000 },
-    "Recording": { budget: 1800, standard: 2500, premium: 5000 },
-    "Lighting design": { budget: 2500, standard: 4000, premium: 8000 },
-  },
-  production: {
-    "Photographer": { budget: 1400, standard: 2000, premium: 3500, perDay: true },
-    "Videographer": { budget: 2500, standard: 3500, premium: 6000, perDay: true },
-    "Post-event highlight video": { budget: 2500, standard: 3500, premium: 6000, perDay: false },
-    "Social media coverage": { budget: 800, standard: 1200, premium: 2000, perDay: true },
-    "Graphic recording": { budget: 1800, standard: 2500, premium: 4000, perDay: true },
-  },
-  collateral: {
-    "Event website": { budget: 1400, standard: 2000, premium: 4000, perPerson: false },
-    "Registration system": { budget: 400, standard: 600, premium: 1200, perPerson: false },
-    "Event app": { budget: 2800, standard: 4000, premium: 8000, perPerson: false },
-    "Printed programs": { budget: 2.5, standard: 4, premium: 8, perPerson: true },
-    "Name badges": { budget: 2, standard: 3, premium: 6, perPerson: true },
-    "Signage/banners": { budget: 1400, standard: 2000, premium: 4000, perPerson: false },
-    "Swag/giveaways": { budget: 15, standard: 25, premium: 50, perPerson: true },
-  },
-  marketing: {
-    "Email campaigns": { budget: 400, standard: 600, premium: 1200 },
-    "Social media (organic)": { budget: 400, standard: 600, premium: 1000 },
-    "Social media (paid)": { budget: 1500, standard: 2500, premium: 5000 },
-    "Press/media outreach": { budget: 1400, standard: 2000, premium: 4000 },
-  },
-  staffing: { budget: 1800, standard: 2500, premium: 4000 },
-  contingency: { budget: 0.12, standard: 0.15, premium: 0.18 },
-  durationMultipliers: { "2-3 hours": 0.5, "Half day (4-5 hours)": 0.5, "Full day": 1, "1.5 days": 1.5, "2 days": 2, "Multi-day (3+)": 3 },
-  attendanceDefaults: { "Under 25 (intimate)": 20, "25-50 (small)": 40, "50-100 (medium)": 75, "100-250 (large)": 175, "250-500 (very large)": 375, "500+ (major)": 600 },
-};
-
-const DEFAULT_VENDORS = {
-  venues: [
-    { city: "Washington DC", name: "Ronald Reagan Building", type: "Conference center", tier: "Premium", min_capacity: 50, max_capacity: 5000, min_price: 15000, max_price: 50000, url: "https://rrbitc.com", notes: "65000 sq ft. Iconic DC venue." },
-    { city: "Washington DC", name: "National Building Museum", type: "Museum/unique venue", tier: "Premium", min_capacity: 100, max_capacity: 1000, min_price: 18000, max_price: 35000, url: "https://nbm.org", notes: "Historic Great Hall." },
-    { city: "Washington DC", name: "Partnership for Public Service", type: "Conference center", tier: "Standard", min_capacity: 15, max_capacity: 200, min_price: 5000, max_price: 12000, url: "https://ourpublicservice.org/about/conference-center-rental/", notes: "Modern. Mon/Fri discounts." },
-    { city: "Washington DC", name: "National Press Club", type: "Conference center", tier: "Standard", min_capacity: 25, max_capacity: 500, min_price: 4000, max_price: 15000, url: "https://press.org", notes: "Great for policy events." },
-    { city: "Washington DC", name: "Marriott Marquis DC", type: "Hotel", tier: "Standard", min_capacity: 50, max_capacity: 2500, min_price: 8000, max_price: 30000, url: "https://marriott.com", notes: "Convention center adjacent." },
-    { city: "Washington DC", name: "Georgetown Conference Center", type: "University/campus", tier: "Budget", min_capacity: 25, max_capacity: 300, min_price: 2500, max_price: 8000, url: "https://conference.georgetown.edu", notes: "Academic discounts possible." },
-    { city: "Washington DC", name: "GWU Marvin Center", type: "University/campus", tier: "Budget", min_capacity: 50, max_capacity: 400, min_price: 2000, max_price: 6000, url: "https://gwu.edu", notes: "Central location." },
-    { city: "Washington DC", name: "MLK Library", type: "Government building", tier: "Budget", min_capacity: 25, max_capacity: 200, min_price: 1500, max_price: 4000, url: "https://dclibrary.org/mlk", notes: "Renovated 2020." },
-  ],
-  caterers: [
-    { city: "Washington DC", name: "Ridgewells Catering", tier: "Premium", budget_pp: 85, standard_pp: 135, premium_pp: 200, url: "https://ridgewells.com", notes: "95+ years. Award-winning." },
-    { city: "Washington DC", name: "Occasions Caterers", tier: "Premium", budget_pp: 75, standard_pp: 120, premium_pp: 180, url: "https://occasionscaterers.com", notes: "Custom menus." },
-    { city: "Washington DC", name: "RSVP Catering", tier: "Standard", budget_pp: 50, standard_pp: 80, premium_pp: 120, url: "https://rsvpcatering.com", notes: "Corporate focus." },
-    { city: "Washington DC", name: "CNF Catering", tier: "Budget", budget_pp: 35, standard_pp: 55, premium_pp: 85, url: "https://cnfcatering.com", notes: "Since 1986. Good value." },
-  ],
-  av_companies: [
-    { city: "Washington DC", name: "Media Support Services", tier: "Standard", basic_day: 1800, standard_day: 4000, premium_day: 10000, url: "https://mssav.com", notes: "Since 1996." },
-    { city: "Washington DC", name: "Electric Events DC", tier: "Standard", basic_day: 2000, standard_day: 5000, premium_day: 15000, url: "https://electriceventsdc.com", notes: "Full service." },
-    { city: "Washington DC", name: "AV Universal", tier: "Budget", basic_day: 1000, standard_day: 2500, premium_day: 6000, url: "https://avuniversal.com", notes: "Good value." },
-  ],
-};
-
-const SMART_DEFAULTS = {
-  "Conference": { duration: "Full day", attendance: "100-250 (large)", venue_type: "Conference center", program_elements: ["Keynote speeches", "Panel discussions", "Networking time", "Q&A sessions"], fnb_items: ["Coffee/Light Snacks", "Lunch", "Reception/Appetizers"], av_needs: ["Basic (mics, projector)", "Multiple screens", "Recording"], production_needs: ["Photographer", "Videographer"], collateral_needs: ["Event website", "Registration system", "Name badges", "Printed programs"] },
-  "Workshop/Training": { duration: "Half day (4-5 hours)", attendance: "25-50 (small)", venue_type: "Conference center", program_elements: ["Workshops/trainings", "Breakout sessions", "Q&A sessions"], fnb_items: ["Coffee/Light Snacks", "Lunch"], av_needs: ["Basic (mics, projector)"], production_needs: [], collateral_needs: ["Registration system", "Name badges"] },
-  "Roundtable Discussion": { duration: "2-3 hours", attendance: "Under 25 (intimate)", venue_type: "Corporate office", program_elements: ["Panel discussions", "Networking time"], fnb_items: ["Coffee/Light Snacks"], av_needs: ["Basic (mics, projector)"], production_needs: [], collateral_needs: ["Name badges"] },
-  "Summit": { duration: "Full day", attendance: "100-250 (large)", venue_type: "Hotel", program_elements: ["Keynote speeches", "Panel discussions", "Breakout sessions", "Networking time"], fnb_items: ["Coffee/Light Snacks", "Breakfast", "Lunch", "Reception/Appetizers"], av_needs: ["Basic (mics, projector)", "Professional staging", "Recording"], production_needs: ["Photographer", "Videographer"], collateral_needs: ["Event website", "Registration system", "Name badges", "Swag/giveaways"] },
-  "Reception/Networking": { duration: "2-3 hours", attendance: "50-100 (medium)", venue_type: "Museum/unique venue", program_elements: ["Networking time", "Entertainment"], fnb_items: ["Reception/Appetizers", "Alcohol service"], av_needs: ["Basic (mics, projector)"], production_needs: ["Photographer"], collateral_needs: ["Name badges"] },
-  "Briefing/Presentation": { duration: "2-3 hours", attendance: "25-50 (small)", venue_type: "Corporate office", program_elements: ["Keynote speeches", "Q&A sessions"], fnb_items: ["Coffee/Light Snacks"], av_needs: ["Basic (mics, projector)"], production_needs: [], collateral_needs: [] },
-  "Demo Day/Showcase": { duration: "Half day (4-5 hours)", attendance: "50-100 (medium)", venue_type: "Conference center", program_elements: ["Demos/showcases", "Networking time"], fnb_items: ["Coffee/Light Snacks", "Lunch"], av_needs: ["Basic (mics, projector)", "Multiple screens"], production_needs: ["Photographer", "Videographer"], collateral_needs: ["Event website", "Registration system", "Name badges"] },
-};
-
-const STORAGE_KEY = 'seedai-event-planner-save';
-
-// ╔════════════════════════════════════════════════════════════════════════════╗
-// ║                              HELPER FUNCTIONS                               ║
-// ╚════════════════════════════════════════════════════════════════════════════╝
-
-const getSetupMultiplier = (duration) => {
-  const m = { "2-3 hours": 1.5, "Half day (4-5 hours)": 1.5, "Full day": 1.5, "1.5 days": 1.33, "2 days": 1.25, "Multi-day (3+)": 1.2 };
-  return m[duration] || 1.5;
-};
-
-const getVenueCostFromData = (vendors, location, venueType, attendance, scenario) => {
-  const matching = (vendors.venues || [])
-    .filter(v => v.city === location)
-    .filter(v => !venueType || venueType === "Not sure yet" || v.type === venueType)
-    .filter(v => attendance >= (v.min_capacity || 0) && attendance <= (v.max_capacity || 9999));
-  
-  if (matching.length === 0) return null;
-  
-  const byTier = { Budget: [], Standard: [], Premium: [] };
-  matching.forEach(v => { if (byTier[v.tier]) byTier[v.tier].push(v); });
-  
-  let target = scenario === 'budget' ? (byTier.Budget.length ? byTier.Budget : byTier.Standard) :
-               scenario === 'premium' ? (byTier.Premium.length ? byTier.Premium : byTier.Standard) :
-               (byTier.Standard.length ? byTier.Standard : matching);
-  
-  if (target.length === 0) target = matching;
-  
-  const avgMin = target.reduce((s, v) => s + (v.min_price || 0), 0) / target.length;
-  const avgMax = target.reduce((s, v) => s + (v.max_price || 0), 0) / target.length;
-  
-  return scenario === 'budget' ? avgMin : scenario === 'premium' ? avgMax : (avgMin + avgMax) / 2;
-};
-
-const calculateBudget = (responses, scenario, config, vendors = {}) => {
-  // Only calculate if user has made relevant selections
-  const hasAttendance = !!responses.attendance;
-  const hasDuration = !!responses.duration;
-  const hasLocation = !!responses.location;
-  const hasVenueType = !!responses.venue_type;
-  
-  const attendance = hasAttendance ? config.attendanceDefaults[responses.attendance] : 0;
-  const baseDays = hasDuration ? (config.durationMultipliers[responses.duration] || 1) : 0;
-  const venueDays = baseDays > 0 ? baseDays * getSetupMultiplier(responses.duration) : 0;
-  const locationMult = hasLocation ? (config.locations[responses.location]?.multiplier || 1.0) : 1.0;
-  const venueType = responses.venue_type || "Not sure yet";
-  
-  let costs = { venue: 0, foodBeverage: 0, avTechnical: 0, production: 0, collateral: 0, marketing: 0, staffing: 0 };
-  
-  // Only calculate venue if we have attendance, duration, location, AND venue type
-  if (hasAttendance && hasDuration && hasLocation && hasVenueType) {
-    const venueFromData = getVenueCostFromData(vendors, responses.location, venueType, attendance, scenario);
-    if (venueFromData) {
-      costs.venue = venueFromData * venueDays * locationMult;
-    } else {
-      const vc = config.venueTypes[venueType] || config.venueTypes["Not sure yet"];
-      costs.venue = Math.max((vc.perPerson[scenario] || 75) * attendance, vc.minSpend || 0) * venueDays * locationMult;
-    }
-  }
-  
-  // F&B only if items selected AND we have attendance/duration
-  if (hasAttendance && hasDuration) {
-    (responses.fnb_items || []).forEach(item => {
-      const c = config.foodAndBeverage[item];
-      if (c) costs.foodBeverage += (c[scenario] || c.standard) * attendance * baseDays * locationMult;
-    });
-  }
-  
-  // AV only if items selected AND we have duration
-  if (hasDuration) {
-    (responses.av_needs || []).forEach(item => {
-      const c = config.avTechnical[item];
-      if (c) costs.avTechnical += (c[scenario] || c.standard) * Math.ceil(baseDays * 1.25) * locationMult;
-    });
-  }
-  
-  // Production only if items selected
-  (responses.production_needs || []).forEach(item => {
-    const c = config.production[item];
-    if (c) costs.production += (c.perDay ? (c[scenario] || c.standard) * (baseDays || 1) : (c[scenario] || c.standard)) * locationMult;
-  });
-  
-  // Collateral - some are per-person, some are flat
-  (responses.collateral_needs || []).forEach(item => {
-    const c = config.collateral[item];
-    if (c) {
-      if (c.perPerson && hasAttendance) {
-        costs.collateral += (c[scenario] || c.standard) * attendance;
-      } else if (!c.perPerson) {
-        costs.collateral += c[scenario] || c.standard;
-      }
-    }
-  });
-  
-  // Marketing - flat costs
-  (responses.marketing_channels || []).forEach(item => {
-    const c = config.marketing[item];
-    if (c) costs.marketing += c[scenario] || c.standard;
-  });
-  
-  // Staffing only if we have duration
-  if (hasDuration && venueDays > 0) {
-    costs.staffing = (config.staffing[scenario] || 2500) * venueDays * locationMult;
-  }
-  
-  const subtotal = Object.values(costs).reduce((a, b) => a + b, 0);
-  const contingency = subtotal > 0 ? subtotal * (config.contingency[scenario] || 0.15) : 0;
-  
-  return { 
-    ...costs, 
-    subtotal, 
-    contingency, 
-    total: subtotal + contingency, 
-    attendance: attendance || 0, 
-    baseDays: baseDays || 0, 
-    venueDays: venueDays || 0, 
-    location: responses.location || "Not selected", 
-    locationMult, 
-    venueType, 
-    scenario, 
-    usedVenueData: !!(hasAttendance && hasDuration && hasLocation && hasVenueType && getVenueCostFromData(vendors, responses.location, venueType, attendance, scenario)),
-    hasMinimumData: hasAttendance && hasDuration
-  };
-};
-
-const generateTimeline = (eventDate, responses, config) => {
-  if (!eventDate) return [];
-  const date = new Date(eventDate);
-  if (isNaN(date.getTime())) return [];
-  const today = new Date();
-  const weeksOut = Math.floor((date - today) / (7 * 24 * 60 * 60 * 1000));
-  const leadTime = config.venueTypes[responses.venue_type]?.leadTime || 12;
-  
-  const milestones = [
-    { weeks: Math.max(leadTime, 16), task: "Venue contract signed", icon: "🏛️" },
-    { weeks: 14, task: "Keynote speakers confirmed", icon: "🎤" },
-    { weeks: 12, task: "Program outline finalized", icon: "📋" },
-    { weeks: 10, task: "Marketing campaign launched", icon: "📣" },
-    { weeks: 8, task: "Registration opens", icon: "📝" },
-    { weeks: 8, task: "Catering menu selected", icon: "🍽️" },
-    { weeks: 6, task: "AV requirements confirmed", icon: "🎬" },
-    { weeks: 4, task: "Collateral to print", icon: "📦" },
-    { weeks: 2, task: "Final headcount to venue", icon: "🔢" },
-    { weeks: 1, task: "Final walkthrough", icon: "✅" },
-    { weeks: 0, task: "EVENT DAY!", icon: "🎉" },
-  ];
-  
-  return milestones.filter(m => m.weeks <= weeksOut + 2).map(m => {
-    const d = new Date(date);
-    d.setDate(d.getDate() - (m.weeks * 7));
-    const isPast = d < today;
-    const twoWeeksFromNow = new Date(today.getTime() + 14 * 24 * 60 * 60 * 1000);
-    const isUrgent = !isPast && d <= twoWeeksFromNow;
-    return { ...m, date: d, isPast, isUrgent, weeksOut: m.weeks };
-  }).sort((a, b) => a.date - b.date);
-};
-
-const analyzeRisks = (responses, config) => {
-  const risks = [];
-  const attendance = config.attendanceDefaults[responses.attendance] || 75;
-  const eventDate = responses.target_date ? new Date(responses.target_date) : null;
-  const weeksOut = eventDate ? Math.floor((eventDate - new Date()) / (7 * 24 * 60 * 60 * 1000)) : null;
-  const leadTime = config.venueTypes[responses.venue_type]?.leadTime || 12;
-  const location = config.locations[responses.location];
-  
-  if (weeksOut !== null && weeksOut < leadTime) {
-    risks.push({ severity: "high", icon: "⏰", message: `${responses.venue_type || 'This venue type'} typically needs ${leadTime}+ weeks. You have ${weeksOut}.` });
-  } else if (weeksOut !== null && weeksOut < 8) {
-    risks.push({ severity: "high", icon: "⏰", message: `Only ${weeksOut} weeks out. Rush planning may add 15-25% to costs.` });
-  }
-  
-  if (eventDate && location?.peakMonths?.includes(eventDate.getMonth() + 1)) {
-    risks.push({ severity: "medium", icon: "📅", message: `Peak season in ${location.label}. Expect 20-30% higher costs.` });
-  }
-  
-  if (responses.location === "Washington DC" && eventDate && [3, 4].includes(eventDate.getMonth() + 1)) {
-    risks.push({ severity: "medium", icon: "🌸", message: "Cherry blossom season = premium hotel rates." });
-  }
-  
-  if (responses.format === "Hybrid (in-person + virtual)") {
-    risks.push({ severity: "medium", icon: "🖥️", message: "Hybrid events typically cost 30-40% more." });
-  }
-  
-  if (responses.fnb_items?.includes("Alcohol service") && responses.venue_type === "Government building") {
-    risks.push({ severity: "high", icon: "🍷", message: "Most government venues prohibit alcohol." });
-  }
-  
-  return risks.sort((a, b) => ({ high: 0, medium: 1, low: 2 }[a.severity] - { high: 0, medium: 1, low: 2 }[b.severity]));
-};
-
-// Sound system
-class SoundSystem {
-  constructor() { this.enabled = true; this.ctx = null; }
-  init() { if (!this.ctx) this.ctx = new (window.AudioContext || window.webkitAudioContext)(); }
-  play(type) {
-    if (!this.enabled) return;
-    this.init();
-    const osc = this.ctx.createOscillator();
-    const gain = this.ctx.createGain();
-    osc.connect(gain); gain.connect(this.ctx.destination);
-    const now = this.ctx.currentTime;
-    osc.type = 'square';
-    if (type === 'select') { osc.frequency.setValueAtTime(440, now); osc.frequency.setValueAtTime(880, now + 0.05); gain.gain.setValueAtTime(0.1, now); osc.start(now); osc.stop(now + 0.1); }
-    else if (type === 'navigate') { osc.frequency.setValueAtTime(330, now); gain.gain.setValueAtTime(0.08, now); osc.start(now); osc.stop(now + 0.05); }
-    else if (type === 'complete') { osc.frequency.setValueAtTime(523, now); osc.frequency.setValueAtTime(659, now + 0.1); osc.frequency.setValueAtTime(784, now + 0.2); gain.gain.setValueAtTime(0.1, now); osc.start(now); osc.stop(now + 0.4); }
-    else if (type === 'start') { osc.frequency.setValueAtTime(262, now); osc.frequency.setValueAtTime(330, now + 0.1); gain.gain.setValueAtTime(0.1, now); osc.start(now); osc.stop(now + 0.2); }
-  }
-  toggle() { this.enabled = !this.enabled; return this.enabled; }
-}
-const sound = new SoundSystem();
-
-// Pixel Characters
-const getCharacterSvg = (id, size = 48) => {
-  const scale = size / 48;
-  const chars = {
-    stuart: (<svg viewBox="0 0 16 20" width={48 * scale} height={60 * scale} style={{ imageRendering: 'pixelated' }}><rect x="4" y="0" width="2" height="1" fill="#2d2d2d"/><rect x="7" y="0" width="1" height="1" fill="#2d2d2d"/><rect x="10" y="0" width="2" height="1" fill="#2d2d2d"/><rect x="3" y="1" width="10" height="3" fill="#3d3d3d"/><rect x="4" y="4" width="8" height="6" fill="#E8C4A0"/><rect x="3" y="5" width="4" height="3" fill="#1a1a1a"/><rect x="9" y="5" width="4" height="3" fill="#1a1a1a"/><rect x="4" y="6" width="2" height="1" fill="#87CEEB"/><rect x="10" y="6" width="2" height="1" fill="#87CEEB"/><rect x="5" y="8" width="6" height="2" fill="#9d8b7a"/><rect x="5" y="10" width="6" height="2" fill="#E8DCC8"/><rect x="3" y="12" width="10" height="4" fill="#1a1a1a"/><rect x="4" y="16" width="3" height="2" fill="#2d3748"/><rect x="9" y="16" width="3" height="2" fill="#2d3748"/><rect x="3" y="18" width="4" height="2" fill="#1a1a1a"/><rect x="9" y="18" width="4" height="2" fill="#1a1a1a"/></svg>),
-    austin: (<svg viewBox="0 0 16 20" width={48 * scale} height={60 * scale} style={{ imageRendering: 'pixelated' }}><rect x="3" y="0" width="10" height="4" fill="#5C4033"/><rect x="4" y="4" width="8" height="6" fill="#E8C4A0"/><rect x="4" y="5" width="3" height="2" fill="#CD853F"/><rect x="9" y="5" width="3" height="2" fill="#CD853F"/><rect x="5" y="5" width="1" height="1" fill="#DEB887"/><rect x="10" y="5" width="1" height="1" fill="#DEB887"/><rect x="3" y="7" width="10" height="3" fill="#4A3728"/><rect x="5" y="10" width="6" height="1" fill="#FFFFFF"/><rect x="3" y="11" width="10" height="5" fill="#1e3a5f"/><rect x="4" y="16" width="3" height="2" fill="#2d3748"/><rect x="9" y="16" width="3" height="2" fill="#2d3748"/><rect x="3" y="18" width="4" height="2" fill="#1a1a1a"/><rect x="9" y="18" width="4" height="2" fill="#1a1a1a"/></svg>),
-    anna: (<svg viewBox="0 0 16 20" width={48 * scale} height={60 * scale} style={{ imageRendering: 'pixelated' }}><rect x="6" y="0" width="4" height="3" fill="#6B4423"/><rect x="3" y="3" width="10" height="1" fill="#5C4033"/><rect x="3" y="4" width="2" height="3" fill="#6B4423"/><rect x="11" y="4" width="2" height="3" fill="#6B4423"/><rect x="5" y="4" width="6" height="6" fill="#F5D0B0"/><rect x="6" y="6" width="1" height="1" fill="#4A3728"/><rect x="9" y="6" width="1" height="1" fill="#4A3728"/><rect x="3" y="6" width="1" height="1" fill="#FFD700"/><rect x="12" y="6" width="1" height="1" fill="#FFD700"/><rect x="7" y="8" width="2" height="1" fill="#E8A090"/><rect x="3" y="11" width="10" height="5" fill="#E07B8B"/><rect x="6" y="11" width="4" height="1" fill="#F5D0B0"/><rect x="4" y="16" width="8" height="2" fill="#2d3748"/><rect x="4" y="18" width="3" height="2" fill="#1a1a1a"/><rect x="9" y="18" width="3" height="2" fill="#1a1a1a"/></svg>),
-    josh: (<svg viewBox="0 0 16 20" width={48 * scale} height={60 * scale} style={{ imageRendering: 'pixelated' }}><rect x="3" y="0" width="10" height="4" fill="#5C4033"/><rect x="5" y="1" width="2" height="1" fill="#6B4423"/><rect x="9" y="1" width="2" height="1" fill="#6B4423"/><rect x="4" y="4" width="8" height="6" fill="#E8C4A0"/><rect x="4" y="5" width="3" height="2" fill="#8B7355"/><rect x="9" y="5" width="3" height="2" fill="#8B7355"/><rect x="4" y="8" width="8" height="1" fill="#3d3d3d"/><rect x="7" y="9" width="2" height="1" fill="#D4A090"/><rect x="5" y="10" width="6" height="1" fill="#FFFFFF"/><rect x="3" y="11" width="10" height="5" fill="#6B7280"/><rect x="4" y="16" width="3" height="2" fill="#2d3748"/><rect x="9" y="16" width="3" height="2" fill="#2d3748"/><rect x="3" y="18" width="4" height="2" fill="#1a1a1a"/><rect x="9" y="18" width="4" height="2" fill="#1a1a1a"/></svg>)
-  };
-  return chars[id] || null;
-};
-
-const PixelChar = ({ selected, onClick, id }) => {
-  const names = { stuart: "Stuart", austin: "Austin", anna: "Anna", josh: "Josh" };
-  const titles = { stuart: "The Visionary", austin: "The Strategist", anna: "The Coordinator", josh: "The Analyst" };
-  return (
-    <div onClick={onClick} className={`cursor-pointer transition-all ${selected ? 'scale-110' : 'hover:scale-105'}`}>
-      <div className={`p-3 border-4 ${selected ? 'border-yellow-400 bg-slate-700' : 'border-slate-600 bg-slate-800'}`}>{getCharacterSvg(id, 56)}</div>
-      <div className={`text-center mt-2 ${selected ? 'text-yellow-400' : 'text-slate-400'}`}>
-        <div className="text-sm font-bold">{names[id]}</div>
-        <div className="text-xs opacity-75">{titles[id]}</div>
-      </div>
-    </div>
-  );
-};
-
-const charNames = { stuart: "Stuart", austin: "Austin", anna: "Anna", josh: "Josh" };
-
-// UI Components
-const Btn = ({ children, onClick, disabled, variant = "primary", className = "" }) => {
-  const v = { 
-    primary: "bg-blue-600 hover:bg-blue-500 border-blue-400 text-white", 
-    secondary: "bg-slate-700 hover:bg-slate-600 border-slate-500 text-slate-200", 
-    success: "bg-green-600 hover:bg-green-500 border-green-400 text-white", 
-    warning: "bg-yellow-500 hover:bg-yellow-400 border-yellow-300 text-slate-900",
-    purple: "bg-purple-600 hover:bg-purple-500 border-purple-400 text-white"
-  };
-  return (
-    <button onClick={(e) => { sound.play('navigate'); onClick?.(e); }} disabled={disabled} 
-      className={`px-4 py-3 font-mono font-bold uppercase text-sm border-4 transition-all disabled:opacity-50 active:translate-y-1 ${v[variant]} ${className}`} 
-      style={{ boxShadow: '4px 4px 0px rgba(0,0,0,0.5)' }}>
-      {children}
-    </button>
-  );
-};
-
-const ProgressBar = ({ current, total, label, characterId }) => {
-  const pct = Math.round((current / total) * 100);
-  return (
-    <div className="font-mono">
-      <div className="flex justify-between text-xs text-slate-400 mb-1"><span>{label}</span><span>{pct}%</span></div>
-      <div className="relative">
-        <div className="flex gap-0.5 h-5">{[...Array(10)].map((_, i) => (<div key={i} className={`flex-1 border ${i < Math.round((current / total) * 10) ? 'bg-green-400 border-green-300' : 'bg-slate-800 border-slate-600'}`}/>))}</div>
-        <div className="absolute top-1/2 transition-all duration-300" style={{ left: `${Math.min(pct, 95)}%`, transform: 'translate(-50%, -50%)' }}>{getCharacterSvg(characterId, 24)}</div>
-      </div>
-    </div>
-  );
-};
-
-const Checkbox = ({ options, selected = [], onChange }) => (
-  <div className="grid grid-cols-1 sm:grid-cols-2 gap-1">
-    {options.map(o => (
-      <button key={o} onClick={() => { sound.play('select'); onChange(selected.includes(o) ? selected.filter(x => x !== o) : [...selected, o]); }}
-        className={`p-2 text-xs text-left border-2 flex items-center gap-2 ${selected.includes(o) ? 'border-yellow-400 bg-slate-700 text-yellow-400' : 'border-slate-600 bg-slate-800 text-slate-300'}`}>
-        <span>{selected.includes(o) ? '☑' : '☐'}</span>
-        <span className="flex-1 truncate">{o}</span>
-      </button>
-    ))}
-  </div>
-);
-
-const programs = [
-  { id: 'ai-across-america', name: 'AI Across America', icon: '🇺🇸' },
-  { id: 'accelerate-science', name: 'Accelerate Science Now', icon: '🔬' },
-  { id: 'ai-primers', name: 'AI Primers', icon: '📚' },
-  { id: 'fysa', name: 'FYSA', icon: '📋' },
-  { id: 'policy', name: 'Policy Engagement', icon: '🏛️' },
-  { id: 'other', name: 'Other Initiative', icon: '✨' }
+const EVENT_TYPES = [
+  'Policy Conference',
+  'Congressional Briefing',
+  'Stakeholder Summit',
+  'Press Event / Media Briefing',
+  'Fundraising Gala',
+  'Board Meeting',
+  'Training / Workshop',
+  'Networking Reception',
+  'Panel Discussion',
+  'Award Ceremony',
+  'Product Launch',
+  'Other'
 ];
 
-// Timeline Component - Compact display
-const TimelineView = ({ responses, budgetConfig }) => {
-  const timeline = generateTimeline(responses.target_date, responses, budgetConfig);
+const SIZE_CONFIG = {
+  'intimate': { label: 'Intimate (10-25)', min: 10, max: 25 },
+  'small': { label: 'Small (25-50)', min: 25, max: 50 },
+  'medium': { label: 'Medium (50-100)', min: 50, max: 100 },
+  'large': { label: 'Large (100-200)', min: 100, max: 200 },
+  'major': { label: 'Major (200-500)', min: 200, max: 500 },
+  'flagship': { label: 'Flagship (500+)', min: 500, max: 1000 }
+};
+
+const DURATION_OPTIONS = [
+  { value: 'half', label: 'Half day (3-4 hours)', days: 0.5 },
+  { value: 'full', label: 'Full day (6-8 hours)', days: 1 },
+  { value: 'two', label: '2 days', days: 2 },
+  { value: 'three', label: '3 days', days: 3 }
+];
+
+const OPTIONS = {
+  format: ['In-Person', 'Virtual', 'Hybrid'],
+  venue: ['Hotel Ballroom', 'Conference Center', 'Historic Venue', 'Government Building', 'University/Academic', 'Museum/Cultural', 'Rooftop/Outdoor', 'Restaurant/Private Dining', 'Corporate Office', 'Other'],
+  audience: ['Congressional Staff', 'Federal Agency Officials', 'State/Local Officials', 'Industry Executives', 'Nonprofit Leaders', 'Academics/Researchers', 'Journalists/Media', 'General Public', 'International Delegates', 'Students/Young Professionals'],
+  program: ['Keynote Address', 'Panel Discussion', 'Fireside Chat', 'Breakout Sessions', 'Workshops', 'Networking Breaks', 'Awards/Recognition', 'Press Conference', 'VIP Reception', 'Group Photo'],
+  spaces: ['Main Plenary Hall', 'Breakout Rooms', 'VIP Green Room', 'Press/Media Room', 'Registration Area', 'Networking Lounge', 'Outdoor Terrace', 'Executive Boardroom'],
+  fnb: ['Continental Breakfast', 'Hot Breakfast', 'Morning Coffee/Tea', 'Working Lunch (Boxed)', 'Plated Lunch', 'Afternoon Break', 'Cocktail Reception', 'Happy Hour / Reception', 'Plated Dinner', 'Dessert Reception'],
+  av: ['Projector/Screen', 'Confidence Monitor', 'Wireless Microphones', 'Podium with Mic', 'Livestream Setup', 'Recording Equipment', 'Video Playback', 'LED Wall/Display', 'Interpretation Equipment'],
+  production: ['Stage Design', 'Custom Backdrop', 'Step & Repeat', 'Branded Signage', 'Floral Arrangements', 'Lighting Design', 'Event Photographer', 'Videographer'],
+  collateral: ['Name Badges', 'Printed Agenda', 'Branded Folders', 'Note Pads/Pens', 'Gift Bags', 'Promotional Items', 'Policy Briefs/Reports', 'Speaker Bios'],
+  marketing: ['Save the Date', 'Email Invitations', 'Event Website', 'Social Media Campaign', 'Press Release', 'Media Advisory', 'Paid Advertising', 'Partner Outreach'],
+  postEvent: ['Thank You Emails', 'Event Recording', 'Photo Gallery', 'Summary Report', 'Survey/Feedback', 'Social Media Recap', 'Media Clips Package']
+};
+
+const DEFAULT_COSTS = {
+  venue: { 'intimate': [2000, 5000], 'small': [3000, 8000], 'medium': [5000, 15000], 'large': [10000, 30000], 'major': [20000, 50000], 'flagship': [35000, 100000] },
+  fnb: { 'Continental Breakfast': 25, 'Hot Breakfast': 45, 'Morning Coffee/Tea': 12, 'Working Lunch (Boxed)': 35, 'Plated Lunch': 55, 'Afternoon Break': 18, 'Cocktail Reception': 65, 'Happy Hour / Reception': 55, 'Plated Dinner': 95, 'Dessert Reception': 30 },
+  av: { 'Projector/Screen': 500, 'Confidence Monitor': 400, 'Wireless Microphones': 300, 'Podium with Mic': 250, 'Livestream Setup': 2500, 'Recording Equipment': 1500, 'Video Playback': 400, 'LED Wall/Display': 5000, 'Interpretation Equipment': 2000 },
+  production: { 'Stage Design': 5000, 'Custom Backdrop': 3000, 'Step & Repeat': 1500, 'Branded Signage': 2000, 'Floral Arrangements': 1500, 'Lighting Design': 4000, 'Event Photographer': 2500, 'Videographer': 4000 },
+  collateral: { 'Name Badges': 5, 'Printed Agenda': 3, 'Branded Folders': 8, 'Note Pads/Pens': 6, 'Gift Bags': 25, 'Promotional Items': 15, 'Policy Briefs/Reports': 12, 'Speaker Bios': 2 },
+  marketing: { 'Save the Date': 500, 'Email Invitations': 300, 'Event Website': 2500, 'Social Media Campaign': 1500, 'Press Release': 800, 'Media Advisory': 500, 'Paid Advertising': 5000, 'Partner Outreach': 1000 }
+};
+
+// ============================================================================
+// EVENT TEMPLATES
+// ============================================================================
+
+const EVENT_TEMPLATES = {
+  congressionalBriefing: {
+    name: 'Congressional Briefing',
+    icon: '🏛️',
+    description: 'Targeted briefing for Hill staff on policy issues',
+    preview: '30-50 guests • 2-3 hours • Government Building',
+    data: {
+      type: 'Congressional Briefing',
+      size: 'small',
+      duration: 'half',
+      format: 'In-Person',
+      venue: 'Government Building',
+      audience: ['Congressional Staff', 'Federal Agency Officials'],
+      program: ['Panel Discussion', 'Networking Breaks'],
+      spaces: ['Main Plenary Hall', 'Registration Area'],
+      fnb: ['Morning Coffee/Tea', 'Afternoon Break'],
+      av: ['Projector/Screen', 'Wireless Microphones', 'Podium with Mic'],
+      production: ['Branded Signage'],
+      collateral: ['Name Badges', 'Printed Agenda', 'Policy Briefs/Reports'],
+      marketing: ['Email Invitations', 'Partner Outreach'],
+      postEvent: ['Thank You Emails', 'Summary Report']
+    }
+  },
+  policyConference: {
+    name: 'Policy Conference',
+    icon: '📊',
+    description: 'Full-day conference with multiple sessions and networking',
+    preview: '100-200 guests • Full day • Conference Center',
+    data: {
+      type: 'Policy Conference',
+      size: 'large',
+      duration: 'full',
+      format: 'In-Person',
+      venue: 'Conference Center',
+      audience: ['Congressional Staff', 'Federal Agency Officials', 'Industry Executives', 'Nonprofit Leaders', 'Academics/Researchers'],
+      program: ['Keynote Address', 'Panel Discussion', 'Breakout Sessions', 'Networking Breaks'],
+      spaces: ['Main Plenary Hall', 'Breakout Rooms', 'Registration Area', 'Networking Lounge'],
+      fnb: ['Continental Breakfast', 'Morning Coffee/Tea', 'Plated Lunch', 'Afternoon Break'],
+      av: ['Projector/Screen', 'Confidence Monitor', 'Wireless Microphones', 'Podium with Mic', 'Recording Equipment'],
+      production: ['Branded Signage', 'Event Photographer'],
+      collateral: ['Name Badges', 'Printed Agenda', 'Branded Folders', 'Policy Briefs/Reports', 'Speaker Bios'],
+      marketing: ['Save the Date', 'Email Invitations', 'Event Website', 'Social Media Campaign', 'Press Release'],
+      postEvent: ['Thank You Emails', 'Event Recording', 'Photo Gallery', 'Summary Report', 'Survey/Feedback']
+    }
+  },
+  fundraisingGala: {
+    name: 'Fundraising Gala',
+    icon: '✨',
+    description: 'Evening reception with dinner and program',
+    preview: '150-300 guests • Evening • Hotel Ballroom',
+    data: {
+      type: 'Fundraising Gala',
+      size: 'major',
+      duration: 'half',
+      format: 'In-Person',
+      venue: 'Hotel Ballroom',
+      audience: ['Industry Executives', 'Nonprofit Leaders'],
+      program: ['Keynote Address', 'Awards/Recognition', 'VIP Reception', 'Group Photo'],
+      spaces: ['Main Plenary Hall', 'VIP Green Room', 'Registration Area'],
+      fnb: ['Cocktail Reception', 'Plated Dinner', 'Dessert Reception'],
+      av: ['Projector/Screen', 'Wireless Microphones', 'Podium with Mic', 'Video Playback'],
+      production: ['Stage Design', 'Custom Backdrop', 'Step & Repeat', 'Floral Arrangements', 'Lighting Design', 'Event Photographer', 'Videographer'],
+      collateral: ['Name Badges', 'Printed Agenda', 'Gift Bags'],
+      marketing: ['Save the Date', 'Email Invitations', 'Event Website', 'Social Media Campaign'],
+      postEvent: ['Thank You Emails', 'Photo Gallery', 'Social Media Recap']
+    }
+  },
+  networkingReception: {
+    name: 'Networking Reception',
+    icon: '🤝',
+    description: 'Casual evening mixer for relationship building',
+    preview: '50-100 guests • 2-3 hours • Restaurant/Rooftop',
+    data: {
+      type: 'Networking Reception',
+      size: 'medium',
+      duration: 'half',
+      format: 'In-Person',
+      venue: 'Restaurant/Private Dining',
+      audience: ['Industry Executives', 'Nonprofit Leaders', 'Students/Young Professionals'],
+      program: ['Networking Breaks', 'VIP Reception'],
+      spaces: ['Main Plenary Hall', 'Outdoor Terrace'],
+      fnb: ['Happy Hour / Reception', 'Cocktail Reception'],
+      av: ['Wireless Microphones'],
+      production: ['Branded Signage', 'Event Photographer'],
+      collateral: ['Name Badges'],
+      marketing: ['Email Invitations', 'Social Media Campaign'],
+      postEvent: ['Thank You Emails', 'Photo Gallery', 'Social Media Recap']
+    }
+  },
+  pressConference: {
+    name: 'Press Event',
+    icon: '📰',
+    description: 'Media briefing with announcement and Q&A',
+    preview: '25-50 guests • 1-2 hours • Press-friendly venue',
+    data: {
+      type: 'Press Event / Media Briefing',
+      size: 'small',
+      duration: 'half',
+      format: 'Hybrid',
+      venue: 'Corporate Office',
+      audience: ['Journalists/Media', 'Industry Executives'],
+      program: ['Press Conference', 'Networking Breaks'],
+      spaces: ['Main Plenary Hall', 'Press/Media Room', 'VIP Green Room'],
+      fnb: ['Morning Coffee/Tea'],
+      av: ['Projector/Screen', 'Wireless Microphones', 'Podium with Mic', 'Livestream Setup', 'Recording Equipment'],
+      production: ['Custom Backdrop', 'Step & Repeat', 'Event Photographer', 'Videographer'],
+      collateral: ['Printed Agenda', 'Policy Briefs/Reports', 'Speaker Bios'],
+      marketing: ['Press Release', 'Media Advisory'],
+      postEvent: ['Event Recording', 'Media Clips Package', 'Social Media Recap']
+    }
+  },
+  workshopTraining: {
+    name: 'Workshop / Training',
+    icon: '📚',
+    description: 'Interactive learning session with hands-on activities',
+    preview: '25-50 guests • Full day • Conference room',
+    data: {
+      type: 'Training / Workshop',
+      size: 'small',
+      duration: 'full',
+      format: 'In-Person',
+      venue: 'Conference Center',
+      audience: ['Federal Agency Officials', 'Nonprofit Leaders', 'Students/Young Professionals'],
+      program: ['Workshops', 'Breakout Sessions', 'Networking Breaks'],
+      spaces: ['Main Plenary Hall', 'Breakout Rooms'],
+      fnb: ['Continental Breakfast', 'Morning Coffee/Tea', 'Working Lunch (Boxed)', 'Afternoon Break'],
+      av: ['Projector/Screen', 'Wireless Microphones'],
+      production: ['Branded Signage'],
+      collateral: ['Name Badges', 'Printed Agenda', 'Branded Folders', 'Note Pads/Pens'],
+      marketing: ['Email Invitations', 'Partner Outreach'],
+      postEvent: ['Thank You Emails', 'Survey/Feedback', 'Summary Report']
+    }
+  },
+  multiDaySummit: {
+    name: 'Multi-Day Summit',
+    icon: '🌐',
+    description: 'Major 2-3 day convening with diverse programming',
+    preview: '200-500 guests • 2-3 days • Hotel/Conference Center',
+    data: {
+      type: 'Stakeholder Summit',
+      size: 'major',
+      duration: 'three',
+      format: 'Hybrid',
+      venue: 'Hotel Ballroom',
+      audience: ['Congressional Staff', 'Federal Agency Officials', 'Industry Executives', 'Nonprofit Leaders', 'Academics/Researchers', 'International Delegates'],
+      program: ['Keynote Address', 'Panel Discussion', 'Fireside Chat', 'Breakout Sessions', 'Workshops', 'Networking Breaks', 'VIP Reception', 'Group Photo'],
+      spaces: ['Main Plenary Hall', 'Breakout Rooms', 'VIP Green Room', 'Press/Media Room', 'Registration Area', 'Networking Lounge'],
+      fnb: ['Hot Breakfast', 'Morning Coffee/Tea', 'Plated Lunch', 'Afternoon Break', 'Cocktail Reception', 'Plated Dinner'],
+      av: ['Projector/Screen', 'Confidence Monitor', 'Wireless Microphones', 'Podium with Mic', 'Livestream Setup', 'Recording Equipment', 'Interpretation Equipment'],
+      production: ['Stage Design', 'Custom Backdrop', 'Branded Signage', 'Lighting Design', 'Event Photographer', 'Videographer'],
+      collateral: ['Name Badges', 'Printed Agenda', 'Branded Folders', 'Note Pads/Pens', 'Policy Briefs/Reports', 'Speaker Bios'],
+      marketing: ['Save the Date', 'Email Invitations', 'Event Website', 'Social Media Campaign', 'Press Release', 'Media Advisory', 'Partner Outreach'],
+      postEvent: ['Thank You Emails', 'Event Recording', 'Photo Gallery', 'Summary Report', 'Survey/Feedback', 'Social Media Recap', 'Media Clips Package']
+    }
+  }
+};
+
+// ============================================================================
+// CONGRESSIONAL CALENDAR (2026)
+// ============================================================================
+
+const CONGRESSIONAL_CALENDAR_2026 = {
+  recesses: [
+    { start: '2026-01-01', end: '2026-01-05', name: 'New Year' },
+    { start: '2026-02-14', end: '2026-02-22', name: 'Presidents Day Recess' },
+    { start: '2026-03-28', end: '2026-04-12', name: 'Spring Recess' },
+    { start: '2026-05-23', end: '2026-05-31', name: 'Memorial Day Recess' },
+    { start: '2026-06-27', end: '2026-07-12', name: 'Independence Day Recess' },
+    { start: '2026-08-01', end: '2026-09-07', name: 'August Recess' },
+    { start: '2026-10-10', end: '2026-10-18', name: 'Columbus Day Recess' },
+    { start: '2026-11-21', end: '2026-11-29', name: 'Thanksgiving Recess' },
+    { start: '2026-12-12', end: '2026-12-31', name: 'Holiday Recess' }
+  ],
+  // Election day 2026
+  electionDay: '2026-11-03',
+  // Budget cycle key dates
+  budgetDates: [
+    { date: '2026-02-01', event: 'President\'s Budget typically released' },
+    { date: '2026-04-15', event: 'Tax Day' },
+    { date: '2026-09-30', event: 'End of Fiscal Year' },
+    { date: '2026-10-01', event: 'New Fiscal Year begins' }
+  ]
+};
+
+function checkCongressionalCalendar(dateStr) {
+  if (!dateStr) return [];
   
-  if (timeline.length === 0) {
-    return (
-      <div className="border-2 border-slate-600 bg-slate-800 p-3 mb-3 rounded">
-        <div className="flex items-center gap-2 text-slate-400 mb-2">
-          <Calendar size={16}/> <span className="text-sm font-bold">TIMELINE</span>
-        </div>
-        <p className="text-slate-500 text-xs">Set a target date in Phase 4 to generate your planning timeline.</p>
-      </div>
-    );
+  const date = new Date(dateStr);
+  const warnings = [];
+  
+  // Check recesses
+  for (const recess of CONGRESSIONAL_CALENDAR_2026.recesses) {
+    const start = new Date(recess.start);
+    const end = new Date(recess.end);
+    if (date >= start && date <= end) {
+      warnings.push({
+        type: 'recess',
+        severity: 'high',
+        message: `During ${recess.name} — Congress not in session, Hill staff may be traveling`
+      });
+    }
   }
   
-  const eventDate = new Date(responses.target_date);
-  const today = new Date();
-  const daysUntil = Math.ceil((eventDate - today) / (24 * 60 * 60 * 1000));
+  // Check if during August (general warning)
+  if (date.getMonth() === 7) {
+    if (!warnings.some(w => w.type === 'recess')) {
+      warnings.push({
+        type: 'august',
+        severity: 'medium',
+        message: 'August is traditionally slow in DC — many contacts may be away'
+      });
+    }
+  }
   
-  return (
-    <div className="border-2 border-cyan-500 bg-slate-800 p-3 mb-3 rounded">
-      <div className="flex items-center justify-between mb-2">
-        <div className="flex items-center gap-2 text-cyan-400">
-          <Calendar size={16}/> <span className="text-sm font-bold">TIMELINE</span>
-        </div>
-        <div className="text-right">
-          <div className="text-sm font-bold text-white">{eventDate.toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}</div>
-          <div className="text-xs text-cyan-300">{daysUntil > 0 ? `${daysUntil} days` : daysUntil === 0 ? "TODAY!" : `${Math.abs(daysUntil)} days ago`}</div>
-        </div>
-      </div>
-      <div className="space-y-1 max-h-48 overflow-y-auto">
-        {timeline.map((m, i) => (
-          <div key={i} className={`flex items-center gap-2 p-2 rounded text-xs ${
-            m.isPast ? 'bg-green-900/30 text-green-400' : 
-            m.weeksOut === 0 ? 'bg-yellow-900/40 text-yellow-300 font-bold' :
-            m.isUrgent ? 'bg-orange-900/30 text-orange-300' : 
-            'bg-slate-700/50 text-slate-300'
-          }`}>
-            <span>{m.icon}</span>
-            <span className="flex-1">{m.task}</span>
-            <span className="text-slate-500 w-16 text-right">
-              {m.isPast ? <CheckCircle size={12} className="inline text-green-500"/> : m.date.toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}
-            </span>
-          </div>
-        ))}
-      </div>
-    </div>
-  );
-};
+  // Thursday/Friday warning for Hill events
+  const dayOfWeek = date.getDay();
+  if (dayOfWeek === 4 || dayOfWeek === 5) {
+    warnings.push({
+      type: 'endOfWeek',
+      severity: 'low',
+      message: 'Thu/Fri can be tricky — Members often travel to districts'
+    });
+  }
+  
+  // Monday morning warning
+  if (dayOfWeek === 1) {
+    warnings.push({
+      type: 'monday',
+      severity: 'low',
+      message: 'Monday mornings can have lower Hill attendance — afternoon may work better'
+    });
+  }
+  
+  // Check proximity to election (within 4 weeks)
+  const election = new Date(CONGRESSIONAL_CALENDAR_2026.electionDay);
+  const daysToElection = Math.ceil((election - date) / (1000 * 60 * 60 * 24));
+  if (daysToElection > 0 && daysToElection <= 28) {
+    warnings.push({
+      type: 'election',
+      severity: 'high',
+      message: `${daysToElection} days before Election Day — political figures will be campaigning`
+    });
+  }
+  
+  // Check budget cycle dates
+  for (const bd of CONGRESSIONAL_CALENDAR_2026.budgetDates) {
+    const budgetDate = new Date(bd.date);
+    const daysDiff = Math.abs(Math.ceil((date - budgetDate) / (1000 * 60 * 60 * 24)));
+    if (daysDiff <= 7) {
+      warnings.push({
+        type: 'budget',
+        severity: 'medium',
+        message: `Near ${bd.event} — budget-related events may compete for attention`
+      });
+    }
+  }
+  
+  return warnings;
+}
 
-// Risk Flags Component
-const RiskFlags = ({ responses, budgetConfig }) => {
-  const risks = analyzeRisks(responses, budgetConfig);
-  if (risks.length === 0) return null;
+// ============================================================================
+// SMART SUGGESTIONS (Rule-Based)
+// ============================================================================
+
+function generateSuggestions(data, budget) {
+  const suggestions = [];
+  const size = SIZE_CONFIG[data.size];
+  const guestCount = size ? Math.round((size.min + size.max) / 2) : 50;
   
-  const colors = { 
-    high: "border-red-500 bg-red-900/20 text-red-400", 
-    medium: "border-yellow-500 bg-yellow-900/20 text-yellow-400", 
-    low: "border-blue-500 bg-blue-900/20 text-blue-400" 
+  // Event insurance recommendations
+  const budgetMax = budget?.total?.max || 0;
+  const hasAlcohol = (data.fnb || []).some(f => f.includes('Cocktail') || f.includes('Happy Hour') || f.includes('Reception'));
+  const isOutdoor = data.venue === 'Rooftop/Outdoor';
+  const isLargeEvent = ['major', 'flagship'].includes(data.size);
+  const hasVIPs = data.vips && data.vips.trim().length > 20;
+  
+  if (budgetMax >= 50000) {
+    suggestions.push({
+      category: 'insurance',
+      priority: 'high',
+      message: `Budget exceeds $50k — event insurance is strongly recommended. Consider general liability, cancellation, and property coverage.`
+    });
+  } else if (budgetMax >= 25000 || (isLargeEvent && hasAlcohol)) {
+    suggestions.push({
+      category: 'insurance',
+      priority: 'medium',
+      message: `Consider event insurance for liability protection, especially with ${hasAlcohol ? 'alcohol service' : 'this budget level'}.`
+    });
+  }
+  
+  if (isOutdoor && budgetMax >= 15000) {
+    suggestions.push({
+      category: 'insurance',
+      priority: 'medium',
+      message: 'Outdoor events should consider weather-related cancellation coverage.'
+    });
+  }
+  
+  if (hasVIPs && isLargeEvent) {
+    suggestions.push({
+      category: 'insurance',
+      priority: 'low',
+      message: 'High-profile attendees may warrant additional security and liability coverage.'
+    });
+  }
+  
+  // AV suggestions based on size
+  if (['large', 'major', 'flagship'].includes(data.size)) {
+    if (!(data.av || []).includes('Wireless Microphones')) {
+      suggestions.push({
+        category: 'av',
+        message: 'Events over 100 guests typically need wireless mics for Q&A and speaker mobility'
+      });
+    }
+    if (!(data.av || []).includes('Recording Equipment') && !(data.av || []).includes('Livestream Setup')) {
+      suggestions.push({
+        category: 'av',
+        message: 'Consider recording larger events — useful for absent stakeholders and content repurposing'
+      });
+    }
+  }
+  
+  // Hybrid format requirements
+  if (data.format === 'Hybrid') {
+    if (!(data.av || []).includes('Livestream Setup')) {
+      suggestions.push({
+        category: 'av',
+        message: 'Hybrid events require livestream capability for remote attendees'
+      });
+    }
+    if (!(data.production || []).includes('Videographer')) {
+      suggestions.push({
+        category: 'production',
+        message: 'A videographer helps ensure professional quality for your virtual audience'
+      });
+    }
+  }
+  
+  // Government audience considerations
+  if ((data.audience || []).some(a => ['Congressional Staff', 'Federal Agency Officials'].includes(a))) {
+    if ((data.fnb || []).includes('Plated Dinner') || (data.fnb || []).includes('Cocktail Reception')) {
+      suggestions.push({
+        category: 'compliance',
+        message: 'Note: Federal ethics rules limit gifts to $20/item, $50/year from single source — verify meal costs comply'
+      });
+    }
+    if (!(data.spaces || []).includes('Registration Area')) {
+      suggestions.push({
+        category: 'logistics',
+        message: 'Government attendees often need sign-in for ethics compliance — consider a registration area'
+      });
+    }
+  }
+  
+  // Press event needs
+  if (data.type === 'Press Event / Media Briefing' || (data.audience || []).includes('Journalists/Media')) {
+    if (!(data.spaces || []).includes('Press/Media Room')) {
+      suggestions.push({
+        category: 'logistics',
+        message: 'Press events benefit from a dedicated media room for interviews and filing'
+      });
+    }
+    if (!(data.production || []).includes('Step & Repeat')) {
+      suggestions.push({
+        category: 'production',
+        message: 'A branded step & repeat creates professional photo opportunities for media'
+      });
+    }
+  }
+  
+  // VIP considerations
+  if (data.vips && data.vips.trim().length > 0) {
+    if (!(data.spaces || []).includes('VIP Green Room')) {
+      suggestions.push({
+        category: 'logistics',
+        message: 'VIP speakers often need a green room for prep and private conversations'
+      });
+    }
+  }
+  
+  // Multi-day event suggestions
+  if (['two', 'three'].includes(data.duration)) {
+    if (!(data.program || []).includes('Networking Breaks')) {
+      suggestions.push({
+        category: 'program',
+        message: 'Multi-day events need dedicated networking time to prevent fatigue'
+      });
+    }
+  }
+  
+  // Gala specifics
+  if (data.type === 'Fundraising Gala') {
+    if (!(data.fnb || []).includes('Cocktail Reception')) {
+      suggestions.push({
+        category: 'fnb',
+        message: 'Galas typically open with a cocktail reception for arrival and mingling'
+      });
+    }
+    if (!(data.production || []).includes('Lighting Design')) {
+      suggestions.push({
+        category: 'production',
+        message: 'Lighting design transforms a space for gala atmosphere'
+      });
+    }
+  }
+  
+  // Outdoor venue backup
+  if (data.venue === 'Rooftop/Outdoor') {
+    suggestions.push({
+      category: 'logistics',
+      message: 'Outdoor venues need a weather backup plan — confirm indoor alternative with venue'
+    });
+  }
+  
+  // International delegates
+  if ((data.audience || []).includes('International Delegates')) {
+    if (!(data.av || []).includes('Interpretation Equipment')) {
+      suggestions.push({
+        category: 'av',
+        message: 'International attendees may need interpretation services'
+      });
+    }
+  }
+  
+  // Post-event gaps
+  if ((data.postEvent || []).length === 0 && data.type) {
+    suggestions.push({
+      category: 'postEvent',
+      message: 'Don\'t forget post-event follow-up — thank you notes and surveys extend your impact'
+    });
+  }
+  
+  return suggestions;
+}
+
+// ============================================================================
+// BUDGET CALCULATION
+// ============================================================================
+
+const fmt = (n) => new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD', minimumFractionDigits: 0, maximumFractionDigits: 0 }).format(n);
+
+function calculateBudget(data, vendorData) {
+  const size = SIZE_CONFIG[data.size] || SIZE_CONFIG.medium;
+  const guests = Math.round((size.min + size.max) / 2);
+  const duration = DURATION_OPTIONS.find(d => d.value === data.duration) || DURATION_OPTIONS[1];
+  const days = duration.days;
+  const region = REGIONS[data.region] || REGIONS['dc-metro'];
+  const multiplier = region.multiplier;
+
+  const costs = { venue: { min: 0, max: 0 }, fnb: 0, av: 0, production: 0, collateral: 0, marketing: 0 };
+
+  const venueRange = DEFAULT_COSTS.venue[data.size] || [5000, 15000];
+  costs.venue.min = Math.round(venueRange[0] * days * multiplier);
+  costs.venue.max = Math.round(venueRange[1] * days * multiplier);
+
+  (data.fnb || []).forEach(item => {
+    const cost = DEFAULT_COSTS.fnb[item] || 30;
+    costs.fnb += Math.round(cost * guests * multiplier);
+  });
+
+  (data.av || []).forEach(item => {
+    const cost = DEFAULT_COSTS.av[item] || 500;
+    costs.av += Math.round(cost * days * multiplier);
+  });
+
+  (data.production || []).forEach(item => {
+    const cost = DEFAULT_COSTS.production[item] || 2000;
+    costs.production += Math.round(cost * multiplier);
+  });
+
+  (data.collateral || []).forEach(item => {
+    const cost = DEFAULT_COSTS.collateral[item] || 5;
+    costs.collateral += Math.round(cost * guests);
+  });
+
+  (data.marketing || []).forEach(item => {
+    costs.marketing += DEFAULT_COSTS.marketing[item] || 500;
+  });
+
+  const subtotalMin = costs.venue.min + costs.fnb + costs.av + costs.production + costs.collateral + costs.marketing;
+  const subtotalMax = costs.venue.max + costs.fnb + costs.av + costs.production + costs.collateral + costs.marketing;
+  
+  const staffingMin = Math.round(subtotalMin * 0.10);
+  const staffingMax = Math.round(subtotalMax * 0.10);
+  const contingencyMin = Math.round(subtotalMin * 0.15);
+  const contingencyMax = Math.round(subtotalMax * 0.15);
+
+  return {
+    costs,
+    subtotal: { min: subtotalMin, max: subtotalMax },
+    staffing: { min: staffingMin, max: staffingMax },
+    contingency: { min: contingencyMin, max: contingencyMax },
+    total: { min: subtotalMin + staffingMin + contingencyMin, max: subtotalMax + staffingMax + contingencyMax },
+    guests,
+    days,
+    region: region.name
+  };
+}
+
+// ============================================================================
+// TIMELINE GENERATION
+// ============================================================================
+
+function generateTimeline(data) {
+  const eventDate = data.date ? new Date(data.date) : new Date(Date.now() + 90 * 24 * 60 * 60 * 1000);
+  const today = new Date();
+  
+  const milestones = [
+    { weeks: -16, task: 'Define goals, budget, and initial planning', label: '16 weeks out' },
+    { weeks: -14, task: 'Secure venue and set date', label: '14 weeks out' },
+    { weeks: -12, task: 'Confirm speakers and program outline', label: '12 weeks out' },
+    { weeks: -10, task: 'Launch invitations and registration', label: '10 weeks out' },
+    { weeks: -8, task: 'Finalize catering and AV requirements', label: '8 weeks out' },
+    { weeks: -6, task: 'Confirm all vendors and logistics', label: '6 weeks out' },
+    { weeks: -4, task: 'Send reminders, finalize materials', label: '4 weeks out' },
+    { weeks: -2, task: 'Final walkthrough and briefings', label: '2 weeks out' },
+    { weeks: -1, task: 'Confirm final headcount, last details', label: '1 week out' },
+    { weeks: 0, task: 'Event day - execute plan', label: 'Event Day' }
+  ];
+
+  return milestones.map(m => {
+    const milestoneDate = new Date(eventDate);
+    milestoneDate.setDate(eventDate.getDate() + (m.weeks * 7));
+    const isPast = milestoneDate < today;
+    const isCurrent = !isPast && milestoneDate <= new Date(today.getTime() + 7 * 24 * 60 * 60 * 1000);
+    return { ...m, date: milestoneDate, isPast, isCurrent };
+  });
+}
+
+// ============================================================================
+// RISK ANALYSIS
+// ============================================================================
+
+function analyzeRisks(data) {
+  const risks = [];
+  const eventDate = data.date ? new Date(data.date) : null;
+  const daysOut = eventDate ? Math.ceil((eventDate - new Date()) / (1000 * 60 * 60 * 24)) : 999;
+
+  if (daysOut < 42) risks.push({ level: 'high', message: 'Less than 6 weeks out — timeline is tight for vendor booking' });
+  if (daysOut < 84 && !data.venue) risks.push({ level: 'high', message: 'Less than 12 weeks out without venue type selected' });
+  if (['large', 'major', 'flagship'].includes(data.size) && !(data.av || []).includes('Wireless Microphones')) {
+    risks.push({ level: 'medium', message: 'Large event may need microphones for speakers' });
+  }
+  if (data.format === 'Hybrid' && !(data.av || []).includes('Livestream Setup')) {
+    risks.push({ level: 'medium', message: 'Hybrid event needs livestream capability' });
+  }
+  if (['major', 'flagship'].includes(data.size) && !(data.funding || '').trim()) {
+    risks.push({ level: 'medium', message: 'Large budget without confirmed funding sources' });
+  }
+
+  return risks;
+}
+
+// ============================================================================
+// CALENDAR EXPORT (.ics)
+// ============================================================================
+
+function generateICS(data, timeline) {
+  const eventDate = data.date ? new Date(data.date) : new Date();
+  const formatICSDate = (date) => {
+    return date.toISOString().replace(/[-:]/g, '').split('.')[0] + 'Z';
   };
   
-  return (
-    <div className="border-2 border-orange-500 bg-slate-800 p-3 mb-3 rounded">
-      <div className="flex items-center gap-2 text-orange-400 mb-2">
-        <AlertTriangle size={16}/> <span className="text-sm font-bold">RISK FLAGS</span>
-        <span className="text-xs bg-orange-600 px-1.5 py-0.5 rounded text-white">{risks.length}</span>
-      </div>
-      <div className="space-y-2">
-        {risks.map((r, i) => (
-          <div key={i} className={`p-2 border-l-2 text-xs ${colors[r.severity]}`}>
-            <span className="mr-2">{r.icon}</span>{r.message}
-          </div>
-        ))}
-      </div>
-    </div>
-  );
-};
+  let icsContent = `BEGIN:VCALENDAR
+VERSION:2.0
+PRODID:-//SeedAI//Event Planner//EN
+CALSCALE:GREGORIAN
+METHOD:PUBLISH
+`;
 
-// Venue Recommendations (Inline, compact)
-// Enhanced Vendor Matching Panel
-const VendorMatching = ({ vendors, responses, budgetConfig }) => {
-  const [expanded, setExpanded] = useState(true);
-  const location = responses.location || "Washington DC";
-  const attendance = budgetConfig.attendanceDefaults[responses.attendance] || 0;
-  const venueType = responses.venue_type;
-  const hasFnb = responses.fnb_items?.length > 0;
-  const hasAv = responses.av_needs?.length > 0;
-  const duration = budgetConfig.durationMultipliers[responses.duration] || 1;
+  // Main event
+  const eventEnd = new Date(eventDate);
+  const duration = DURATION_OPTIONS.find(d => d.value === data.duration);
+  if (duration && duration.days >= 1) {
+    eventEnd.setDate(eventEnd.getDate() + Math.ceil(duration.days));
+  } else {
+    eventEnd.setHours(eventEnd.getHours() + 4);
+  }
   
-  // Don't show if no relevant selections
-  if (!venueType && !hasFnb && !hasAv) return null;
-  if (venueType === "Not sure yet" && !hasFnb && !hasAv) return null;
-  
-  const formatMoney = (n) => '$' + Math.round(n).toLocaleString();
-  const tierColors = { Budget: 'bg-green-900/50 text-green-400 border-green-600', Standard: 'bg-blue-900/50 text-blue-400 border-blue-600', Premium: 'bg-purple-900/50 text-purple-400 border-purple-600' };
-  const tierBadge = { Budget: 'bg-green-600', Standard: 'bg-blue-600', Premium: 'bg-purple-600' };
-  
-  // Match venues
-  const matchedVenues = venueType && venueType !== "Not sure yet" ? (vendors.venues || [])
-    .filter(v => v.city === location)
-    .filter(v => v.type === venueType)
-    .filter(v => attendance >= (v.min_capacity || 0) && attendance <= (v.max_capacity || 9999))
-    .slice(0, 4) : [];
-  
-  // Match caterers based on attendance and location
-  const matchedCaterers = hasFnb && attendance > 0 ? (vendors.caterers || [])
-    .filter(c => c.city === location)
-    .filter(c => attendance >= (c.min_guests || 0) && attendance <= (c.max_guests || 9999))
-    .slice(0, 3) : [];
-  
-  // Match AV companies based on needs
-  const matchedAV = hasAv ? (vendors.av_companies || [])
-    .filter(av => av.city === location)
-    .slice(0, 3) : [];
-  
-  const totalMatches = matchedVenues.length + matchedCaterers.length + matchedAV.length;
-  if (totalMatches === 0) return null;
-  
-  // Estimate costs from matched vendors
-  const venueEstimate = matchedVenues.length > 0 ? {
-    low: Math.min(...matchedVenues.map(v => v.min_price || 0)) * duration,
-    high: Math.max(...matchedVenues.map(v => v.max_price || 0)) * duration
-  } : null;
-  
-  const cateringEstimate = matchedCaterers.length > 0 && attendance > 0 ? {
-    low: Math.min(...matchedCaterers.map(c => c.min_per_person || 0)) * attendance * duration,
-    high: Math.max(...matchedCaterers.map(c => c.max_per_person || 0)) * attendance * duration
-  } : null;
-  
-  return (
-    <div className="border-2 border-amber-500 bg-slate-800 p-3 mb-3 rounded">
-      <button onClick={() => setExpanded(!expanded)} className="w-full flex items-center justify-between mb-2">
-        <div className="flex items-center gap-2 text-amber-400">
-          <Building size={16}/> <span className="text-sm font-bold">VENDOR MATCHES</span>
-          <span className="text-xs bg-amber-600 text-white px-1.5 py-0.5 rounded">{totalMatches}</span>
-        </div>
-        <ChevronDown size={16} className={`text-slate-400 transition-transform ${expanded ? 'rotate-180' : ''}`}/>
-      </button>
+  icsContent += `BEGIN:VEVENT
+DTSTART:${formatICSDate(eventDate)}
+DTEND:${formatICSDate(eventEnd)}
+SUMMARY:${data.name || 'Event'}
+DESCRIPTION:${data.description || ''}
+LOCATION:${REGIONS[data.region]?.name || 'TBD'}
+STATUS:CONFIRMED
+UID:${Date.now()}-event@seedai.org
+END:VEVENT
+`;
+
+  // Add milestone reminders
+  timeline.forEach((milestone, index) => {
+    if (milestone.weeks < 0) {
+      const reminderDate = new Date(milestone.date);
+      reminderDate.setHours(9, 0, 0, 0);
+      const reminderEnd = new Date(reminderDate);
+      reminderEnd.setHours(10, 0, 0, 0);
       
-      {expanded && (
-        <div className="space-y-3">
-          {/* Summary Estimate */}
-          {(venueEstimate || cateringEstimate) && (
-            <div className="bg-slate-900 p-2 rounded text-xs">
-              <div className="text-slate-400 mb-1">Based on matched vendors:</div>
-              <div className="grid grid-cols-2 gap-2">
-                {venueEstimate && (
-                  <div>
-                    <span className="text-slate-500">Venue:</span>{' '}
-                    <span className="text-amber-400">{formatMoney(venueEstimate.low)} - {formatMoney(venueEstimate.high)}</span>
-                  </div>
-                )}
-                {cateringEstimate && (
-                  <div>
-                    <span className="text-slate-500">Catering:</span>{' '}
-                    <span className="text-amber-400">{formatMoney(cateringEstimate.low)} - {formatMoney(cateringEstimate.high)}</span>
-                  </div>
-                )}
-              </div>
-            </div>
-          )}
-          
-          {/* Matched Venues */}
-          {matchedVenues.length > 0 && (
-            <div>
-              <div className="text-xs text-slate-500 mb-1 flex items-center gap-1">
-                <span>🏛️</span> VENUES ({matchedVenues.length} match {venueType})
-              </div>
-              <div className="space-y-1">
-                {matchedVenues.map((v, i) => (
-                  <div key={i} className={`border p-2 rounded text-xs ${tierColors[v.tier] || 'border-slate-600 bg-slate-900'}`}>
-                    <div className="flex justify-between items-start">
-                      <div className="flex-1 min-w-0">
-                        <div className="font-bold truncate">{v.name}</div>
-                        <div className="text-slate-400">
-                          {formatMoney(v.min_price)}-{formatMoney(v.max_price)}/day • {v.min_capacity}-{v.max_capacity} guests
-                        </div>
-                      </div>
-                      <div className="flex items-center gap-1 ml-2">
-                        <span className={`text-xs px-1.5 py-0.5 rounded text-white ${tierBadge[v.tier] || 'bg-slate-600'}`}>{v.tier}</span>
-                        {v.url && (
-                          <a href={v.url} target="_blank" rel="noopener noreferrer" className="text-blue-400 hover:text-blue-300 p-1">
-                            <ExternalLink size={12}/>
-                          </a>
-                        )}
-                      </div>
-                    </div>
-                    {v.notes && <div className="text-slate-500 mt-1 text-xs">{v.notes}</div>}
-                  </div>
-                ))}
-              </div>
-            </div>
-          )}
-          
-          {/* Matched Caterers */}
-          {matchedCaterers.length > 0 && (
-            <div>
-              <div className="text-xs text-slate-500 mb-1 flex items-center gap-1">
-                <span>🍽️</span> CATERERS ({matchedCaterers.length} in {location})
-              </div>
-              <div className="space-y-1">
-                {matchedCaterers.map((c, i) => (
-                  <div key={i} className={`border p-2 rounded text-xs ${tierColors[c.tier] || 'border-slate-600 bg-slate-900'}`}>
-                    <div className="flex justify-between items-start">
-                      <div className="flex-1 min-w-0">
-                        <div className="font-bold truncate">{c.name}</div>
-                        <div className="text-slate-400">
-                          {formatMoney(c.min_per_person)}-{formatMoney(c.max_per_person)}/person • {c.min_guests}-{c.max_guests} guests
-                        </div>
-                      </div>
-                      <div className="flex items-center gap-1 ml-2">
-                        <span className={`text-xs px-1.5 py-0.5 rounded text-white ${tierBadge[c.tier] || 'bg-slate-600'}`}>{c.tier}</span>
-                        {c.url && (
-                          <a href={c.url} target="_blank" rel="noopener noreferrer" className="text-blue-400 hover:text-blue-300 p-1">
-                            <ExternalLink size={12}/>
-                          </a>
-                        )}
-                      </div>
-                    </div>
-                    {c.cuisine && <div className="text-slate-500 mt-1">{c.cuisine}</div>}
-                  </div>
-                ))}
-              </div>
-            </div>
-          )}
-          
-          {/* Matched AV Companies */}
-          {matchedAV.length > 0 && (
-            <div>
-              <div className="text-xs text-slate-500 mb-1 flex items-center gap-1">
-                <span>🎤</span> AV COMPANIES ({matchedAV.length} in {location})
-              </div>
-              <div className="space-y-1">
-                {matchedAV.map((av, i) => (
-                  <div key={i} className={`border p-2 rounded text-xs ${tierColors[av.tier] || 'border-slate-600 bg-slate-900'}`}>
-                    <div className="flex justify-between items-start">
-                      <div className="flex-1 min-w-0">
-                        <div className="font-bold truncate">{av.name}</div>
-                        {av.services && <div className="text-slate-400">{av.services}</div>}
-                      </div>
-                      <div className="flex items-center gap-1 ml-2">
-                        <span className={`text-xs px-1.5 py-0.5 rounded text-white ${tierBadge[av.tier] || 'bg-slate-600'}`}>{av.tier}</span>
-                        {av.url && (
-                          <a href={av.url} target="_blank" rel="noopener noreferrer" className="text-blue-400 hover:text-blue-300 p-1">
-                            <ExternalLink size={12}/>
-                          </a>
-                        )}
-                      </div>
-                    </div>
-                  </div>
-                ))}
-              </div>
-            </div>
-          )}
-          
-          <div className="text-xs text-slate-600 text-center pt-2 border-t border-slate-700">
-            💡 Vendor data from local database. Prices are estimates — request quotes for accuracy.
-          </div>
-          
-          {/* Generate RFP Email Button */}
-          <div className="mt-3 pt-3 border-t border-slate-700">
-            <RfpGenerator responses={responses} budgetConfig={budgetConfig} matchedVenues={matchedVenues} matchedCaterers={matchedCaterers} matchedAV={matchedAV} />
-          </div>
-        </div>
-      )}
-    </div>
-  );
+      icsContent += `BEGIN:VEVENT
+DTSTART:${formatICSDate(reminderDate)}
+DTEND:${formatICSDate(reminderEnd)}
+SUMMARY:[${data.name || 'Event'}] ${milestone.label}: ${milestone.task}
+DESCRIPTION:Planning milestone for ${data.name || 'your event'}
+STATUS:TENTATIVE
+UID:${Date.now()}-milestone-${index}@seedai.org
+END:VEVENT
+`;
+    }
+  });
+
+  icsContent += 'END:VCALENDAR';
+  return icsContent;
+}
+
+// ============================================================================
+// DOCUMENT GENERATORS
+// ============================================================================
+
+const generateBriefing = (data, budget) => {
+  const size = SIZE_CONFIG[data.size] || SIZE_CONFIG.medium;
+  return `EVENT BRIEFING
+${'='.repeat(60)}
+
+${data.name || 'Untitled Event'}
+${data.type || 'Event'} | ${data.date || 'Date TBD'}
+
+OVERVIEW
+${'-'.repeat(40)}
+${data.description || 'No description provided.'}
+
+KEY OBJECTIVES
+${'-'.repeat(40)}
+${data.objectives || 'Objectives not yet defined.'}
+
+EVENT DETAILS
+${'-'.repeat(40)}
+Format: ${data.format || 'TBD'}
+Expected Attendance: ${size.min}-${size.max} guests
+Duration: ${DURATION_OPTIONS.find(d => d.value === data.duration)?.label || 'TBD'}
+Location: ${budget.region}
+Venue Type: ${data.venue || 'TBD'}
+
+BUDGET SUMMARY
+${'-'.repeat(40)}
+Estimated Range: ${fmt(budget.total.min)} - ${fmt(budget.total.max)}
+
+TARGET AUDIENCE
+${'-'.repeat(40)}
+${(data.audience || []).join(', ') || 'Not specified'}
+
+VIP ATTENDEES
+${'-'.repeat(40)}
+${data.vips || 'None identified yet'}
+
+SPEAKERS/PRESENTERS
+${'-'.repeat(40)}
+${data.speakers || 'Not confirmed'}
+
+PROGRAM HIGHLIGHTS
+${'-'.repeat(40)}
+${(data.program || []).join(', ') || 'Program not finalized'}
+
+---
+Generated by SeedAI Event Planner | ${new Date().toLocaleDateString()}`;
 };
 
-// RFP Email Generator
-const RfpGenerator = ({ responses, budgetConfig, matchedVenues, matchedCaterers, matchedAV }) => {
-  const [showRfp, setShowRfp] = useState(null);
-  const [copied, setCopied] = useState(false);
+const generateRunOfShow = (data, budget) => {
+  const duration = DURATION_OPTIONS.find(d => d.value === data.duration) || DURATION_OPTIONS[1];
+  let schedule = '';
   
-  const eventName = responses.event_name || '[Event Name]';
-  const eventDate = responses.target_date ? new Date(responses.target_date).toLocaleDateString('en-US', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' }) : '[Date TBD]';
-  const attendance = budgetConfig.attendanceDefaults[responses.attendance] || '[TBD]';
-  const duration = responses.duration || '[TBD]';
-  const location = responses.location || '[Location TBD]';
-  const format = responses.format || 'In-person';
-  
-  const generateVenueRfp = (venue = null) => {
-    const venueName = venue ? venue.name : '[Venue Name]';
-    const spaces = responses.space_needs?.join(', ') || 'Main event space';
-    const fnbItems = responses.fnb_items?.join(', ') || 'TBD';
+  if (duration.days <= 1) {
+    schedule = `
+08:00 AM  Staff arrival and setup
+08:30 AM  Vendor check-in, AV testing
+09:00 AM  Registration opens
+09:30 AM  Welcome and opening remarks
+10:00 AM  ${(data.program || []).includes('Keynote Address') ? 'Keynote Address' : 'Opening Session'}
+10:45 AM  Networking break
+11:00 AM  ${(data.program || []).includes('Panel Discussion') ? 'Panel Discussion' : 'Main Program'}
+12:00 PM  ${(data.fnb || []).some(f => f.includes('Lunch')) ? 'Lunch Service' : 'Midday Break'}
+01:00 PM  Afternoon programming
+02:30 PM  Break
+02:45 PM  ${(data.program || []).includes('Breakout Sessions') ? 'Breakout Sessions' : 'Continued Programming'}
+04:00 PM  Closing remarks
+04:30 PM  ${(data.fnb || []).includes('Cocktail Reception') ? 'Networking Reception' : 'Event Concludes'}
+06:00 PM  Venue breakdown`;
+  } else {
+    schedule = `
+DAY 1
+------
+08:00 AM  Staff arrival and setup
+09:00 AM  Registration opens
+09:30 AM  Welcome and opening remarks
+10:00 AM  Morning sessions
+12:00 PM  Lunch
+01:30 PM  Afternoon programming
+05:00 PM  Day 1 concludes
+06:00 PM  Evening reception (if applicable)
+
+DAY 2
+------
+08:30 AM  Registration/coffee
+09:00 AM  Day 2 opening
+09:30 AM  Morning sessions
+12:00 PM  Lunch
+01:30 PM  Afternoon programming
+04:00 PM  Closing session
+04:30 PM  Event concludes`;
     
-    return `Subject: RFP - ${eventName} | ${eventDate}
+    if (duration.days >= 3) {
+      schedule += `
 
-Dear ${venueName} Events Team,
+DAY 3
+------
+08:30 AM  Registration/coffee
+09:00 AM  Day 3 sessions
+12:00 PM  Lunch
+01:30 PM  Final sessions
+03:30 PM  Closing ceremony
+04:00 PM  Event concludes
+04:30 PM  Breakdown begins`;
+    }
+  }
 
-I am writing to request a proposal for an upcoming event:
+  return `RUN OF SHOW
+${'='.repeat(60)}
 
-EVENT OVERVIEW
-━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-Event Name: ${eventName}
-Date: ${eventDate}
-Duration: ${duration}
-Expected Attendance: ${attendance} guests
-Format: ${format}
+${data.name || 'Untitled Event'}
+${data.date || 'Date TBD'} | ${budget.region}
+${schedule}
+
+KEY CONTACTS
+${'-'.repeat(40)}
+${(data.team || []).map(t => `${t.role}: ${t.name}`).join('\n') || 'Team not assigned'}
+
+NOTES
+${'-'.repeat(40)}
+${data.notes || 'No additional notes'}
+
+---
+Generated by SeedAI Event Planner | ${new Date().toLocaleDateString()}`;
+};
+
+const generateBudgetDoc = (data, budget) => {
+  return `BUDGET BREAKDOWN
+${'='.repeat(60)}
+
+${data.name || 'Untitled Event'}
+${data.date || 'Date TBD'} | ${budget.guests} guests | ${budget.days} day(s)
+Location: ${budget.region}
+
+COST ESTIMATES
+${'-'.repeat(40)}
+
+VENUE
+  Estimate: ${fmt(budget.costs.venue.min)} - ${fmt(budget.costs.venue.max)}
+  Type: ${data.venue || 'TBD'}
+
+FOOD & BEVERAGE
+  Estimate: ${fmt(budget.costs.fnb)}
+  Items: ${(data.fnb || []).join(', ') || 'None selected'}
+
+AUDIO/VISUAL
+  Estimate: ${fmt(budget.costs.av)}
+  Items: ${(data.av || []).join(', ') || 'None selected'}
+
+PRODUCTION & DESIGN
+  Estimate: ${fmt(budget.costs.production)}
+  Items: ${(data.production || []).join(', ') || 'None selected'}
+
+COLLATERAL & MATERIALS
+  Estimate: ${fmt(budget.costs.collateral)}
+  Items: ${(data.collateral || []).join(', ') || 'None selected'}
+
+MARKETING & COMMUNICATIONS
+  Estimate: ${fmt(budget.costs.marketing)}
+  Items: ${(data.marketing || []).join(', ') || 'None selected'}
+
+${'-'.repeat(40)}
+SUBTOTAL: ${fmt(budget.subtotal.min)} - ${fmt(budget.subtotal.max)}
+
+Staffing (10%): ${fmt(budget.staffing.min)} - ${fmt(budget.staffing.max)}
+Contingency (15%): ${fmt(budget.contingency.min)} - ${fmt(budget.contingency.max)}
+
+${'='.repeat(40)}
+TOTAL ESTIMATE: ${fmt(budget.total.min)} - ${fmt(budget.total.max)}
+
+FUNDING SOURCES
+${'-'.repeat(40)}
+${data.funding || 'Not specified'}
+
+---
+Generated by SeedAI Event Planner | ${new Date().toLocaleDateString()}`;
+};
+
+const generateChecklist = (data) => {
+  return `PLANNING CHECKLIST
+${'='.repeat(60)}
+
+${data.name || 'Untitled Event'}
+${data.date || 'Date TBD'}
+
+16+ WEEKS OUT
+${'-'.repeat(40)}
+[ ] Define event goals and success metrics
+[ ] Establish preliminary budget
+[ ] Identify key stakeholders
+[ ] Begin venue research
+
+14 WEEKS OUT
+${'-'.repeat(40)}
+[ ] Secure venue contract
+[ ] Confirm event date
+[ ] Draft speaker wish list
+[ ] Create project timeline
+
+12 WEEKS OUT
+${'-'.repeat(40)}
+[ ] Confirm keynote speakers
+[ ] Finalize program outline
+[ ] Select catering vendor
+[ ] Book AV provider
+
+10 WEEKS OUT
+${'-'.repeat(40)}
+[ ] Launch save-the-date
+[ ] Open registration
+[ ] Finalize marketing plan
+[ ] Order collateral materials
+
+8 WEEKS OUT
+${'-'.repeat(40)}
+[ ] Send formal invitations
+[ ] Confirm all vendors
+[ ] Finalize menu selections
+[ ] Review AV requirements
+
+6 WEEKS OUT
+${'-'.repeat(40)}
+[ ] Track RSVPs
+[ ] Brief speakers on logistics
+[ ] Finalize printed materials
+[ ] Confirm staffing plan
+
+4 WEEKS OUT
+${'-'.repeat(40)}
+[ ] Send reminder emails
+[ ] Finalize seating/layout
+[ ] Create run of show
+[ ] Prepare name badges
+
+2 WEEKS OUT
+${'-'.repeat(40)}
+[ ] Final venue walkthrough
+[ ] Confirm final headcount
+[ ] Brief all staff/volunteers
+[ ] Test all technology
+
+1 WEEK OUT
+${'-'.repeat(40)}
+[ ] Final vendor confirmations
+[ ] Print final materials
+[ ] Prepare emergency kit
+[ ] Send final attendee communications
+
+EVENT DAY
+${'-'.repeat(40)}
+[ ] Early arrival for setup
+[ ] Staff briefing
+[ ] Vendor check-ins
+[ ] Execute run of show
+[ ] Capture photos/video
+[ ] Monitor and adjust as needed
+
+POST-EVENT
+${'-'.repeat(40)}
+[ ] Send thank you notes
+[ ] Distribute survey
+[ ] Compile event report
+[ ] Process vendor payments
+[ ] Archive materials
+[ ] Debrief with team
+
+---
+Generated by SeedAI Event Planner | ${new Date().toLocaleDateString()}`;
+};
+
+const generateVenueRFP = (data, budget) => {
+  const size = SIZE_CONFIG[data.size] || SIZE_CONFIG.medium;
+  const duration = DURATION_OPTIONS.find(d => d.value === data.duration) || DURATION_OPTIONS[1];
+  return `VENUE INQUIRY
+${'='.repeat(60)}
+
+Subject: Venue Inquiry - ${data.name || 'Event'} | ${data.date || 'Date TBD'}
+
+Dear Events Team,
+
+We are seeking venue availability for an upcoming ${data.type || 'event'}.
+
+EVENT DETAILS
+${'-'.repeat(40)}
+Event Name: ${data.name || 'TBD'}
+Date: ${data.date || 'Flexible'}
+Duration: ${duration.label}
+Expected Attendance: ${size.min}-${size.max} guests
+Format: ${data.format || 'In-Person'}
 
 SPACE REQUIREMENTS
-━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-${spaces}
+${'-'.repeat(40)}
+${(data.spaces || []).map(s => `• ${s}`).join('\n') || '• Main event space\n• Registration area'}
 
-${responses.program_elements?.length > 0 ? `Program Elements: ${responses.program_elements.join(', ')}` : ''}
-
-FOOD & BEVERAGE NEEDS
-━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-${fnbItems}
-
-AV/TECHNICAL REQUIREMENTS
-━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-${responses.av_needs?.length > 0 ? responses.av_needs.join(', ') : 'Basic AV (screen, projector, microphones)'}
-
-Please provide:
-1. Venue rental cost (with any minimum spend requirements)
-2. In-house catering options and pricing
-3. AV package options
-4. Available setup/breakdown windows
-5. Parking and accessibility information
-6. Any date holds or booking requirements
-
-Our budget range for venue and catering is approximately $${Math.round(budgetConfig.attendanceDefaults[responses.attendance] * 100).toLocaleString()} - $${Math.round(budgetConfig.attendanceDefaults[responses.attendance] * 200).toLocaleString()}.
-
-Please let me know your availability to discuss. We'd like to make a decision within the next two weeks.
-
-Best regards,
-[Your Name]
-[Organization]
-[Phone/Email]`;
-  };
-
-  const generateCateringRfp = (caterer = null) => {
-    const catererName = caterer ? caterer.name : '[Caterer Name]';
-    const fnbItems = responses.fnb_items || [];
-    
-    return `Subject: Catering RFP - ${eventName} | ${eventDate}
-
-Dear ${catererName} Team,
-
-We are seeking catering proposals for an upcoming event:
-
-EVENT DETAILS
-━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-Event: ${eventName}
-Date: ${eventDate}
-Location: ${location}
-Expected Guests: ${attendance}
-Duration: ${duration}
-
-SERVICE REQUIREMENTS
-━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-${fnbItems.map(item => `• ${item}`).join('\n') || '• TBD'}
-
-DIETARY CONSIDERATIONS
-━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-Please include vegetarian, vegan, and gluten-free options.
-
-Please provide:
-1. Menu options at different price points (per person)
-2. Service staff requirements and costs
-3. Equipment/rental needs
-4. Setup and breakdown timeline
-5. Minimum order requirements
-6. Deposit and payment terms
-
-Our target budget is approximately $${Math.round(attendance * 50).toLocaleString()} - $${Math.round(attendance * 100).toLocaleString()} for catering.
-
-Best regards,
-[Your Name]
-[Organization]
-[Phone/Email]`;
-  };
-
-  const generateAVRfp = (avCompany = null) => {
-    const avName = avCompany ? avCompany.name : '[AV Company Name]';
-    const avNeeds = responses.av_needs || [];
-    
-    return `Subject: AV Services RFP - ${eventName} | ${eventDate}
-
-Dear ${avName} Team,
-
-We need AV support for an upcoming event:
-
-EVENT DETAILS
-━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-Event: ${eventName}
-Date: ${eventDate}
-Location: ${location}
-Attendance: ${attendance}
-Duration: ${duration}
-Format: ${format}
+CATERING NEEDS
+${'-'.repeat(40)}
+${(data.fnb || []).map(f => `• ${f}`).join('\n') || '• To be determined'}
 
 AV REQUIREMENTS
-━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-${avNeeds.map(item => `• ${item}`).join('\n') || '• Basic presentation setup'}
+${'-'.repeat(40)}
+${(data.av || []).map(a => `• ${a}`).join('\n') || '• Basic AV setup'}
 
-${format === 'Hybrid (in-person + virtual)' ? `
-LIVESTREAM REQUIREMENTS
-━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-• Live streaming capability
-• Platform integration (Zoom/Teams/YouTube)
-• Remote speaker integration
-` : ''}
-
-SPACES TO COVER
-━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-${responses.space_needs?.map(s => `• ${s}`).join('\n') || '• Main event space'}
+BUDGET RANGE
+${'-'.repeat(40)}
+Venue Budget: ${fmt(budget.costs.venue.min)} - ${fmt(budget.costs.venue.max)}
 
 Please provide:
-1. Equipment list and rental costs
-2. Technical staff requirements (setup, event, breakdown)
-3. Setup timeline needs
-4. Recording options if applicable
-5. Backup equipment policy
+1. Availability for requested date(s)
+2. Rental pricing and what's included
+3. Catering options and pricing
+4. AV capabilities and costs
+5. Floor plans for proposed spaces
+6. Any date flexibility or package options
+
+We look forward to hearing from you.
 
 Best regards,
-[Your Name]
-[Organization]
-[Phone/Email]`;
-  };
+${(data.team || []).find(t => t.role?.toLowerCase().includes('lead'))?.name || '[Your Name]'}
+${data.name ? `${data.name} Planning Team` : '[Organization]'}
 
-  const copyToClipboard = (text) => {
-    navigator.clipboard.writeText(text);
-    setCopied(true);
-    sound.play('complete');
-    setTimeout(() => setCopied(false), 2000);
-  };
-
-  return (
-    <div>
-      <div className="text-xs text-amber-400 font-bold mb-2">📧 GENERATE RFP EMAILS</div>
-      <div className="grid grid-cols-3 gap-1">
-        <button onClick={() => setShowRfp(showRfp === 'venue' ? null : 'venue')}
-          className={`p-2 border text-xs rounded ${showRfp === 'venue' ? 'border-amber-400 bg-amber-900/30 text-amber-400' : 'border-slate-600 bg-slate-900 text-slate-400'}`}>
-          🏛️ Venue
-        </button>
-        <button onClick={() => setShowRfp(showRfp === 'catering' ? null : 'catering')}
-          className={`p-2 border text-xs rounded ${showRfp === 'catering' ? 'border-amber-400 bg-amber-900/30 text-amber-400' : 'border-slate-600 bg-slate-900 text-slate-400'}`}>
-          🍽️ Catering
-        </button>
-        <button onClick={() => setShowRfp(showRfp === 'av' ? null : 'av')}
-          className={`p-2 border text-xs rounded ${showRfp === 'av' ? 'border-amber-400 bg-amber-900/30 text-amber-400' : 'border-slate-600 bg-slate-900 text-slate-400'}`}>
-          🎤 AV
-        </button>
-      </div>
-      
-      {showRfp && (
-        <div className="mt-2 bg-slate-900 border border-slate-700 rounded p-2">
-          <div className="flex justify-between items-center mb-2">
-            <span className="text-xs text-slate-400">
-              {showRfp === 'venue' ? 'Venue RFP' : showRfp === 'catering' ? 'Catering RFP' : 'AV RFP'}
-            </span>
-            <button onClick={() => copyToClipboard(
-              showRfp === 'venue' ? generateVenueRfp() : 
-              showRfp === 'catering' ? generateCateringRfp() : 
-              generateAVRfp()
-            )} className="text-xs bg-amber-600 text-white px-2 py-1 rounded flex items-center gap-1">
-              {copied ? <><CheckCircle size={12}/> Copied!</> : <><Copy size={12}/> Copy</>}
-            </button>
-          </div>
-          <pre className="text-xs text-slate-300 whitespace-pre-wrap max-h-48 overflow-y-auto bg-slate-950 p-2 rounded">
-            {showRfp === 'venue' ? generateVenueRfp() : 
-             showRfp === 'catering' ? generateCateringRfp() : 
-             generateAVRfp()}
-          </pre>
-        </div>
-      )}
-    </div>
-  );
+---
+Generated by SeedAI Event Planner | ${new Date().toLocaleDateString()}`;
 };
 
-// Budget Scenarios Component
-const BudgetScenarios = ({ responses, budgetConfig, vendors, onAiRefine, aiEstimate, aiLoading }) => {
-  const [selected, setSelected] = useState('standard');
-  const scenarios = {
-    budget: calculateBudget(responses, 'budget', budgetConfig, vendors),
-    standard: calculateBudget(responses, 'standard', budgetConfig, vendors),
-    premium: calculateBudget(responses, 'premium', budgetConfig, vendors)
+const generateCateringRFP = (data, budget) => {
+  const size = SIZE_CONFIG[data.size] || SIZE_CONFIG.medium;
+  return `CATERING INQUIRY
+${'='.repeat(60)}
+
+Subject: Catering Request - ${data.name || 'Event'} | ${data.date || 'Date TBD'}
+
+Dear Catering Team,
+
+We are requesting a proposal for catering services for our upcoming event.
+
+EVENT OVERVIEW
+${'-'.repeat(40)}
+Event: ${data.name || 'TBD'}
+Date: ${data.date || 'TBD'}
+Location: ${data.venue || 'TBD'} (${budget.region})
+Guest Count: ${size.min}-${size.max}
+
+SERVICE REQUIREMENTS
+${'-'.repeat(40)}
+${(data.fnb || []).map(f => `• ${f}`).join('\n') || '• To be determined'}
+
+DIETARY CONSIDERATIONS
+${'-'.repeat(40)}
+Please include options for:
+• Vegetarian/Vegan
+• Gluten-free
+• Common allergies
+
+BUDGET
+${'-'.repeat(40)}
+F&B Budget: Approximately ${fmt(budget.costs.fnb)}
+
+Please provide:
+1. Proposed menus for each service
+2. Per-person pricing
+3. Minimum guest requirements
+4. Staff and equipment included
+5. Setup and breakdown timing
+
+Thank you for your consideration.
+
+Best regards,
+${(data.team || []).find(t => t.role?.toLowerCase().includes('lead'))?.name || '[Your Name]'}
+
+---
+Generated by SeedAI Event Planner | ${new Date().toLocaleDateString()}`;
+};
+
+const generateSpeakerInvite = (data) => {
+  return `SPEAKER INVITATION
+${'='.repeat(60)}
+
+Subject: Speaking Invitation - ${data.name || 'Event'}
+
+Dear [Speaker Name],
+
+On behalf of [Organization], I am pleased to invite you to participate as a speaker at ${data.name || 'our upcoming event'}.
+
+EVENT DETAILS
+${'-'.repeat(40)}
+Event: ${data.name || 'TBD'}
+Date: ${data.date || 'TBD'}
+Location: ${REGIONS[data.region]?.name || 'TBD'}
+Format: ${data.format || 'In-Person'}
+
+ABOUT THE EVENT
+${'-'.repeat(40)}
+${data.description || 'Event description to be provided.'}
+
+TARGET AUDIENCE
+${'-'.repeat(40)}
+${(data.audience || []).join(', ') || 'Policy professionals and stakeholders'}
+
+Expected attendance: ${SIZE_CONFIG[data.size]?.label || '50-100 guests'}
+
+SPEAKING OPPORTUNITY
+${'-'.repeat(40)}
+We would be honored to have you [participate in a panel discussion / deliver a keynote address / lead a workshop session].
+
+Topic area: [Proposed topic]
+Time slot: [Proposed time]
+Duration: [XX minutes]
+
+WHAT WE PROVIDE
+${'-'.repeat(40)}
+• Travel and accommodation (if applicable)
+• Speaker preparation support
+• Professional AV and production
+• Promotion to our network
+
+Please let us know your availability and interest by [date]. We're happy to discuss the opportunity further at your convenience.
+
+Warm regards,
+${(data.team || []).find(t => t.role?.toLowerCase().includes('lead'))?.name || '[Your Name]'}
+[Title]
+[Organization]
+[Contact Information]
+
+---
+Generated by SeedAI Event Planner | ${new Date().toLocaleDateString()}`;
+};
+
+const generateContacts = (data) => {
+  return `DAY-OF CONTACTS
+${'='.repeat(60)}
+
+${data.name || 'Event'}
+${data.date || 'Date TBD'}
+
+INTERNAL TEAM
+${'-'.repeat(40)}
+${(data.team || []).map(t => `${t.role || 'Team Member'}: ${t.name || 'TBD'}
+  Phone: [Add phone]
+  Email: [Add email]`).join('\n\n') || 'Team not assigned'}
+
+VENUE CONTACT
+${'-'.repeat(40)}
+Venue: ${data.venue || 'TBD'}
+Contact: [Name]
+Phone: [Phone]
+Email: [Email]
+
+CATERING CONTACT
+${'-'.repeat(40)}
+Company: [Caterer Name]
+Contact: [Name]
+Phone: [Phone]
+Day-of Lead: [Name]
+
+AV/PRODUCTION CONTACT
+${'-'.repeat(40)}
+Company: [AV Company]
+Contact: [Name]
+Phone: [Phone]
+Day-of Tech: [Name]
+
+EMERGENCY CONTACTS
+${'-'.repeat(40)}
+Venue Security: [Phone]
+Building Management: [Phone]
+Local Emergency: 911
+
+NOTES
+${'-'.repeat(40)}
+${data.notes || 'No additional notes'}
+
+---
+Generated by SeedAI Event Planner | ${new Date().toLocaleDateString()}`;
+};
+
+const DOCUMENTS = {
+  briefing: { name: 'Event Briefing', icon: '📋', generate: generateBriefing },
+  runofshow: { name: 'Run of Show', icon: '⏱️', generate: generateRunOfShow },
+  budget: { name: 'Budget Breakdown', icon: '💰', generate: generateBudgetDoc },
+  checklist: { name: 'Planning Checklist', icon: '✅', generate: generateChecklist },
+  venueRfp: { name: 'Venue RFP', icon: '🏛️', generate: generateVenueRFP },
+  cateringRfp: { name: 'Catering RFP', icon: '🍽️', generate: generateCateringRFP },
+  speakerInvite: { name: 'Speaker Invitation', icon: '🎤', generate: generateSpeakerInvite },
+  contacts: { name: 'Day-Of Contacts', icon: '📞', generate: generateContacts }
+};
+
+// ============================================================================
+// AI PROMPT GENERATOR (for Copy for AI)
+// ============================================================================
+
+function generateAIPrompt(data, budget) {
+  const size = SIZE_CONFIG[data.size] || SIZE_CONFIG.medium;
+  
+  return `I'm planning a policy event and need help refining my plan. Here are the details:
+
+## Event Overview
+- **Name:** ${data.name || '[Not yet named]'}
+- **Type:** ${data.type || '[Not specified]'}
+- **Date:** ${data.date || '[TBD]'}
+- **Location:** ${REGIONS[data.region]?.name || 'Washington, DC'}
+- **Format:** ${data.format || '[Not specified]'}
+- **Expected Size:** ${size ? `${size.min}-${size.max} guests` : '[Not specified]'}
+- **Duration:** ${DURATION_OPTIONS.find(d => d.value === data.duration)?.label || '[Not specified]'}
+- **Venue Type:** ${data.venue || '[Not specified]'}
+
+## Purpose & Goals
+**Description:** ${data.description || '[No description yet]'}
+
+**Objectives:** ${data.objectives || '[No objectives defined]'}
+
+## Audience
+**Target Audience:** ${(data.audience || []).join(', ') || '[Not specified]'}
+
+**VIPs:** ${data.vips || '[None identified]'}
+
+**Speakers:** ${data.speakers || '[Not confirmed]'}
+
+## Program & Logistics
+**Program Elements:** ${(data.program || []).join(', ') || '[None selected]'}
+
+**Spaces Needed:** ${(data.spaces || []).join(', ') || '[None selected]'}
+
+**Food & Beverage:** ${(data.fnb || []).join(', ') || '[None selected]'}
+
+**AV Requirements:** ${(data.av || []).join(', ') || '[None selected]'}
+
+**Production:** ${(data.production || []).join(', ') || '[None selected]'}
+
+## Budget
+**Estimated Range:** ${fmt(budget.total.min)} - ${fmt(budget.total.max)}
+
+**Funding Sources:** ${data.funding || '[Not specified]'}
+
+## Team
+${(data.team || []).filter(t => t.name).map(t => `- ${t.name}${t.role ? ` (${t.role})` : ''}`).join('\n') || '[No team assigned]'}
+
+## Additional Notes
+${data.notes || '[None]'}
+
+---
+
+Please help me with:
+1. Review this plan for any gaps or risks I might have missed
+2. Suggest improvements based on DC policy event best practices
+3. [Add your specific question here]`;
+}
+
+// ============================================================================
+// PHASE DEFINITIONS
+// ============================================================================
+
+const PHASES = [
+  {
+    id: 'vision',
+    name: 'Vision',
+    title: 'Define Your Vision',
+    description: 'Start with the big picture — what are you trying to achieve?',
+    icon: '💡'
+  },
+  {
+    id: 'audience',
+    name: 'Audience',
+    title: 'Know Your Audience',
+    description: 'Who are you bringing together and why does it matter to them?',
+    icon: '👥'
+  },
+  {
+    id: 'logistics',
+    name: 'Logistics',
+    title: 'Set the Stage',
+    description: 'Where and when will this happen?',
+    icon: '📍'
+  },
+  {
+    id: 'program',
+    name: 'Program',
+    title: 'Design the Experience',
+    description: 'What will attendees do and experience?',
+    icon: '📝'
+  },
+  {
+    id: 'services',
+    name: 'Services',
+    title: 'Plan the Details',
+    description: 'Food, AV, materials — the practical elements that make it work.',
+    icon: '🔧'
+  },
+  {
+    id: 'review',
+    name: 'Review',
+    title: 'Review & Generate',
+    description: 'See your complete plan and generate documents.',
+    icon: '✨'
+  }
+];
+
+// ============================================================================
+// GUIDING PROMPTS
+// ============================================================================
+
+const PROMPTS = {
+  name: "What's the working title for your event? This can evolve as planning progresses.",
+  type: "What type of event best describes what you're planning?",
+  description: "In 2-3 sentences, describe what this event is about. What's the core theme or focus?",
+  objectives: "What does success look like? What should attendees walk away with? What impact do you want to create?",
+  size: "How many people do you realistically expect to attend?",
+  audience: "Who specifically are you trying to reach? Think about job titles, sectors, and why they'd want to attend.",
+  vips: "Are there specific high-profile individuals you're hoping to attract? Members of Congress, executives, thought leaders?",
+  speakers: "Who would be ideal to present, moderate, or lead discussions? Dream big, but also consider realistic options.",
+  date: "When are you planning to hold this event? Consider seasonality and competing events.",
+  duration: "How long do you need to accomplish your goals?",
+  format: "Will attendees gather in person, join virtually, or both?",
+  venue: "What type of space fits your event's tone and needs?",
+  region: "Where will this event take place? This helps us estimate local market costs.",
+  spaces: "Beyond the main room, what other spaces might you need?",
+  program: "What elements will make up your agenda? Think about variety and pacing.",
+  fnb: "Food and beverage sets the tone. What level of hospitality fits your event?",
+  av: "What technology do you need to deliver your content effectively?",
+  production: "What visual and design elements will enhance the experience?",
+  collateral: "What materials will attendees receive or take home?",
+  marketing: "How will you spread the word and drive registration?",
+  postEvent: "What happens after the event to extend its impact?",
+  team: "Who are the key people responsible for making this happen?",
+  funding: "Where is the budget coming from? Sponsors, organizational budget, grants?",
+  notes: "Anything else important to remember as planning progresses?"
+};
+
+// ============================================================================
+// MAIN COMPONENT
+// ============================================================================
+
+export default function EventPlannerV7() {
+  const [currentPhase, setCurrentPhase] = useState(0);
+  const [data, setData] = useState({
+    name: '', type: '', size: '', duration: '', date: '', format: '', venue: '', region: 'dc-metro',
+    description: '', objectives: '', audience: [], vips: '', speakers: '',
+    program: [], spaces: [], fnb: [], av: [], production: [], collateral: [], marketing: [], postEvent: [],
+    team: [{ name: '', role: '' }], notes: '', funding: ''
+  });
+  const [vendorData, setVendorData] = useState(null);
+  const [activeDoc, setActiveDoc] = useState(null);
+  const [copySuccess, setCopySuccess] = useState(false);
+  const [showShareMenu, setShowShareMenu] = useState(false);
+  const [showTemplates, setShowTemplates] = useState(false);
+  const fileInputRef = useRef(null);
+
+  // Load saved data
+  useEffect(() => {
+    try {
+      const saved = localStorage.getItem('seedai-planner-v7');
+      if (saved) {
+        const parsed = JSON.parse(saved);
+        setData(prev => ({ ...prev, ...parsed }));
+      }
+    } catch (e) {
+      console.error('Failed to load saved data:', e);
+    }
+  }, []);
+
+  // Auto-save
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      try {
+        localStorage.setItem('seedai-planner-v7', JSON.stringify(data));
+      } catch (e) {
+        console.error('Failed to save:', e);
+      }
+    }, 1000);
+    return () => clearTimeout(timer);
+  }, [data]);
+
+  const update = (field, value) => setData(prev => ({ ...prev, [field]: value }));
+  const toggle = (field, value) => {
+    setData(prev => ({
+      ...prev,
+      [field]: prev[field].includes(value)
+        ? prev[field].filter(v => v !== value)
+        : [...prev[field], value]
+    }));
   };
-  const b = scenarios[selected];
-  const fmt = (n) => n > 0 ? '$' + Math.round(n).toLocaleString() : '-';
-  
-  // Only show categories that have actual selections
-  const hasVenue = responses.venue_type && responses.venue_type !== "Not sure yet" && responses.location && responses.attendance && responses.duration;
-  const hasFnb = responses.fnb_items?.length > 0;
-  const hasAv = responses.av_needs?.length > 0;
-  const hasProduction = responses.production_needs?.length > 0;
-  const hasCollateral = responses.collateral_needs?.length > 0;
-  const hasMarketing = responses.marketing_channels?.length > 0;
-  const hasStaffing = (hasVenue || hasFnb || hasAv) && responses.duration;
-  
-  const cats = [
-    hasVenue && { key: 'venue', label: 'Venue', icon: '🏛️' },
-    hasFnb && { key: 'foodBeverage', label: 'F&B', icon: '🍽️' },
-    hasAv && { key: 'avTechnical', label: 'AV', icon: '🎤' },
-    hasProduction && { key: 'production', label: 'Production', icon: '📸' },
-    hasCollateral && { key: 'collateral', label: 'Collateral', icon: '📦' },
-    hasMarketing && { key: 'marketing', label: 'Marketing', icon: '📣' },
-    hasStaffing && { key: 'staffing', label: 'Staffing', icon: '👥' },
-  ].filter(Boolean);
-  
-  const hasData = cats.length > 0;
-  const total = scenarios[selected].total;
-  
-  return (
-    <div className="border-2 border-green-500 bg-slate-800 p-3 mb-3 rounded">
-      <div className="flex items-center justify-between mb-2">
-        <div className="flex items-center gap-2 text-green-400">
-          <Calculator size={16}/> <span className="text-sm font-bold">BUDGET ESTIMATE</span>
-        </div>
-        {responses.location && (
-          <div className="flex items-center gap-1 text-xs text-slate-400">
-            <MapPin size={12}/> {responses.location}
-          </div>
-        )}
-      </div>
-      
-      {!hasData ? (
-        <div className="text-slate-500 text-xs py-4 text-center">
-          <div className="mb-2">📊 No budget items yet</div>
-          <div className="text-slate-600">Complete Phases 2-5 to build your estimate:</div>
-          <div className="text-slate-600 mt-1">• Attendance & duration → Venue costs</div>
-          <div className="text-slate-600">• F&B, AV, production → Line items</div>
+
+  const budget = calculateBudget(data, vendorData);
+  const timeline = generateTimeline(data);
+  const risks = analyzeRisks(data);
+  const suggestions = generateSuggestions(data, budget);
+  const calendarWarnings = checkCongressionalCalendar(data.date);
+
+  // Phase completion checks
+  const phaseComplete = {
+    vision: !!(data.name && data.type && data.description && data.objectives),
+    audience: !!(data.size && data.audience.length > 0),
+    logistics: !!(data.date && data.duration && data.format && data.venue && data.region),
+    program: !!(data.program.length > 0),
+    services: !!(data.fnb.length > 0 || data.av.length > 0),
+    review: true
+  };
+
+  const completedPhases = Object.values(phaseComplete).filter(Boolean).length;
+
+  // Handlers
+  const handleCopy = useCallback(async (text) => {
+    try {
+      await navigator.clipboard.writeText(text);
+      setCopySuccess(true);
+      setTimeout(() => setCopySuccess(false), 2000);
+    } catch (e) {
+      console.error('Copy failed:', e);
+    }
+  }, []);
+
+  const handleDownload = useCallback((text, filename) => {
+    const blob = new Blob([text], { type: 'text/plain' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = filename;
+    a.click();
+    URL.revokeObjectURL(url);
+  }, []);
+
+  const handleExportJSON = useCallback(() => {
+    const exportData = {
+      version: 'v7',
+      exportedAt: new Date().toISOString(),
+      data
+    };
+    const blob = new Blob([JSON.stringify(exportData, null, 2)], { type: 'application/json' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `${data.name || 'event'}-plan.json`.toLowerCase().replace(/\s+/g, '-');
+    a.click();
+    URL.revokeObjectURL(url);
+  }, [data]);
+
+  const handleImportJSON = useCallback((event) => {
+    const file = event.target.files?.[0];
+    if (!file) return;
+    
+    const reader = new FileReader();
+    reader.onload = (e) => {
+      try {
+        const imported = JSON.parse(e.target?.result);
+        if (imported.data) {
+          setData(prev => ({ ...prev, ...imported.data }));
+          alert('Plan imported successfully!');
+        }
+      } catch (err) {
+        alert('Failed to import plan. Invalid file format.');
+      }
+    };
+    reader.readAsText(file);
+  }, []);
+
+  const handleExportCalendar = useCallback(() => {
+    const icsContent = generateICS(data, timeline);
+    const blob = new Blob([icsContent], { type: 'text/calendar' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `${data.name || 'event'}-calendar.ics`.toLowerCase().replace(/\s+/g, '-');
+    a.click();
+    URL.revokeObjectURL(url);
+  }, [data, timeline]);
+
+  const handleCopyForAI = useCallback(() => {
+    const prompt = generateAIPrompt(data, budget);
+    handleCopy(prompt);
+  }, [data, budget, handleCopy]);
+
+  const applyTemplate = useCallback((templateKey) => {
+    const template = EVENT_TEMPLATES[templateKey];
+    if (template) {
+      setData(prev => ({
+        ...prev,
+        ...template.data,
+        name: '', // Keep name blank for user to fill
+        description: '', // Keep description blank
+        objectives: '', // Keep objectives blank
+        date: '', // Keep date blank
+        region: prev.region || 'dc-metro', // Keep their region or default
+        vips: '',
+        speakers: '',
+        team: [{ name: '', role: '' }],
+        notes: '',
+        funding: ''
+      }));
+      setShowTemplates(false);
+      setCurrentPhase(0); // Go to first phase
+    }
+  }, []);
+
+  // Components
+  const Prompt = ({ text }) => (
+    <p className="text-zinc-400 text-sm mb-3 italic">{text}</p>
+  );
+
+  const Input = ({ label, field, type = 'text', options, required, placeholder }) => (
+    <div className="mb-4">
+      <label className="block text-sm font-medium text-zinc-300 mb-1">
+        {label} {required && <span className="text-red-400">*</span>}
+      </label>
+      {PROMPTS[field] && <Prompt text={PROMPTS[field]} />}
+      {type === 'select' ? (
+        <select
+          value={data[field]}
+          onChange={(e) => update(field, e.target.value)}
+          className="w-full bg-zinc-900 border border-zinc-700 rounded-lg px-4 py-3 text-white focus:border-emerald-500 focus:outline-none"
+        >
+          <option value="">{placeholder || 'Select...'}</option>
+          {options.map(opt => (
+            <option key={typeof opt === 'string' ? opt : opt.value} value={typeof opt === 'string' ? opt : opt.value}>
+              {typeof opt === 'string' ? opt : opt.label}
+            </option>
+          ))}
+        </select>
+      ) : type === 'textarea' ? (
+        <textarea
+          value={data[field]}
+          onChange={(e) => update(field, e.target.value)}
+          placeholder={placeholder}
+          rows={4}
+          className="w-full bg-zinc-900 border border-zinc-700 rounded-lg px-4 py-3 text-white focus:border-emerald-500 focus:outline-none resize-none"
+        />
+      ) : type === 'date' ? (
+        <div className="flex gap-2">
+          <input
+            type="date"
+            value={data[field]}
+            onChange={(e) => update(field, e.target.value)}
+            className="flex-1 bg-zinc-900 border border-zinc-700 rounded-lg px-4 py-3 text-white focus:border-emerald-500 focus:outline-none [&::-webkit-calendar-picker-indicator]:invert"
+          />
+          <input
+            type="text"
+            value={data[field] ? new Date(data[field] + 'T00:00:00').toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }) : ''}
+            onChange={(e) => {
+              // Try to parse common date formats
+              const input = e.target.value;
+              const parsed = new Date(input);
+              if (!isNaN(parsed.getTime())) {
+                const yyyy = parsed.getFullYear();
+                const mm = String(parsed.getMonth() + 1).padStart(2, '0');
+                const dd = String(parsed.getDate()).padStart(2, '0');
+                update(field, `${yyyy}-${mm}-${dd}`);
+              }
+            }}
+            placeholder="or type: Mar 15, 2026"
+            className="flex-1 bg-zinc-900 border border-zinc-700 rounded-lg px-4 py-3 text-white focus:border-emerald-500 focus:outline-none"
+          />
         </div>
       ) : (
-        <>
-          <div className="text-xs text-slate-400 mb-2">
-            {b.attendance} attendees • {b.baseDays} day(s) {b.venueDays > b.baseDays && `(+${(b.venueDays - b.baseDays).toFixed(1)} setup)`}
-          </div>
-          
-          {b.usedVenueData && (
-            <div className="text-xs text-green-500 bg-green-900/20 p-1.5 rounded mb-2">
-              ✓ Using real venue data
-            </div>
-          )}
-          
-          {/* Scenario Tabs */}
-          <div className="grid grid-cols-3 gap-1 mb-3">
-            {[
-              { id: 'budget', label: '💰 Budget' }, 
-              { id: 'standard', label: '⭐ Standard' }, 
-              { id: 'premium', label: '✨ Premium' }
-            ].map(s => (
-              <button key={s.id} onClick={() => { sound.play('select'); setSelected(s.id); }}
-                className={`p-2 border-2 text-xs text-center ${selected === s.id ? 'border-green-400 bg-green-900/30 text-green-400' : 'border-slate-600 bg-slate-900 text-slate-400'}`}>
-                {s.label}
-              </button>
-            ))}
-          </div>
-          
-          {/* Budget Items - Mobile friendly list */}
-          <div className="mb-3 text-xs space-y-1">
-            {cats.map(c => (
-              <div key={c.key} className="flex justify-between items-center py-1.5 border-b border-slate-700">
-                <div className="text-slate-300">{c.icon} {c.label}</div>
-                <div className="text-green-400 font-bold">{fmt(scenarios[selected][c.key])}</div>
-              </div>
-            ))}
-            <div className="flex justify-between items-center py-1.5 border-b border-slate-700 text-slate-500">
-              <div>📋 Contingency ({Math.round((budgetConfig.contingency[selected] || 0.15) * 100)}%)</div>
-              <div>{fmt(scenarios[selected].contingency)}</div>
-            </div>
-            <div className="flex justify-between items-center py-2 font-bold text-sm">
-              <div className="text-green-400">TOTAL</div>
-              <div className="text-green-400">{fmt(total)}</div>
-            </div>
-          </div>
-          
-          {/* Range summary */}
-          <div className="text-xs text-slate-500 text-center mb-3 p-2 bg-slate-900 rounded">
-            Range: {fmt(scenarios.budget.total)} – {fmt(scenarios.premium.total)}
-          </div>
-          
-          {/* AI Refinement */}
-          <div className="border-t border-slate-700 pt-3">
-            <button onClick={onAiRefine} disabled={aiLoading}
-              className={`w-full p-2 border-2 text-xs flex items-center justify-center gap-2 ${aiLoading ? 'border-purple-500 bg-purple-900/30 text-purple-400' : 'border-purple-500 bg-slate-900 text-purple-400'} disabled:opacity-50`}>
-              {aiLoading ? (<><Loader size={14} className="animate-spin"/> Searching...</>) : (<><Zap size={14}/> Refine with AI</>)}
-            </button>
-            {aiEstimate && (
-              <div className="mt-2 p-2 bg-purple-900/20 border border-purple-500/50 rounded text-xs">
-                <div className="text-purple-400 font-bold mb-1"><Sparkles size={12} className="inline mr-1"/> AI INSIGHTS</div>
-                <div className="text-slate-300 whitespace-pre-wrap">{aiEstimate}</div>
-              </div>
-            )}
-          </div>
-        </>
+        <input
+          type={type}
+          value={data[field]}
+          onChange={(e) => update(field, e.target.value)}
+          placeholder={placeholder}
+          className="w-full bg-zinc-900 border border-zinc-700 rounded-lg px-4 py-3 text-white focus:border-emerald-500 focus:outline-none"
+        />
       )}
     </div>
   );
-};
 
-// Event Checklist Component - Smart checklist based on selections
-const EventChecklist = ({ responses, checkedItems, onToggle }) => {
-  // Build dynamic checklist based on selections
-  const generateChecklist = () => {
-    const items = [];
-    
-    // DOCUMENTS - Always needed
-    items.push({ id: 'doc_ros', category: '📄 Documents', label: 'Run of Show / Agenda', always: true });
-    items.push({ id: 'doc_contacts', category: '📄 Documents', label: 'Emergency contact list', always: true });
-    items.push({ id: 'doc_venue', category: '📄 Documents', label: 'Venue contract & floor plan', always: true });
-    
-    // Vendor docs
-    if (responses.fnb_items?.length > 0) {
-      items.push({ id: 'doc_caterer_w9', category: '📄 Documents', label: 'Caterer W9 & contract', always: false });
-      items.push({ id: 'doc_menu', category: '📄 Documents', label: 'Final menu & dietary list', always: false });
-    }
-    if (responses.av_needs?.length > 0) {
-      items.push({ id: 'doc_av_w9', category: '📄 Documents', label: 'AV vendor W9 & contract', always: false });
-      items.push({ id: 'doc_av_specs', category: '📄 Documents', label: 'AV tech specs & cue sheet', always: false });
-    }
-    if (responses.production_needs?.length > 0) {
-      items.push({ id: 'doc_photo_w9', category: '📄 Documents', label: 'Photo/video vendor W9', always: false });
-    }
-    if (responses.vips) {
-      items.push({ id: 'doc_speaker_bios', category: '📄 Documents', label: 'Speaker bios & headshots', always: false });
-      items.push({ id: 'doc_speaker_release', category: '📄 Documents', label: 'Speaker release forms', always: false });
-    }
-    
-    // MATERIALS - Based on collateral selections
-    if (responses.collateral_needs?.includes('Name badges')) {
-      items.push({ id: 'mat_badges', category: '📦 Materials', label: 'Name badges printed', always: false });
-      items.push({ id: 'mat_lanyards', category: '📦 Materials', label: 'Lanyards / badge holders', always: false });
-    }
-    if (responses.collateral_needs?.includes('Printed programs')) {
-      items.push({ id: 'mat_programs', category: '📦 Materials', label: 'Programs printed', always: false });
-    }
-    if (responses.collateral_needs?.includes('Signage/banners')) {
-      items.push({ id: 'mat_signage', category: '📦 Materials', label: 'Signage & banners', always: false });
-      items.push({ id: 'mat_easels', category: '📦 Materials', label: 'Easels / sign stands', always: false });
-    }
-    if (responses.collateral_needs?.includes('Swag/giveaways')) {
-      items.push({ id: 'mat_swag', category: '📦 Materials', label: 'Swag bags packed', always: false });
-    }
-    
-    // Registration materials
-    if (responses.space_needs?.includes('Registration area')) {
-      items.push({ id: 'mat_reg_table', category: '📦 Materials', label: 'Registration table supplies', always: false });
-      items.push({ id: 'mat_checkin_list', category: '📦 Materials', label: 'Printed check-in list (backup)', always: false });
-    }
-    
-    // Breakout/workshop materials
-    if (responses.space_needs?.includes('Breakout rooms') || responses.program_elements?.includes('Workshops/trainings')) {
-      items.push({ id: 'mat_table_numbers', category: '📦 Materials', label: 'Table numbers / tent cards', always: false });
-      items.push({ id: 'mat_notebooks', category: '📦 Materials', label: 'Notebooks & pens', always: false });
-      items.push({ id: 'mat_flipcharts', category: '📦 Materials', label: 'Flip charts & markers', always: false });
-    }
-    
-    // Common materials always good to have
-    items.push({ id: 'mat_tape', category: '📦 Materials', label: 'Tape, scissors, markers', always: true });
-    items.push({ id: 'mat_extension', category: '📦 Materials', label: 'Extension cords & power strips', always: true });
-    
-    // DAY-OF LOGISTICS
-    items.push({ id: 'day_walkthrough', category: '🎯 Day-Of', label: 'Final venue walkthrough done', always: true });
-    items.push({ id: 'day_staff_brief', category: '🎯 Day-Of', label: 'Staff/volunteer briefing scheduled', always: true });
-    
-    if (responses.vips) {
-      items.push({ id: 'day_speaker_confirm', category: '🎯 Day-Of', label: 'Speaker confirmations sent', always: false });
-      items.push({ id: 'day_green_room', category: '🎯 Day-Of', label: 'Green room / speaker holding area ready', always: false });
-    }
-    if (responses.fnb_items?.length > 0) {
-      items.push({ id: 'day_final_count', category: '🎯 Day-Of', label: 'Final headcount to caterer', always: false });
-    }
-    if (responses.format === 'Hybrid (in-person + virtual)') {
-      items.push({ id: 'day_stream_test', category: '🎯 Day-Of', label: 'Livestream tech check', always: false });
-    }
-    
-    // POST-EVENT - Based on post_event selections
-    if (responses.post_event?.includes('Attendee survey')) {
-      items.push({ id: 'post_survey', category: '📬 Post-Event', label: 'Attendee survey created & ready', always: false });
-    }
-    if (responses.post_event?.includes('Post-event report/summary')) {
-      items.push({ id: 'post_report_template', category: '📬 Post-Event', label: 'Report template prepared', always: false });
-      items.push({ id: 'post_report_data', category: '📬 Post-Event', label: 'Data collection plan in place', always: false });
-    }
-    if (responses.post_event?.includes('Video recording distribution')) {
-      items.push({ id: 'post_video_edit', category: '📬 Post-Event', label: 'Video editing timeline confirmed', always: false });
-      items.push({ id: 'post_video_platform', category: '📬 Post-Event', label: 'Video hosting platform ready', always: false });
-    }
-    if (responses.post_event?.includes('Photo gallery/highlights')) {
-      items.push({ id: 'post_photo_gallery', category: '📬 Post-Event', label: 'Photo gallery platform ready', always: false });
-    }
-    if (responses.post_event?.includes('Press release/media outreach')) {
-      items.push({ id: 'post_press_draft', category: '📬 Post-Event', label: 'Press release draft ready', always: false });
-      items.push({ id: 'post_media_list', category: '📬 Post-Event', label: 'Media contact list prepared', always: false });
-    }
-    if (responses.post_event?.includes('Social media recap')) {
-      items.push({ id: 'post_social_plan', category: '📬 Post-Event', label: 'Social media recap plan', always: false });
-    }
-    if (responses.post_event?.includes('Follow-up emails to attendees')) {
-      items.push({ id: 'post_email_draft', category: '📬 Post-Event', label: 'Follow-up email drafted', always: false });
-    }
-    if (responses.post_event?.includes('Policy brief or recommendations')) {
-      items.push({ id: 'post_policy_brief', category: '📬 Post-Event', label: 'Policy brief outline ready', always: false });
-    }
-    if (responses.production_needs?.includes('Photographer') || responses.production_needs?.includes('Videographer')) {
-      items.push({ id: 'post_media_delivery', category: '📬 Post-Event', label: 'Photo/video delivery timeline confirmed', always: false });
-    }
-    items.push({ id: 'post_thankyou', category: '📬 Post-Event', label: 'Thank you emails drafted', always: true });
-    items.push({ id: 'post_debrief', category: '📬 Post-Event', label: 'Team debrief scheduled', always: true });
-    
-    return items;
-  };
-  
-  const items = generateChecklist();
-  const categories = [...new Set(items.map(i => i.category))];
-  const checkedCount = items.filter(i => checkedItems[i.id]).length;
-  
-  return (
-    <div className="border-2 border-yellow-500 bg-slate-800 p-3 mb-3 rounded">
-      <div className="flex items-center justify-between mb-2">
-        <div className="flex items-center gap-2 text-yellow-400">
-          <CheckCircle size={16}/> <span className="text-sm font-bold">EVENT CHECKLIST</span>
+  const CheckboxGroup = ({ label, field, options }) => (
+    <div className="mb-6">
+      <label className="block text-sm font-medium text-zinc-300 mb-1">{label}</label>
+      {PROMPTS[field] && <Prompt text={PROMPTS[field]} />}
+      <div className="flex flex-wrap gap-2">
+        {options.map(opt => (
+          <button
+            key={opt}
+            onClick={() => toggle(field, opt)}
+            className={`px-3 py-2 rounded-lg text-sm transition-all ${
+              data[field].includes(opt)
+                ? 'bg-emerald-600 text-white'
+                : 'bg-zinc-800 text-zinc-300 hover:bg-zinc-700'
+            }`}
+          >
+            {opt}
+          </button>
+        ))}
+      </div>
+    </div>
+  );
+
+  const TeamMembers = () => (
+    <div className="mb-6">
+      <label className="block text-sm font-medium text-zinc-300 mb-1">Planning Team</label>
+      {PROMPTS.team && <Prompt text={PROMPTS.team} />}
+      {data.team.map((member, i) => (
+        <div key={i} className="flex gap-2 mb-2">
+          <input
+            placeholder="Name"
+            value={member.name}
+            onChange={(e) => {
+              const newTeam = [...data.team];
+              newTeam[i].name = e.target.value;
+              update('team', newTeam);
+            }}
+            className="flex-1 bg-zinc-900 border border-zinc-700 rounded-lg px-3 py-2 text-white focus:border-emerald-500 focus:outline-none"
+          />
+          <input
+            placeholder="Role"
+            value={member.role}
+            onChange={(e) => {
+              const newTeam = [...data.team];
+              newTeam[i].role = e.target.value;
+              update('team', newTeam);
+            }}
+            className="flex-1 bg-zinc-900 border border-zinc-700 rounded-lg px-3 py-2 text-white focus:border-emerald-500 focus:outline-none"
+          />
+          {data.team.length > 1 && (
+            <button
+              onClick={() => update('team', data.team.filter((_, j) => j !== i))}
+              className="px-3 py-2 bg-red-900/50 text-red-400 rounded-lg hover:bg-red-900"
+            >
+              ×
+            </button>
+          )}
         </div>
-        <span className="text-xs text-slate-400">{checkedCount}/{items.length} done</span>
+      ))}
+      <button
+        onClick={() => update('team', [...data.team, { name: '', role: '' }])}
+        className="text-emerald-400 text-sm hover:text-emerald-300"
+      >
+        + Add team member
+      </button>
+    </div>
+  );
+
+  // Suggestions Component
+  const SuggestionsPanel = () => {
+    const currentPhaseSuggestions = suggestions.filter(s => {
+      const phase = PHASES[currentPhase].id;
+      if (phase === 'services') return ['av', 'fnb', 'production', 'collateral'].includes(s.category);
+      if (phase === 'logistics') return ['logistics', 'compliance'].includes(s.category);
+      if (phase === 'program') return ['program', 'postEvent'].includes(s.category);
+      return false;
+    });
+
+    if (currentPhaseSuggestions.length === 0) return null;
+
+    return (
+      <div className="bg-amber-900/20 border border-amber-700/50 rounded-lg p-4 mb-6">
+        <h4 className="text-amber-400 font-medium mb-2 flex items-center gap-2">
+          <span>💡</span> Suggestions
+        </h4>
+        <ul className="space-y-2">
+          {currentPhaseSuggestions.map((s, i) => (
+            <li key={i} className="text-amber-200/80 text-sm">{s.message}</li>
+          ))}
+        </ul>
       </div>
-      
-      {/* Progress bar */}
-      <div className="h-2 bg-slate-700 rounded mb-3">
-        <div className="h-2 bg-yellow-500 rounded transition-all" style={{ width: `${(checkedCount / items.length) * 100}%` }}/>
+    );
+  };
+
+  // Calendar Warnings Component
+  const CalendarWarnings = () => {
+    if (calendarWarnings.length === 0) return null;
+
+    return (
+      <div className="bg-blue-900/20 border border-blue-700/50 rounded-lg p-4 mt-4">
+        <h4 className="text-blue-400 font-medium mb-2 flex items-center gap-2">
+          <span>📅</span> DC Calendar Notes
+        </h4>
+        <ul className="space-y-2">
+          {calendarWarnings.map((w, i) => (
+            <li key={i} className={`text-sm ${
+              w.severity === 'high' ? 'text-red-300' : 
+              w.severity === 'medium' ? 'text-yellow-300' : 'text-blue-200/80'
+            }`}>
+              {w.message}
+            </li>
+          ))}
+        </ul>
       </div>
-      
-      <div className="space-y-3 max-h-64 overflow-y-auto">
-        {categories.map(cat => (
-          <div key={cat}>
-            <div className="text-xs text-slate-500 font-bold mb-1">{cat}</div>
-            <div className="space-y-1">
-              {items.filter(i => i.category === cat).map(item => (
-                <button key={item.id} onClick={() => onToggle(item.id)}
-                  className={`w-full text-left p-2 text-xs flex items-center gap-2 rounded transition-all ${
-                    checkedItems[item.id] 
-                      ? 'bg-green-900/30 text-green-400 line-through' 
-                      : 'bg-slate-900 text-slate-300 hover:bg-slate-700'
-                  }`}>
-                  <span>{checkedItems[item.id] ? '☑' : '☐'}</span>
-                  <span className="flex-1">{item.label}</span>
+    );
+  };
+
+  // Document Modal
+  const DocumentModal = () => {
+    if (!activeDoc) return null;
+    const doc = DOCUMENTS[activeDoc];
+    const content = doc.generate(data, budget);
+    const filename = `${data.name || 'event'}-${activeDoc}.txt`.toLowerCase().replace(/\s+/g, '-');
+
+    return (
+      <div className="fixed inset-0 bg-black/80 flex items-center justify-center z-50 p-4" onClick={() => setActiveDoc(null)}>
+        <div className="bg-zinc-900 rounded-xl max-w-3xl w-full max-h-[80vh] flex flex-col" onClick={e => e.stopPropagation()}>
+          <div className="flex items-center justify-between p-4 border-b border-zinc-700">
+            <h3 className="text-lg font-semibold text-white">{doc.icon} {doc.name}</h3>
+            <button onClick={() => setActiveDoc(null)} className="text-zinc-400 hover:text-white text-2xl">×</button>
+          </div>
+          <div className="flex-1 overflow-auto p-4">
+            <pre className="text-sm text-zinc-300 whitespace-pre-wrap font-mono bg-zinc-950 p-4 rounded-lg">{content}</pre>
+          </div>
+          <div className="flex gap-2 p-4 border-t border-zinc-700">
+            <button
+              onClick={() => handleCopy(content)}
+              className="flex-1 bg-emerald-600 text-white py-2 rounded-lg hover:bg-emerald-500"
+            >
+              {copySuccess ? '✓ Copied!' : 'Copy to Clipboard'}
+            </button>
+            <button
+              onClick={() => handleDownload(content, filename)}
+              className="flex-1 bg-zinc-700 text-white py-2 rounded-lg hover:bg-zinc-600"
+            >
+              Download .txt
+            </button>
+          </div>
+        </div>
+      </div>
+    );
+  };
+
+  // Share Menu
+  const ShareMenu = () => {
+    if (!showShareMenu) return null;
+
+    return (
+      <div className="fixed inset-0 bg-black/80 flex items-center justify-center z-50 p-4" onClick={() => setShowShareMenu(false)}>
+        <div className="bg-zinc-900 rounded-xl max-w-md w-full p-6" onClick={e => e.stopPropagation()}>
+          <h3 className="text-xl font-semibold text-white mb-6">Share & Export</h3>
+          
+          <div className="space-y-4">
+            <button
+              onClick={() => { handleCopyForAI(); setShowShareMenu(false); }}
+              className="w-full bg-purple-600 hover:bg-purple-500 text-white p-4 rounded-lg text-left"
+            >
+              <div className="font-medium">🤖 Copy for AI Refinement</div>
+              <div className="text-sm text-purple-200 mt-1">Pre-formatted prompt to paste into Claude for feedback</div>
+            </button>
+            
+            <button
+              onClick={() => { handleExportJSON(); setShowShareMenu(false); }}
+              className="w-full bg-zinc-700 hover:bg-zinc-600 text-white p-4 rounded-lg text-left"
+            >
+              <div className="font-medium">📦 Export Plan (JSON)</div>
+              <div className="text-sm text-zinc-400 mt-1">Share with team members or backup your plan</div>
+            </button>
+            
+            <button
+              onClick={() => fileInputRef.current?.click()}
+              className="w-full bg-zinc-700 hover:bg-zinc-600 text-white p-4 rounded-lg text-left"
+            >
+              <div className="font-medium">📥 Import Plan (JSON)</div>
+              <div className="text-sm text-zinc-400 mt-1">Load a shared plan from a teammate</div>
+            </button>
+            
+            <button
+              onClick={() => { handleExportCalendar(); setShowShareMenu(false); }}
+              className="w-full bg-zinc-700 hover:bg-zinc-600 text-white p-4 rounded-lg text-left"
+            >
+              <div className="font-medium">📅 Export to Calendar (.ics)</div>
+              <div className="text-sm text-zinc-400 mt-1">Add event + milestones to Outlook/Google Calendar</div>
+            </button>
+          </div>
+          
+          <button
+            onClick={() => setShowShareMenu(false)}
+            className="w-full mt-6 text-zinc-400 hover:text-white"
+          >
+            Cancel
+          </button>
+        </div>
+      </div>
+    );
+  };
+
+  // Template Modal
+  const TemplateModal = () => {
+    if (!showTemplates) return null;
+
+    return (
+      <div className="fixed inset-0 bg-black/80 flex items-center justify-center z-50 p-4" onClick={() => setShowTemplates(false)}>
+        <div className="bg-zinc-900 rounded-xl max-w-4xl w-full max-h-[85vh] overflow-hidden flex flex-col" onClick={e => e.stopPropagation()}>
+          <div className="p-6 border-b border-zinc-700">
+            <h3 className="text-xl font-semibold text-white">Start from a Template</h3>
+            <p className="text-zinc-400 mt-1">Choose a template to pre-fill common settings. You'll still customize the details.</p>
+          </div>
+          
+          <div className="flex-1 overflow-auto p-6">
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+              {Object.entries(EVENT_TEMPLATES).map(([key, template]) => (
+                <button
+                  key={key}
+                  onClick={() => applyTemplate(key)}
+                  className="bg-zinc-800 hover:bg-zinc-700 border border-zinc-700 hover:border-emerald-500 rounded-xl p-5 text-left transition-all group"
+                >
+                  <div className="text-3xl mb-3">{template.icon}</div>
+                  <div className="font-semibold text-white group-hover:text-emerald-400 transition-colors">{template.name}</div>
+                  <div className="text-sm text-zinc-400 mt-1">{template.description}</div>
+                  <div className="text-xs text-zinc-500 mt-3 font-mono">{template.preview}</div>
                 </button>
               ))}
             </div>
           </div>
-        ))}
-      </div>
-      
-      <div className="text-xs text-slate-600 mt-2 text-center">
-        💡 Checklist updates based on your selections
-      </div>
-    </div>
-  );
-};
-
-// Document Templates Component
-const DocumentTemplates = ({ responses, team, budgetConfig }) => {
-  const [showTemplate, setShowTemplate] = useState(null);
-  const [copied, setCopied] = useState(false);
-  
-  const eventName = responses.event_name || '[Event Name]';
-  const eventDate = responses.target_date ? new Date(responses.target_date).toLocaleDateString('en-US', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' }) : '[Date TBD]';
-  const attendance = budgetConfig.attendanceDefaults[responses.attendance] || '[TBD]';
-  const duration = responses.duration || '[TBD]';
-  const location = responses.location || '[Location TBD]';
-  const venueType = responses.venue_type || '[Venue TBD]';
-  
-  const templates = {
-    speaker_invite: {
-      name: '📨 Speaker Invitation',
-      content: `Subject: Speaker Invitation - ${eventName} | ${eventDate}
-
-Dear [Speaker Name],
-
-On behalf of SeedAI, I am pleased to invite you to speak at ${eventName}.
-
-EVENT DETAILS
-━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-Date: ${eventDate}
-Location: ${location}
-Expected Audience: ${attendance} attendees
-Format: ${responses.format || 'In-person'}
-
-AUDIENCE
-━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-${responses.target_audience?.join(', ') || 'Policy professionals, researchers, and practitioners'}
-
-EVENT DESCRIPTION
-━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-${responses.spark || '[Event description]'}
-
-WHAT WE'RE ASKING
-━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-• Speaking slot: [Duration, e.g., 20-minute keynote / 45-minute panel]
-• Topic: [Suggested topic based on their expertise]
-• Timing: [Specific time slot if known]
-
-We would be honored to have your insights on this important topic. SeedAI will cover [travel/accommodation if applicable] and provide full AV support.
-
-Please let me know if you're available and interested. I'm happy to schedule a call to discuss further.
-
-Best regards,
-[Your Name]
-[Title]
-SeedAI
-[Phone] | [Email]`
-    },
-    
-    run_of_show: {
-      name: '📋 Run of Show',
-      content: `${eventName.toUpperCase()}
-RUN OF SHOW
-━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-
-Date: ${eventDate}
-Location: ${location} | ${venueType}
-Expected Attendance: ${attendance}
-
-CONTACTS
-━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-Event Lead: [Name] | [Phone] | [Email]
-Venue Contact: [Name] | [Phone]
-AV Lead: [Name] | [Phone]
-Catering: [Name] | [Phone]
-${team.length > 0 ? '\nTeam:\n' + team.map(m => `• ${m.name}${m.role ? ` - ${m.role}` : ''}`).join('\n') : ''}
-
-SETUP DAY (Day Before)
-━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-[ ] __:__ AM  Venue access / Load-in begins
-[ ] __:__ AM  AV setup and testing
-[ ] __:__ PM  Registration area setup
-[ ] __:__ PM  Signage placement
-[ ] __:__ PM  Final walkthrough
-
-EVENT DAY
-━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-[ ] __:__ AM  Staff arrival / Final prep
-[ ] __:__ AM  AV check with speakers
-[ ] __:__ AM  Registration opens
-${responses.fnb_items?.includes('Breakfast/brunch') ? '[ ] __:__ AM  Breakfast service\n' : ''}
-[ ] __:__ AM  Program begins
-              Welcome & Opening Remarks
-              [Speaker/Session 1]
-              
-${responses.fnb_items?.includes('AM break service') ? '[ ] __:__ AM  Morning break\n' : ''}
-              [Speaker/Session 2]
-              
-${responses.fnb_items?.includes('Lunch') ? '[ ] __:__ PM  Lunch\n' : ''}
-${responses.program_elements?.includes('Panel discussions') ? '              Panel Discussion: [Topic]\n' : ''}
-${responses.program_elements?.includes('Breakout sessions') ? '              Breakout Sessions\n' : ''}
-${responses.program_elements?.includes('Workshops/trainings') ? '              Workshop: [Topic]\n' : ''}
-${responses.fnb_items?.includes('PM break service') ? '[ ] __:__ PM  Afternoon break\n' : ''}
-              [Closing Session]
-              
-${responses.fnb_items?.includes('Reception/cocktails') ? '[ ] __:__ PM  Reception\n' : ''}
-[ ] __:__ PM  Event concludes
-[ ] __:__ PM  Breakdown begins
-
-NOTES
-━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-${responses.anchor_moments || '[Key moments and special instructions]'}
-
-EMERGENCY INFO
-━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-Venue Emergency Contact: [Phone]
-Nearest Hospital: [Name & Address]
-`
-    },
-    
-    contact_sheet: {
-      name: '📞 Day-Of Contacts',
-      content: `${eventName.toUpperCase()}
-DAY-OF CONTACT SHEET
-━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-
-Date: ${eventDate}
-Venue: ${venueType} | ${location}
-
-SEEDAI TEAM
-━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-Event Lead:      [Name]         [Phone]
-Day-of Manager:  [Name]         [Phone]
-Registration:    [Name]         [Phone]
-Speaker Liaison: [Name]         [Phone]
-${team.length > 0 ? team.map(m => `${m.role || 'Team'}:`.padEnd(17) + `${m.name}`.padEnd(16) + '[Phone]').join('\n') : ''}
-
-VENDORS
-━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-Venue Contact:   [Name]         [Phone]
-Catering:        [Name]         [Phone]
-AV Company:      [Name]         [Phone]
-${responses.production_needs?.includes('Photographer') ? 'Photographer:    [Name]         [Phone]\n' : ''}${responses.production_needs?.includes('Videographer') ? 'Videographer:    [Name]         [Phone]\n' : ''}
-
-SPEAKERS / VIPs
-━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-${responses.vips ? responses.vips.split('\n').map(v => `[Name]          [Phone]         [Arrival Time]`).join('\n') : '[Speaker 1]     [Phone]         [Arrival Time]\n[Speaker 2]     [Phone]         [Arrival Time]'}
-
-EMERGENCY CONTACTS
-━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-Venue Security:  [Phone]
-Building Mgmt:   [Phone]
-Local Emergency: 911
-Nearest Hospital: [Name]        [Address]
-
-LOGISTICS
-━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-Wifi Network: [Network Name]
-Wifi Password: [Password]
-Parking: [Instructions]
-Loading Dock: [Location/Access]
-`
-    },
-    
-    attendee_followup: {
-      name: '✉️ Attendee Follow-up',
-      content: `Subject: Thank you for attending ${eventName}!
-
-Dear [First Name],
-
-Thank you for joining us at ${eventName} on ${eventDate}. We hope you found the event valuable and engaging.
-
-EVENT HIGHLIGHTS
-━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-${responses.anchor_moments || '• [Key moment 1]\n• [Key moment 2]\n• [Key moment 3]'}
-
-RESOURCES
-━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-${responses.post_event?.includes('Video recording distribution') ? '• Event recording: [Link]\n' : ''}${responses.post_event?.includes('Photo gallery/highlights') ? '• Photo gallery: [Link]\n' : ''}• Presentation slides: [Link]
-• Speaker contact info: [Link]
-${responses.post_event?.includes('Post-event report/summary') ? '• Event summary report: [Link]\n' : ''}
-
-${responses.post_event?.includes('Attendee survey') ? `YOUR FEEDBACK MATTERS
-━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-Please take 2 minutes to share your thoughts:
-[Survey Link]
-
-` : ''}STAY CONNECTED
-━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-• Subscribe to our newsletter: [Link]
-• Follow us: [Social media links]
-• Upcoming events: [Link]
-
-Thank you again for being part of this important conversation. We look forward to seeing you at future SeedAI events.
-
-Best regards,
-[Your Name]
-[Title]
-SeedAI`
-    },
-    
-    budget_summary: {
-      name: '💰 Budget Summary',
-      content: `${eventName.toUpperCase()}
-BUDGET SUMMARY
-━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-
-Event Date: ${eventDate}
-Location: ${location}
-Attendance: ${attendance}
-Duration: ${duration}
-
-ESTIMATED COSTS
-━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-Category                Budget      Standard    Premium
-────────────────────────────────────────────────────────
-Venue                   $____       $____       $____
-Food & Beverage         $____       $____       $____
-AV / Technical          $____       $____       $____
-Production              $____       $____       $____
-Collateral              $____       $____       $____
-Marketing               $____       $____       $____
-Staffing                $____       $____       $____
-────────────────────────────────────────────────────────
-Subtotal                $____       $____       $____
-Contingency (15%)       $____       $____       $____
-────────────────────────────────────────────────────────
-TOTAL                   $____       $____       $____
-
-FUNDING SOURCES
-━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-${responses.funding_sources?.map(f => `☐ ${f}`).join('\n') || '☐ TBD'}
-
-NOTES
-━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-• All estimates based on ${location} market rates
-• Venue costs ${responses.venue_type ? `assume ${responses.venue_type}` : 'TBD'}
-• F&B includes: ${responses.fnb_items?.join(', ') || 'TBD'}
-• AV includes: ${responses.av_needs?.join(', ') || 'TBD'}
-
-Prepared: ${new Date().toLocaleDateString()}
-`
-    }
-  };
-
-  const copyToClipboard = (text) => {
-    navigator.clipboard.writeText(text);
-    setCopied(true);
-    sound.play('complete');
-    setTimeout(() => setCopied(false), 2000);
-  };
-
-  const downloadTemplate = (name, content) => {
-    const blob = new Blob([content], { type: 'text/plain' });
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement('a');
-    a.href = url;
-    a.download = `${eventName.replace(/[^a-z0-9]/gi, '_')}_${name}.txt`;
-    a.click();
-    URL.revokeObjectURL(url);
-    sound.play('complete');
-  };
-
-  return (
-    <div className="border-2 border-indigo-500 bg-slate-800 p-3 mb-3 rounded">
-      <div className="flex items-center gap-2 text-indigo-400 mb-3">
-        <FileText size={16}/> <span className="text-sm font-bold">DOCUMENT TEMPLATES</span>
-      </div>
-      
-      <div className="grid grid-cols-2 gap-1 mb-2">
-        {Object.entries(templates).map(([key, tmpl]) => (
-          <button key={key} onClick={() => setShowTemplate(showTemplate === key ? null : key)}
-            className={`p-2 border text-xs rounded text-left ${showTemplate === key ? 'border-indigo-400 bg-indigo-900/30 text-indigo-400' : 'border-slate-600 bg-slate-900 text-slate-400'}`}>
-            {tmpl.name}
-          </button>
-        ))}
-      </div>
-      
-      {showTemplate && templates[showTemplate] && (
-        <div className="bg-slate-900 border border-slate-700 rounded p-2">
-          <div className="flex justify-between items-center mb-2">
-            <span className="text-xs text-slate-400">{templates[showTemplate].name}</span>
-            <div className="flex gap-1">
-              <button onClick={() => copyToClipboard(templates[showTemplate].content)} 
-                className="text-xs bg-indigo-600 text-white px-2 py-1 rounded flex items-center gap-1">
-                {copied ? <><CheckCircle size={12}/> Copied!</> : <><Copy size={12}/> Copy</>}
-              </button>
-              <button onClick={() => downloadTemplate(showTemplate, templates[showTemplate].content)}
-                className="text-xs bg-slate-600 text-white px-2 py-1 rounded flex items-center gap-1">
-                <Download size={12}/> Save
-              </button>
-            </div>
-          </div>
-          <pre className="text-xs text-slate-300 whitespace-pre-wrap max-h-64 overflow-y-auto bg-slate-950 p-2 rounded">
-            {templates[showTemplate].content}
-          </pre>
-        </div>
-      )}
-      
-      <div className="text-xs text-slate-600 mt-2 text-center">
-        💡 Templates auto-fill with your event details
-      </div>
-    </div>
-  );
-};
-
-// ╔════════════════════════════════════════════════════════════════════════════╗
-// ║                              MAIN APP                                       ║
-// ╚════════════════════════════════════════════════════════════════════════════╝
-
-export default function App() {
-  const [screen, setScreen] = useState('title');
-  const [char, setChar] = useState(null);
-  const [program, setProgram] = useState(null);
-  const [phase, setPhase] = useState(0);
-  const [responses, setResponses] = useState({});
-  const [needsInput, setNeedsInput] = useState({});
-  const [notes, setNotes] = useState({});
-  const [team, setTeam] = useState([]);
-  const [newMember, setNewMember] = useState({ name: '', role: '' });
-  const [blink, setBlink] = useState(true);
-  const [soundOn, setSoundOn] = useState(true);
-  const [showNote, setShowNote] = useState(null);
-  const [status, setStatus] = useState('');
-  const [hasSave, setHasSave] = useState(false);
-  const [aiEstimate, setAiEstimate] = useState(null);
-  const [aiLoading, setAiLoading] = useState(false);
-  const [showSmartDefaults, setShowSmartDefaults] = useState(null);
-  const [appliedDefaults, setAppliedDefaults] = useState(false);
-  const [budgetConfig] = useState(DEFAULT_BUDGET_CONFIG);
-  const [vendors, setVendors] = useState(DEFAULT_VENDORS);
-  const [dataSource, setDataSource] = useState('default');
-  const [checkedItems, setCheckedItems] = useState({});
-
-  const toggleChecklistItem = (id) => {
-    sound.play('select');
-    setCheckedItems(prev => ({ ...prev, [id]: !prev[id] }));
-  };
-
-  // Load from Google Sheets
-  useEffect(() => {
-    const loadData = async () => {
-      if (SHEET_ID === 'YOUR_SHEET_ID_HERE') return;
-      try {
-        const [v, c, a] = await Promise.all([fetchSheetData('venues'), fetchSheetData('caterers'), fetchSheetData('av_companies')]);
-        if (v || c || a) {
-          setVendors({ venues: v || DEFAULT_VENDORS.venues, caterers: c || DEFAULT_VENDORS.caterers, av_companies: a || DEFAULT_VENDORS.av_companies });
-          setDataSource('sheets');
-        }
-      } catch (e) { console.log('Using defaults'); }
-    };
-    loadData();
-  }, []);
-
-  // Load from shared URL
-  useEffect(() => {
-    try {
-      const params = new URLSearchParams(window.location.search);
-      const eventData = params.get('event');
-      if (eventData) {
-        const decoded = JSON.parse(decodeURIComponent(atob(eventData)));
-        if (decoded.responses) {
-          setChar(decoded.char || null);
-          setProgram(decoded.program || null);
-          setResponses(decoded.responses || {});
-          setNeedsInput(decoded.needsInput || {});
-          setNotes(decoded.notes || {});
-          setTeam(decoded.team || []);
-          setCheckedItems(decoded.checkedItems || {});
-          setScreen('play');
-          // Clear URL params after loading
-          window.history.replaceState({}, '', window.location.pathname);
-          setStatus('Loaded from shared link!');
-          setTimeout(() => setStatus(''), 3000);
-        }
-      }
-    } catch (e) { console.log('No shared link data'); }
-  }, []);
-
-  useEffect(() => {
-    try {
-      const saved = localStorage.getItem(STORAGE_KEY);
-      if (saved) {
-        const data = JSON.parse(saved);
-        if (data.responses && Object.keys(data.responses).length > 0) setHasSave(true);
-      }
-    } catch (e) {}
-  }, []);
-
-  useEffect(() => {
-    if (screen === 'play' || screen === 'export') {
-      const timer = setTimeout(() => saveProgress(true), 2000);
-      return () => clearTimeout(timer);
-    }
-  }, [responses, needsInput, notes, team, char, program, phase, screen, checkedItems]);
-
-  useEffect(() => { const i = setInterval(() => setBlink(b => !b), 500); return () => clearInterval(i); }, []);
-
-  useEffect(() => {
-    if (responses.event_type && SMART_DEFAULTS[responses.event_type] && !appliedDefaults) setShowSmartDefaults(responses.event_type);
-  }, [responses.event_type, appliedDefaults]);
-
-  const phases = [
-    { id: 1, name: "THE SPARK", icon: "💡", subtitle: "What's the big idea?", questions: [
-      { id: "event_name", label: "What would you call this event?", type: "text", placeholder: "Working title...", tip: "A catchy name helps rally the team" },
-      { id: "spark", label: "What's the spark? The problem or opportunity?", type: "textarea", placeholder: "What made you think 'we need an event'?", tip: "What's the driving force behind this?" },
-      { id: "success_headline", label: "Imagine success. What's the headline?", type: "textarea", placeholder: "Dream big!", tip: "If this event made news, what would it say?" },
-      { id: "why_event", label: "Why is an event the right format?", type: "textarea", placeholder: "vs. report, webinar, etc.", tip: "Consider alternatives: report, webinar, roundtable" },
-      { id: "seedai_alignment", label: "How does this connect to SeedAI's mission?", type: "textarea", placeholder: "Try It, Prove It, Scale It...", tip: "Which pillar does this support?" },
-      { id: "success_metrics", label: "How will you measure success?", type: "textarea", placeholder: "Goals, metrics...", tip: "Attendees? Media hits? Policy outcomes?" },
-      { id: "post_event", label: "What happens after the event?", type: "checkbox", options: ["Post-event report/summary", "Video recording distribution", "Photo gallery/highlights", "Attendee survey", "Follow-up emails to attendees", "Press release/media outreach", "Social media recap", "Follow-up meetings with key contacts", "Community/network building", "Policy brief or recommendations", "Blog post or article", "Nothing planned yet"] },
-    ]},
-    { id: 2, name: "THE PEOPLE", icon: "👥", subtitle: "Who needs to be there?", questions: [
-      { id: "target_audience", label: "Who is your target audience?", type: "checkbox", options: ["Policymakers", "Congressional Staffers", "Federal Agency Staff", "State/Local Officials", "Private Sector Executives", "Researchers/Academics", "Students", "Nonprofit Leaders", "Media/Press", "General Public"] },
-      { id: "audience_detail", label: "Who MUST be there for success?", type: "textarea", placeholder: "Be specific...", tip: "Name specific people or roles if possible" },
-      { id: "attendance", label: "Expected attendance?", type: "select", options: Object.keys(budgetConfig.attendanceDefaults) },
-      { id: "partners", label: "Target partners or co-hosts?", type: "textarea", placeholder: "Organizations...", tip: "Who could add credibility or resources?" },
-      { id: "vips", label: "Dream speakers or VIPs?", type: "textarea", placeholder: "Who would make this amazing?", tip: "Reach for the stars here" },
-      { id: "registration_type", label: "How will people get access?", type: "select", options: ["Open registration", "Invitation only", "Application/curated", "Ticketed (paid)", "Hybrid approach"] }
-    ]},
-    { id: 3, name: "THE EXPERIENCE", icon: "🎯", subtitle: "What will people do?", questions: [
-      { id: "event_type", label: "What type of event?", type: "select", options: Object.keys(SMART_DEFAULTS) },
-      { id: "duration", label: "How long?", type: "select", options: Object.keys(budgetConfig.durationMultipliers) },
-      { id: "format", label: "Format?", type: "select", options: ["In-person only", "Virtual only", "Hybrid (in-person + virtual)"] },
-      { id: "anchor_moments", label: "2-3 'anchor moments' that define this event?", type: "textarea", placeholder: "The highlights...", tip: "What will people remember?" },
-      { id: "program_elements", label: "What program elements?", type: "checkbox", options: ["Keynote speeches", "Panel discussions", "Breakout sessions", "Workshops/trainings", "Demos/showcases", "Networking time", "Fireside chats", "Q&A sessions", "Awards/recognition", "Entertainment"] },
-      { id: "takeaway", label: "What should attendees walk away with?", type: "textarea", placeholder: "Knowledge, connections...", tip: "New skills? Contacts? Motivation?" }
-    ]},
-    { id: 4, name: "THE DETAILS", icon: "📍", subtitle: "Where, when, how?", questions: [
-      { id: "target_date", label: "Target date?", type: "date", placeholder: "YYYY-MM-DD" },
-      { id: "date_drivers", label: "What's driving the date?", type: "textarea", placeholder: "Calendar, timing...", tip: "Policy deadlines? Seasonal factors?" },
-      { id: "location", label: "Where should this be held?", type: "select", options: Object.keys(budgetConfig.locations) },
-      { id: "venue_type", label: "What type of venue?", type: "select", options: Object.keys(budgetConfig.venueTypes) },
-      { id: "space_needs", label: "What spaces do you need?", type: "checkbox", options: ["Main plenary room", "Breakout rooms", "Demo/exhibit area", "VIP/green room", "Registration area", "Networking lounge", "Press room", "Dining space"] },
-      { id: "fnb_items", label: "Food & beverage needed?", type: "checkbox", options: Object.keys(budgetConfig.foodAndBeverage) },
-    ]},
-    { id: 5, name: "PRODUCTION", icon: "🎬", subtitle: "Tech & content", questions: [
-      { id: "av_needs", label: "AV & technical needs?", type: "checkbox", options: Object.keys(budgetConfig.avTechnical) },
-      { id: "production_needs", label: "Production services?", type: "checkbox", options: Object.keys(budgetConfig.production) },
-      { id: "collateral_needs", label: "Event collateral?", type: "checkbox", options: Object.keys(budgetConfig.collateral) },
-      { id: "marketing_channels", label: "Marketing channels?", type: "checkbox", options: Object.keys(budgetConfig.marketing) },
-    ]},
-    { id: 6, name: "THE PLAN", icon: "🚀", subtitle: "Budget & checklist", questions: [
-      { id: "funding_sources", label: "Potential funding sources?", type: "checkbox", options: ["Organizational budget", "Sponsorships", "Grants", "Registration fees", "Partner contributions", "In-kind support", "TBD"] },
-      { id: "risks", label: "What could go wrong?", type: "textarea", placeholder: "Be honest about risks...", tip: "Speaker cancels? Low turnout? Budget overrun? Have a backup plan." }
-    ], isOutputPhase: true }
-  ];
-
-  const applySmartDefaults = () => {
-    const d = SMART_DEFAULTS[responses.event_type];
-    if (!d) return;
-    sound.play('complete');
-    setResponses(prev => ({ ...prev, ...d }));
-    setAppliedDefaults(true);
-    setShowSmartDefaults(null);
-    setStatus('Smart defaults applied!');
-    setTimeout(() => setStatus(''), 2000);
-  };
-
-  const handleAiRefine = async () => {
-    setAiLoading(true); setAiEstimate(null);
-    const b = calculateBudget(responses, 'standard', budgetConfig, vendors);
-    
-    // Check if API key is configured
-    const apiKey = process.env.REACT_APP_ANTHROPIC_API_KEY;
-    if (!apiKey) {
-      setAiEstimate('⚙️ AI refinement requires API setup.\n\nTo enable:\n1. Get an API key from console.anthropic.com\n2. Add REACT_APP_ANTHROPIC_API_KEY to your Vercel environment variables\n3. Redeploy\n\nCost: ~$0.01-0.05 per refinement');
-      setAiLoading(false);
-      return;
-    }
-    
-    try {
-      const res = await fetch('https://api.anthropic.com/v1/messages', {
-        method: 'POST', 
-        headers: { 
-          'Content-Type': 'application/json',
-          'x-api-key': apiKey,
-          'anthropic-version': '2023-06-01'
-        },
-        body: JSON.stringify({
-          model: 'claude-sonnet-4-20250514', 
-          max_tokens: 1000,
-          tools: [{ type: 'web_search_20250305', name: 'web_search' }],
-          messages: [{ role: 'user', content: `Research current event costs: ${responses.event_name || 'Conference'} in ${b.location}, ${b.attendance} attendees, ${b.baseDays} days, ${b.venueType}. Estimate: $${Math.round(b.total).toLocaleString()}. Provide: 1) Is estimate reasonable? 2) Specific venue suggestions with current prices 3) Cost-saving tips. Be concise, under 150 words.` }]
-        })
-      });
-      const data = await res.json();
-      if (data.error) {
-        setAiEstimate(`⚠️ API Error: ${data.error.message || 'Unknown error'}`);
-      } else {
-        setAiEstimate(data.content?.map(c => c.type === 'text' ? c.text : '').join('') || 'No response received.');
-        sound.play('complete');
-      }
-    } catch (e) { 
-      setAiEstimate('⚠️ Could not connect. Check your API key and network connection.'); 
-    }
-    setAiLoading(false);
-  };
-
-  const saveProgress = (silent = false) => {
-    try {
-      localStorage.setItem(STORAGE_KEY, JSON.stringify({ char, program, phase, responses, needsInput, notes, team, appliedDefaults, checkedItems, savedAt: new Date().toISOString() }));
-      if (!silent) { sound.play('select'); setStatus('Saved!'); setTimeout(() => setStatus(''), 2000); }
-    } catch (e) {}
-  };
-
-  const loadProgress = () => {
-    try {
-      const saved = localStorage.getItem(STORAGE_KEY);
-      if (saved) {
-        const d = JSON.parse(saved);
-        setChar(d.char); setProgram(d.program); setPhase(d.phase || 0);
-        setResponses(d.responses || {}); setNeedsInput(d.needsInput || {}); setNotes(d.notes || {}); setTeam(d.team || []);
-        setAppliedDefaults(d.appliedDefaults || false); setCheckedItems(d.checkedItems || {});
-        sound.play('start'); setScreen('play');
-      }
-    } catch (e) {}
-  };
-
-  const clearSave = () => {
-    localStorage.removeItem(STORAGE_KEY); setHasSave(false);
-    setResponses({}); setNeedsInput({}); setNotes({}); setTeam([]); setCheckedItems({});
-    setChar(null); setProgram(null); setPhase(0); setAiEstimate(null);
-    setAppliedDefaults(false); setShowSmartDefaults(null);
-  };
-
-  const update = (id, val) => { setResponses(p => ({ ...p, [id]: val })); setAiEstimate(null); if (id === 'event_type') setAppliedDefaults(false); };
-  const addMember = () => { if (newMember.name) { sound.play('select'); setTeam([...team, { ...newMember, id: Date.now() }]); setNewMember({ name: '', role: '' }); }};
-
-  const getProgress = (idx) => {
-    const p = phases[idx];
-    return { done: p.questions.filter(q => q.type === 'checkbox' ? responses[q.id]?.length > 0 : responses[q.id]?.toString().trim() || needsInput[q.id]).length, total: p.questions.length };
-  };
-  
-  const totalProgress = () => {
-    let t = 0, d = 0;
-    phases.forEach(p => p.questions.forEach(q => { t++; if (q.type === 'checkbox' ? (responses[q.id]?.length > 0 || needsInput[q.id]) : (responses[q.id]?.toString().trim() || needsInput[q.id])) d++; }));
-    return { done: d, total: t };
-  };
-
-  const formatMoney = (n) => '$' + Math.round(n).toLocaleString();
-
-  const exportText = () => {
-    const b = calculateBudget(responses, 'standard', budgetConfig, vendors);
-    const bLow = calculateBudget(responses, 'budget', budgetConfig, vendors);
-    const bHigh = calculateBudget(responses, 'premium', budgetConfig, vendors);
-    const timeline = generateTimeline(responses.target_date, responses, budgetConfig);
-    const risks = analyzeRisks(responses, budgetConfig);
-    
-    let t = `# EVENT PROPOSAL: ${responses.event_name || 'Untitled'}\n\n`;
-    t += `**Program:** ${programs.find(p => p.id === program)?.name || 'Not selected'}\n`;
-    t += `**Owner:** ${charNames[char] || 'Not selected'}\n`;
-    t += `**Location:** ${budgetConfig.locations[b.location]?.label || b.location}\n`;
-    t += `**Date:** ${responses.target_date || 'TBD'}\n`;
-    t += `**Budget Range:** ${formatMoney(bLow.total)} - ${formatMoney(bHigh.total)}\n\n`;
-    
-    if (team.length) { t += `## Team\n`; team.forEach(m => t += `- **${m.name}** — ${m.role || 'TBD'}\n`); t += '\n'; }
-    if (risks.length) { t += `## ⚠️ Risk Flags\n`; risks.forEach(r => t += `- ${r.icon} ${r.message}\n`); t += '\n'; }
-    if (timeline.length) { t += `## 📅 Timeline\n`; timeline.filter(m => !m.isPast).forEach(m => t += `- **${m.date.toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}** — ${m.icon} ${m.task}\n`); t += '\n'; }
-    
-    phases.forEach(p => {
-      t += `## ${p.icon} ${p.name}\n`;
-      p.questions.forEach(q => {
-        const r = q.type === 'checkbox' ? responses[q.id]?.join(', ') : responses[q.id];
-        if (r?.toString().trim() || (q.type === 'checkbox' && r?.length)) t += `**${q.label}**\n${r}\n\n`;
-      });
-    });
-    
-    t += `## 💰 Budget Estimate\n`;
-    t += `| Scenario | Total |\n|----------|-------|\n`;
-    t += `| Budget | ${formatMoney(bLow.total)} |\n| Standard | ${formatMoney(b.total)} |\n| Premium | ${formatMoney(bHigh.total)} |\n\n`;
-    if (aiEstimate) t += `### AI Analysis\n${aiEstimate}\n\n`;
-    return t;
-  };
-
-  const copy = async () => { await navigator.clipboard.writeText(exportText()); sound.play('complete'); setStatus('Copied!'); setTimeout(() => setStatus(''), 2000); };
-  const email = () => { window.open(`mailto:operations@seedai.org?subject=${encodeURIComponent(`${responses.event_name || 'Event'} - Proposal`)}&body=${encodeURIComponent(exportText())}`); };
-  const download = () => { const a = document.createElement('a'); a.href = URL.createObjectURL(new Blob([exportText()], { type: 'text/plain' })); a.download = `${responses.event_name || 'event'}-proposal.md`; a.click(); sound.play('complete'); };
-
-  // ══════════════════════════════════════════════════════════════════════════
-  // SCREENS
-  // ══════════════════════════════════════════════════════════════════════════
-
-  if (screen === 'title') return (
-    <div className="min-h-screen bg-slate-900 flex items-center justify-center p-6 font-mono">
-      <button onClick={() => { sound.toggle(); setSoundOn(!soundOn); }} className="absolute top-4 right-4 text-slate-500 hover:text-slate-300 p-2">{soundOn ? <Volume2 size={24}/> : <VolumeX size={24}/>}</button>
-      <div className="text-center max-w-sm">
-        <h1 className="text-5xl font-bold text-blue-400 mb-2" style={{ textShadow: '4px 4px 0 #1e3a8a' }}>SeedAI</h1>
-        <h2 className="text-2xl text-yellow-400 mb-6" style={{ textShadow: '2px 2px 0 #92400e' }}>EVENT PLANNER</h2>
-        <p className="text-slate-400 text-sm mb-2">Smart defaults • Budget scenarios • Vendor recommendations</p>
-        <p className="text-slate-600 text-xs mb-8">Data: {dataSource === 'sheets' ? '📊 Google Sheets' : '💾 Built-in'}</p>
-        <div className={`text-white text-lg mb-8 ${blink ? '' : 'opacity-0'}`}>PRESS START</div>
-        <div className="flex flex-col gap-3 items-center">
-          <Btn onClick={() => { sound.play('start'); clearSave(); setScreen('character'); }} variant="warning" className="w-48">NEW EVENT</Btn>
-          {hasSave && (<Btn onClick={loadProgress} variant="success" className="w-48"><RotateCcw size={14} className="inline mr-2"/> CONTINUE</Btn>)}
-        </div>
-      </div>
-    </div>
-  );
-
-  if (screen === 'character') return (
-    <div className="min-h-screen bg-slate-900 p-6 font-mono">
-      <div className="max-w-md mx-auto text-center">
-        <h2 className="text-2xl text-yellow-400 mb-2">WHO'S LEADING THIS?</h2>
-        <p className="text-slate-400 text-sm mb-6">Select yourself as Event Owner</p>
-        <div className="flex justify-center gap-4 flex-wrap mb-8">{['stuart', 'austin', 'anna', 'josh'].map(c => (<PixelChar key={c} id={c} selected={char === c} onClick={() => { sound.play('select'); setChar(c); }}/>))}</div>
-        <div className="flex justify-center gap-4">
-          <Btn onClick={() => setScreen('title')} variant="secondary">← BACK</Btn>
-          <Btn onClick={() => setScreen('program')} disabled={!char} variant="success">CONTINUE →</Btn>
-        </div>
-      </div>
-    </div>
-  );
-
-  if (screen === 'program') return (
-    <div className="min-h-screen bg-slate-900 p-6 font-mono">
-      <div className="max-w-md mx-auto">
-        <h2 className="text-2xl text-yellow-400 mb-6 text-center">SELECT PROGRAM</h2>
-        <div className="grid grid-cols-2 gap-3 mb-8">
-          {programs.map(p => (<button key={p.id} onClick={() => { sound.play('select'); setProgram(p.id); }} className={`p-4 border-4 text-left ${program === p.id ? 'border-yellow-400 bg-slate-700 text-yellow-400' : 'border-slate-600 bg-slate-800 text-slate-300'}`}><span className="text-2xl mr-2">{p.icon}</span><span className="text-sm">{p.name}</span></button>))}
-        </div>
-        <div className="flex justify-center gap-4">
-          <Btn onClick={() => setScreen('character')} variant="secondary">← BACK</Btn>
-          <Btn onClick={() => setScreen('play')} disabled={!program} variant="success">START →</Btn>
-        </div>
-      </div>
-    </div>
-  );
-
-  if (screen === 'export') {
-    const total = totalProgress();
-    
-    // Generate shareable link
-    const generateShareLink = () => {
-      try {
-        const data = { char, program, responses, needsInput, notes, team, checkedItems };
-        const encoded = btoa(encodeURIComponent(JSON.stringify(data)));
-        const url = `${window.location.origin}${window.location.pathname}?event=${encoded}`;
-        navigator.clipboard.writeText(url);
-        sound.play('complete');
-        setStatus('Link copied! Share to let others view/edit.');
-        setTimeout(() => setStatus(''), 3000);
-      } catch (e) {
-        setStatus('Could not generate link');
-        setTimeout(() => setStatus(''), 2000);
-      }
-    };
-    
-    return (
-      <div className="min-h-screen bg-slate-900 p-3 font-mono overflow-auto">
-        <div className="max-w-lg mx-auto">
-          <div className="text-center mb-4">
-            <div className="text-3xl mb-1">🎉</div>
-            <h2 className="text-xl text-yellow-400">PROPOSAL READY</h2>
-            <p className="text-slate-400 text-xs">{total.done}/{total.total} questions completed</p>
-          </div>
           
-          <TimelineView responses={responses} budgetConfig={budgetConfig} />
-          <RiskFlags responses={responses} budgetConfig={budgetConfig} />
-          <BudgetScenarios responses={responses} budgetConfig={budgetConfig} vendors={vendors} onAiRefine={handleAiRefine} aiEstimate={aiEstimate} aiLoading={aiLoading} />
-          <VendorMatching vendors={vendors} responses={responses} budgetConfig={budgetConfig} />
-          <EventChecklist responses={responses} checkedItems={checkedItems} onToggle={toggleChecklistItem} />
-          <DocumentTemplates responses={responses} team={team} budgetConfig={budgetConfig} />
-          
-          {/* Share Section */}
-          <div className="border-2 border-blue-500 bg-slate-800 p-3 mb-3 rounded">
-            <div className="text-blue-400 text-sm font-bold mb-2">SHARE PROPOSAL</div>
-            <div className="grid grid-cols-2 gap-2 mb-2">
-              <Btn onClick={copy} variant="primary" className="w-full text-xs py-2"><Share2 size={12} className="inline mr-1"/>COPY TEXT</Btn>
-              <Btn onClick={email} variant="warning" className="w-full text-xs py-2"><Mail size={12} className="inline mr-1"/>EMAIL</Btn>
-            </div>
-            <div className="grid grid-cols-2 gap-2">
-              <Btn onClick={download} variant="success" className="w-full text-xs py-2"><Download size={12} className="inline mr-1"/>DOWNLOAD</Btn>
-              <Btn onClick={generateShareLink} variant="secondary" className="w-full text-xs py-2"><Link2 size={12} className="inline mr-1"/>SHARE LINK</Btn>
-            </div>
-            {status && <div className="text-center text-green-400 text-xs mt-2">{status}</div>}
-          </div>
-          
-          <div className="text-xs text-slate-600 text-center mb-3 p-2 border border-dashed border-slate-700 rounded">
-            💡 Share Link lets others view and edit their own copy of this event plan
-          </div>
-          
-          <div className="flex justify-center gap-2">
-            <Btn onClick={() => setScreen('play')} variant="secondary" className="text-xs py-2 px-3">← EDIT</Btn>
-            <Btn onClick={() => { clearSave(); setScreen('title'); }} variant="primary" className="text-xs py-2 px-3">NEW EVENT</Btn>
+          <div className="p-4 border-t border-zinc-700 flex justify-between items-center">
+            <span className="text-zinc-500 text-sm">Templates pre-fill logistics — you'll still add your unique details</span>
+            <button
+              onClick={() => setShowTemplates(false)}
+              className="px-4 py-2 text-zinc-400 hover:text-white"
+            >
+              Cancel
+            </button>
           </div>
         </div>
       </div>
     );
-  }
+  };
 
-  // MAIN PLAY SCREEN
-  const p = phases[phase];
-  const prog = getProgress(phase);
-  const total = totalProgress();
-  const isLastPhase = phase === phases.length - 1;
+  // Phase Content
+  const renderPhaseContent = () => {
+    const phase = PHASES[currentPhase];
+
+    switch (phase.id) {
+      case 'vision':
+        return (
+          <div className="space-y-6">
+            <Input label="Event Name" field="name" required placeholder="e.g., 2026 Climate Policy Summit" />
+            <Input label="Event Type" field="type" type="select" options={EVENT_TYPES} required />
+            <Input label="Description" field="description" type="textarea" required placeholder="Describe the event's purpose and focus..." />
+            <Input label="Objectives" field="objectives" type="textarea" required placeholder="What outcomes are you working toward?" />
+          </div>
+        );
+
+      case 'audience':
+        return (
+          <div className="space-y-6">
+            <Input label="Expected Size" field="size" type="select" required options={Object.entries(SIZE_CONFIG).map(([k, v]) => ({ value: k, label: v.label }))} />
+            <CheckboxGroup label="Target Audience" field="audience" options={OPTIONS.audience} />
+            <SuggestionsPanel />
+            <Input label="VIP Attendees" field="vips" type="textarea" placeholder="List specific high-profile individuals you're targeting..." />
+            <Input label="Speakers / Presenters" field="speakers" type="textarea" placeholder="Who do you want to present or lead sessions?" />
+          </div>
+        );
+
+      case 'logistics':
+        return (
+          <div className="space-y-6">
+            <Input label="Event Date" field="date" type="date" required />
+            {data.date && <CalendarWarnings />}
+            <Input label="Duration" field="duration" type="select" required options={DURATION_OPTIONS} />
+            <Input label="Format" field="format" type="select" required options={OPTIONS.format} />
+            <Input label="Venue Type" field="venue" type="select" required options={OPTIONS.venue} />
+            <Input 
+              label="Location" 
+              field="region" 
+              type="select" 
+              required 
+              options={Object.entries(REGIONS).map(([k, v]) => ({ value: k, label: v.name }))} 
+            />
+            <CheckboxGroup label="Spaces Needed" field="spaces" options={OPTIONS.spaces} />
+            <SuggestionsPanel />
+          </div>
+        );
+
+      case 'program':
+        return (
+          <div className="space-y-6">
+            <CheckboxGroup label="Program Elements" field="program" options={OPTIONS.program} />
+            <CheckboxGroup label="Post-Event Activities" field="postEvent" options={OPTIONS.postEvent} />
+            <SuggestionsPanel />
+          </div>
+        );
+
+      case 'services':
+        return (
+          <div className="space-y-6">
+            <CheckboxGroup label="Food & Beverage" field="fnb" options={OPTIONS.fnb} />
+            <CheckboxGroup label="Audio/Visual" field="av" options={OPTIONS.av} />
+            <CheckboxGroup label="Production & Design" field="production" options={OPTIONS.production} />
+            <CheckboxGroup label="Collateral & Materials" field="collateral" options={OPTIONS.collateral} />
+            <CheckboxGroup label="Marketing & Promotion" field="marketing" options={OPTIONS.marketing} />
+            <SuggestionsPanel />
+          </div>
+        );
+
+      case 'review':
+        return (
+          <div className="space-y-6">
+            <TeamMembers />
+            <Input label="Funding Sources" field="funding" type="textarea" placeholder="Where is the budget coming from?" />
+            <Input label="Additional Notes" field="notes" type="textarea" placeholder="Anything else to remember?" />
+
+            {/* All Suggestions */}
+            {suggestions.length > 0 && (
+              <div className="bg-amber-900/20 border border-amber-700/50 rounded-xl p-6">
+                <h3 className="text-lg font-semibold text-amber-400 mb-4">💡 Suggestions to Consider</h3>
+                <ul className="space-y-3">
+                  {suggestions.map((s, i) => (
+                    <li key={i} className="text-amber-200/80 text-sm flex items-start gap-2">
+                      <span className="text-amber-500">•</span>
+                      {s.message}
+                    </li>
+                  ))}
+                </ul>
+              </div>
+            )}
+
+            {/* Budget Summary */}
+            <div className="bg-zinc-800/50 rounded-xl p-6">
+              <h3 className="text-lg font-semibold text-white mb-4">💰 Budget Estimate</h3>
+              <div className="text-3xl font-bold text-emerald-400 mb-4">
+                {fmt(budget.total.min)} – {fmt(budget.total.max)}
+              </div>
+              <div className="grid grid-cols-2 gap-4 text-sm">
+                <div className="text-zinc-400">Venue: <span className="text-white">{fmt(budget.costs.venue.min)}-{fmt(budget.costs.venue.max)}</span></div>
+                <div className="text-zinc-400">F&B: <span className="text-white">{fmt(budget.costs.fnb)}</span></div>
+                <div className="text-zinc-400">AV: <span className="text-white">{fmt(budget.costs.av)}</span></div>
+                <div className="text-zinc-400">Production: <span className="text-white">{fmt(budget.costs.production)}</span></div>
+                <div className="text-zinc-400">Collateral: <span className="text-white">{fmt(budget.costs.collateral)}</span></div>
+                <div className="text-zinc-400">Marketing: <span className="text-white">{fmt(budget.costs.marketing)}</span></div>
+              </div>
+              <div className="mt-4 pt-4 border-t border-zinc-700 text-sm text-zinc-400">
+                + 10% staffing + 15% contingency included
+              </div>
+            </div>
+
+            {/* Risks */}
+            {risks.length > 0 && (
+              <div className="bg-zinc-800/50 rounded-xl p-6">
+                <h3 className="text-lg font-semibold text-white mb-4">⚠️ Risk Alerts</h3>
+                {risks.map((risk, i) => (
+                  <div key={i} className={`p-3 rounded-lg mb-2 ${risk.level === 'high' ? 'bg-red-900/30 text-red-300' : 'bg-yellow-900/30 text-yellow-300'}`}>
+                    {risk.message}
+                  </div>
+                ))}
+              </div>
+            )}
+
+            {/* Timeline Preview */}
+            <div className="bg-zinc-800/50 rounded-xl p-6">
+              <div className="flex justify-between items-center mb-4">
+                <h3 className="text-lg font-semibold text-white">📅 Planning Timeline</h3>
+                <button
+                  onClick={handleExportCalendar}
+                  className="text-sm text-emerald-400 hover:text-emerald-300"
+                >
+                  Export to Calendar →
+                </button>
+              </div>
+              <div className="space-y-2">
+                {timeline.slice(0, 5).map((m, i) => (
+                  <div key={i} className={`flex items-center gap-3 ${m.isCurrent ? 'text-emerald-400' : m.isPast ? 'text-zinc-500' : 'text-zinc-300'}`}>
+                    <span className="text-sm w-24">{m.label}</span>
+                    <span className={`w-2 h-2 rounded-full ${m.isCurrent ? 'bg-emerald-400' : m.isPast ? 'bg-zinc-600' : 'bg-zinc-500'}`} />
+                    <span className="text-sm">{m.task}</span>
+                  </div>
+                ))}
+              </div>
+            </div>
+
+            {/* Documents */}
+            <div className="bg-zinc-800/50 rounded-xl p-6">
+              <h3 className="text-lg font-semibold text-white mb-4">📄 Generate Documents</h3>
+              <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+                {Object.entries(DOCUMENTS).map(([key, doc]) => (
+                  <button
+                    key={key}
+                    onClick={() => setActiveDoc(key)}
+                    className="bg-zinc-700 hover:bg-zinc-600 text-white p-4 rounded-lg text-center transition-all"
+                  >
+                    <div className="text-2xl mb-2">{doc.icon}</div>
+                    <div className="text-sm">{doc.name}</div>
+                  </button>
+                ))}
+              </div>
+            </div>
+          </div>
+        );
+
+      default:
+        return null;
+    }
+  };
 
   return (
-    <div className="min-h-screen bg-slate-900 font-mono">
+    <div className="min-h-screen bg-black text-white">
+      {/* Hidden file input for import */}
+      <input
+        type="file"
+        ref={fileInputRef}
+        onChange={handleImportJSON}
+        accept=".json"
+        className="hidden"
+      />
+
       {/* Header */}
-      <div className="bg-slate-800 border-b-2 border-slate-700 p-2">
-        <div className="max-w-lg mx-auto">
-          <div className="flex justify-between items-center mb-2">
-            <div className="flex items-center gap-2">
-              <span className="text-xl">{programs.find(x => x.id === program)?.icon}</span>
-              <div>
-                <div className="text-blue-400 text-xs font-bold">EVENT PLANNER</div>
-                <div className="text-slate-500 text-xs">{charNames[char]}</div>
-              </div>
+      <div className="bg-zinc-900 border-b border-zinc-800">
+        <div className="max-w-4xl mx-auto px-6 py-4">
+          <div className="flex items-center justify-between">
+            <div>
+              <h1 className="text-xl font-bold">🌱 SeedAI Event Planner</h1>
+              <p className="text-zinc-400 text-sm">Professional event planning for policy professionals</p>
             </div>
-            <div className="flex gap-1 items-center">
-              <button onClick={() => { sound.toggle(); setSoundOn(!soundOn); }} className="text-slate-500 hover:text-slate-300 p-1">{soundOn ? <Volume2 size={14}/> : <VolumeX size={14}/>}</button>
-              <Btn onClick={() => saveProgress()} variant="secondary" className="text-xs py-1 px-2"><Save size={10} className="inline mr-1"/>SAVE</Btn>
-              <Btn onClick={() => { sound.play('complete'); setScreen('export'); }} variant="success" className="text-xs py-1 px-2"><Sparkles size={10} className="inline mr-1"/>EXPORT</Btn>
+            <div className="flex items-center gap-3">
+              <button
+                onClick={() => setShowTemplates(true)}
+                className="px-4 py-2 bg-emerald-600 hover:bg-emerald-500 rounded-lg text-sm font-medium"
+              >
+                Templates
+              </button>
+              <button
+                onClick={() => setShowShareMenu(true)}
+                className="px-4 py-2 bg-zinc-800 hover:bg-zinc-700 rounded-lg text-sm font-medium"
+              >
+                Share / Export
+              </button>
+              <button
+                onClick={() => {
+                  if (confirm('Clear all data and start over?')) {
+                    localStorage.removeItem('seedai-planner-v7');
+                    setData({
+                      name: '', type: '', size: '', duration: '', date: '', format: '', venue: '', region: 'dc-metro',
+                      description: '', objectives: '', audience: [], vips: '', speakers: '',
+                      program: [], spaces: [], fnb: [], av: [], production: [], collateral: [], marketing: [], postEvent: [],
+                      team: [{ name: '', role: '' }], notes: '', funding: ''
+                    });
+                    setCurrentPhase(0);
+                  }
+                }}
+                className="text-zinc-500 hover:text-white text-sm"
+              >
+                Reset
+              </button>
             </div>
           </div>
-          <ProgressBar current={total.done} total={total.total} label="PROGRESS" characterId={char} />
         </div>
       </div>
 
-      <div className="max-w-lg mx-auto p-3">
-        {/* Phase Tabs */}
-        <div className="flex gap-1 mb-3 overflow-x-auto pb-1">
-          {phases.map((x, i) => {
-            const pr = getProgress(i);
-            return (<button key={x.id} onClick={() => { sound.play('navigate'); setPhase(i); }} className={`px-2 py-1 border-2 text-xs whitespace-nowrap flex-shrink-0 ${i === phase ? 'border-yellow-400 bg-slate-700 text-yellow-400' : pr.done === pr.total && pr.total > 0 ? 'border-green-500 bg-slate-800 text-green-400' : 'border-slate-600 bg-slate-800 text-slate-400'}`}>{x.icon}</button>);
-          })}
+      {/* Phase Navigation */}
+      <div className="bg-zinc-900/50 border-b border-zinc-800">
+        <div className="max-w-4xl mx-auto px-6 py-4">
+          <div className="flex items-center justify-between gap-2 overflow-x-auto">
+            {PHASES.map((phase, i) => (
+              <button
+                key={phase.id}
+                onClick={() => setCurrentPhase(i)}
+                className={`flex items-center gap-2 px-4 py-2 rounded-lg whitespace-nowrap transition-all ${
+                  i === currentPhase
+                    ? 'bg-emerald-600 text-white'
+                    : phaseComplete[phase.id]
+                    ? 'bg-zinc-700 text-emerald-400'
+                    : 'bg-zinc-800 text-zinc-400 hover:bg-zinc-700'
+                }`}
+              >
+                <span>{phase.icon}</span>
+                <span className="text-sm font-medium">{phase.name}</span>
+                {phaseComplete[phase.id] && i !== currentPhase && <span className="text-xs">✓</span>}
+              </button>
+            ))}
+          </div>
+        </div>
+      </div>
+
+      {/* Progress Bar */}
+      <div className="bg-zinc-900/30">
+        <div className="max-w-4xl mx-auto px-6">
+          <div className="h-1 bg-zinc-800 rounded-full overflow-hidden">
+            <div
+              className="h-full bg-emerald-500 transition-all duration-500"
+              style={{ width: `${(completedPhases / PHASES.length) * 100}%` }}
+            />
+          </div>
+        </div>
+      </div>
+
+      {/* Main Content */}
+      <div className="max-w-4xl mx-auto px-6 py-8">
+        {/* Phase Header */}
+        <div className="mb-8">
+          <div className="flex items-center gap-3 mb-2">
+            <span className="text-3xl">{PHASES[currentPhase].icon}</span>
+            <div>
+              <p className="text-zinc-500 text-sm">Phase {currentPhase + 1} of {PHASES.length}</p>
+              <h2 className="text-2xl font-bold text-white">{PHASES[currentPhase].title}</h2>
+            </div>
+          </div>
+          <p className="text-zinc-400 ml-12">{PHASES[currentPhase].description}</p>
         </div>
 
-        {/* Smart Defaults Banner */}
-        {showSmartDefaults && phase === 2 && (
-          <div className="border-4 border-purple-500 bg-purple-900/20 p-4 mb-4">
-            <div className="flex items-center gap-2 text-purple-400 mb-2"><Lightbulb size={20}/> <span className="font-bold">SMART DEFAULTS</span></div>
-            <p className="text-sm text-slate-300 mb-3">Apply typical settings for <span className="text-purple-400 font-bold">{responses.event_type}</span>?</p>
-            <div className="flex gap-3">
-              <Btn onClick={applySmartDefaults} variant="purple" className="flex-1"><Sparkles size={14} className="inline mr-1"/> Apply Defaults</Btn>
-              <Btn onClick={() => setShowSmartDefaults(null)} variant="secondary" className="flex-1">Skip</Btn>
-            </div>
-          </div>
-        )}
+        {/* Phase Content */}
+        <div className="bg-zinc-900/50 rounded-xl p-6 mb-8">
+          {renderPhaseContent()}
+        </div>
 
-        {/* Main Content Card */}
-        <div className="border-2 border-blue-500 bg-slate-800 mb-4 rounded">
-          <div className="bg-blue-600 p-3 border-b-2 border-blue-500">
-            <div className="text-xs text-blue-200">PHASE {p.id} OF {phases.length}</div>
-            <h2 className="text-lg text-white">{p.icon} {p.name}</h2>
-            <div className="text-xs text-blue-200">{p.subtitle}</div>
-          </div>
+        {/* Navigation Buttons */}
+        <div className="flex justify-between">
+          <button
+            onClick={() => setCurrentPhase(Math.max(0, currentPhase - 1))}
+            disabled={currentPhase === 0}
+            className={`px-6 py-3 rounded-lg font-medium transition-all ${
+              currentPhase === 0
+                ? 'bg-zinc-800 text-zinc-600 cursor-not-allowed'
+                : 'bg-zinc-700 text-white hover:bg-zinc-600'
+            }`}
+          >
+            ← Previous
+          </button>
 
-          {/* Team Section (Phase 1) */}
-          {phase === 0 && (
-            <div className="p-3 border-b-2 border-slate-700">
-              <div className="text-yellow-400 text-xs mb-2 flex items-center gap-2"><Users size={14}/> <span className="font-bold">PLANNING TEAM</span></div>
-              <div className="text-slate-400 text-xs mb-2">Owner: <span className="text-yellow-400 font-bold">{charNames[char]}</span></div>
-              {team.length > 0 && (<div className="space-y-1 mb-2">{team.map(m => (<div key={m.id} className="flex justify-between items-center bg-slate-900 p-2 border border-slate-700 text-xs text-slate-300">{m.name} {m.role && `— ${m.role}`}<button onClick={() => setTeam(team.filter(x => x.id !== m.id))} className="text-red-400 p-1"><X size={12}/></button></div>))}</div>)}
-              <div className="flex gap-1">
-                <input value={newMember.name} onChange={e => setNewMember({ ...newMember, name: e.target.value })} className="flex-1 p-2 bg-slate-900 border border-slate-600 text-slate-200 text-xs" placeholder="Name"/>
-                <input value={newMember.role} onChange={e => setNewMember({ ...newMember, role: e.target.value })} className="flex-1 p-2 bg-slate-900 border border-slate-600 text-slate-200 text-xs" placeholder="Role"/>
-                <button onClick={addMember} className="px-3 bg-green-600 border border-green-400 text-white text-xs"><Plus size={14}/></button>
-              </div>
-            </div>
-          )}
-
-          {/* Phase 6: Budget & Timeline Output Screen */}
-          {isLastPhase ? (
-            <div className="p-3">
-              <TimelineView responses={responses} budgetConfig={budgetConfig} />
-              <RiskFlags responses={responses} budgetConfig={budgetConfig} />
-              <BudgetScenarios responses={responses} budgetConfig={budgetConfig} vendors={vendors} onAiRefine={handleAiRefine} aiEstimate={aiEstimate} aiLoading={aiLoading} />
-              <VendorMatching vendors={vendors} responses={responses} budgetConfig={budgetConfig} />
-              <EventChecklist responses={responses} checkedItems={checkedItems} onToggle={toggleChecklistItem} />
-              <DocumentTemplates responses={responses} team={team} budgetConfig={budgetConfig} />
-              
-              {/* Phase 6 Questions (Funding Sources, Risks) */}
-              {p.questions.length > 0 && (
-                <div className="border-t border-slate-700 pt-3 mt-3 space-y-3">
-                  {p.questions.map((q, i) => (
-                    <div key={q.id}>
-                      <label className="text-yellow-400 text-xs font-bold block mb-1">{q.label}</label>
-                      {q.tip && !responses[q.id] && <div className="text-slate-500 text-xs mb-1 italic">💡 {q.tip}</div>}
-                      {q.type === 'checkbox' ? (
-                        <Checkbox options={q.options} selected={responses[q.id] || []} onChange={(val) => update(q.id, val)} />
-                      ) : q.type === 'textarea' ? (
-                        <textarea value={responses[q.id] || ''} onChange={e => update(q.id, e.target.value)} rows={2} className="w-full p-2 bg-slate-900 border-2 border-slate-600 text-slate-200 text-xs focus:border-yellow-400 focus:outline-none resize-none" placeholder={q.placeholder}/>
-                      ) : (
-                        <input type="text" value={responses[q.id] || ''} onChange={e => update(q.id, e.target.value)} className="w-full p-2 bg-slate-900 border-2 border-slate-600 text-slate-200 text-xs focus:border-yellow-400 focus:outline-none" placeholder={q.placeholder}/>
-                      )}
-                    </div>
-                  ))}
-                </div>
-              )}
-              
-              <div className="text-center text-slate-600 text-xs mt-3 p-2 border border-dashed border-slate-700 rounded">
-                💡 Estimates based on Phases 1-5. Go back to adjust.
-              </div>
-            </div>
+          {currentPhase < PHASES.length - 1 ? (
+            <button
+              onClick={() => setCurrentPhase(currentPhase + 1)}
+              className="px-6 py-3 bg-emerald-600 text-white rounded-lg font-medium hover:bg-emerald-500 transition-all"
+            >
+              Continue →
+            </button>
           ) : (
-            /* Questions (Phases 1-5) */
-            <div className="p-3 space-y-4">
-              {p.questions.map((q, i) => (
-                <div key={q.id}>
-                  <div className="flex justify-between items-start mb-1">
-                    <label className="text-yellow-400 text-xs font-bold">{i+1}. {q.label}</label>
-                    <div className="flex gap-1 ml-2">
-                      <button onClick={() => setShowNote(showNote === q.id ? null : q.id)} className={`p-1 ${notes[q.id] ? 'text-blue-400' : 'text-slate-600'}`}><MessageSquare size={12}/></button>
-                      <button onClick={() => { sound.play('select'); setNeedsInput(pr => ({ ...pr, [q.id]: !pr[q.id] })); }} className={`p-1 ${needsInput[q.id] ? 'text-yellow-400' : 'text-slate-600'}`}><HelpCircle size={12}/></button>
-                    </div>
-                  </div>
-                  {q.tip && !responses[q.id] && <div className="text-slate-500 text-xs mb-1 italic">💡 {q.tip}</div>}
-                  {showNote === q.id && (<input value={notes[q.id] || ''} onChange={e => setNotes({ ...notes, [q.id]: e.target.value })} className="w-full p-2 mb-2 bg-slate-700 border border-slate-600 text-slate-300 text-xs" placeholder="Add a note..."/>)}
-                  {q.type === 'checkbox' ? (<Checkbox options={q.options} selected={responses[q.id] || []} onChange={(val) => update(q.id, val)} />)
-                    : q.type === 'textarea' ? (<textarea value={responses[q.id] || ''} onChange={e => update(q.id, e.target.value)} rows={2} className="w-full p-2 bg-slate-900 border-2 border-slate-600 text-slate-200 text-xs focus:border-yellow-400 focus:outline-none resize-none" placeholder={q.placeholder}/>)
-                    : q.type === 'select' ? (<select value={responses[q.id] || ''} onChange={e => { sound.play('select'); update(q.id, e.target.value); }} className="w-full p-2 bg-slate-900 border-2 border-slate-600 text-slate-200 text-xs focus:border-yellow-400 focus:outline-none"><option value="">-- SELECT --</option>{q.options.map(o => <option key={o} value={o}>{o}</option>)}</select>)
-                    : q.type === 'date' ? (<input type="date" value={responses[q.id] || ''} onChange={e => update(q.id, e.target.value)} className="w-full p-2 bg-slate-900 border-2 border-slate-600 text-slate-200 text-xs focus:border-yellow-400 focus:outline-none"/>)
-                    : (<input type="text" value={responses[q.id] || ''} onChange={e => update(q.id, e.target.value)} className="w-full p-2 bg-slate-900 border-2 border-slate-600 text-slate-200 text-xs focus:border-yellow-400 focus:outline-none" placeholder={q.placeholder}/>)}
-                  {needsInput[q.id] && !(q.type === 'checkbox' ? responses[q.id]?.length : responses[q.id]?.toString().trim()) && (<div className="text-yellow-400 text-xs mt-1 flex items-center gap-1"><HelpCircle size={10}/> Flagged for team input</div>)}
-                </div>
-              ))}
+            <div className="text-emerald-400 flex items-center gap-2">
+              ✓ Plan Complete — Generate your documents above
             </div>
           )}
-
-          {/* Navigation */}
-          <div className="border-t-2 border-slate-700 p-3 flex justify-between items-center">
-            <Btn onClick={() => setPhase(Math.max(0, phase - 1))} disabled={phase === 0} variant="secondary" className="text-xs py-2 px-3">← PREV</Btn>
-            <span className="text-slate-500 text-xs">{prog.done}/{prog.total}</span>
-            {phase < phases.length - 1 ? (<Btn onClick={() => setPhase(phase + 1)} variant="primary" className="text-xs py-2 px-3">NEXT →</Btn>) : (<Btn onClick={() => { sound.play('complete'); setScreen('export'); }} variant="success" className="text-xs py-2 px-3"><Trophy size={12} className="inline mr-1"/>FINISH</Btn>)}
-          </div>
         </div>
-        {status && <div className="text-center text-green-400 text-xs">{status}</div>}
       </div>
+
+      {/* Modals */}
+      <DocumentModal />
+      <ShareMenu />
+      <TemplateModal />
     </div>
   );
 }
