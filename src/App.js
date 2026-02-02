@@ -1287,7 +1287,45 @@ export default function EventPlannerV8() {
   const [copySuccess, setCopySuccess] = useState(false);
   const [showShareMenu, setShowShareMenu] = useState(false);
   const [showTemplates, setShowTemplates] = useState(false);
+  const [aiSuggestions, setAiSuggestions] = useState([]);
+  const [isLoadingAI, setIsLoadingAI] = useState(false);
+  const [aiError, setAiError] = useState(null);
   const fileInputRef = useRef(null);
+
+  // Fetch AI Suggestions from API
+  const fetchAISuggestions = async (eventData) => {
+    try {
+      const response = await fetch('/api/suggestions', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ eventData })
+      });
+      
+      if (!response.ok) {
+        const errorData = await response.json().catch(() => ({}));
+        throw new Error(errorData.error || 'Failed to fetch suggestions');
+      }
+      
+      const result = await response.json();
+      return result.suggestions || [];
+    } catch (error) {
+      console.error('Error fetching AI suggestions:', error);
+      throw error;
+    }
+  };
+
+  const getAISuggestions = async () => {
+    setIsLoadingAI(true);
+    setAiError(null);
+    try {
+      const suggestions = await fetchAISuggestions(data);
+      setAiSuggestions(suggestions);
+    } catch (error) {
+      setAiError(error.message);
+    } finally {
+      setIsLoadingAI(false);
+    }
+  };
 
   // Load saved data
   useEffect(() => {
@@ -1657,6 +1695,54 @@ export default function EventPlannerV8() {
                 </ul>
               </div>
             )}
+
+            {/* AI Suggestions */}
+            <div className="bg-purple-900/20 border border-purple-700/50 rounded-xl p-6">
+              <h3 className="text-lg font-semibold text-purple-400 mb-4">🤖 AI-Powered Analysis</h3>
+              <p className="text-purple-200/70 text-sm mb-4">
+                Get personalized suggestions based on DC policy event best practices, your specific audience, and timing considerations.
+              </p>
+              
+              <button
+                onClick={getAISuggestions}
+                disabled={isLoadingAI}
+                className="w-full bg-purple-600 hover:bg-purple-500 disabled:bg-purple-800 disabled:cursor-not-allowed text-white p-4 rounded-lg font-medium transition-all"
+              >
+                {isLoadingAI ? (
+                  <span className="flex items-center justify-center gap-2">
+                    <svg className="animate-spin h-5 w-5" viewBox="0 0 24 24">
+                      <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" fill="none" />
+                      <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z" />
+                    </svg>
+                    Analyzing your event...
+                  </span>
+                ) : '🤖 Get AI Suggestions'}
+              </button>
+
+              {aiError && (
+                <div className="mt-4 p-4 bg-red-900/30 border border-red-700/50 rounded-lg text-red-300 text-sm">
+                  <strong>Error:</strong> {aiError}
+                  <p className="mt-1 text-red-400/70">Make sure the API is configured correctly. See VERCEL_SETUP_GUIDE.md for help.</p>
+                </div>
+              )}
+
+              {aiSuggestions.length > 0 && (
+                <div className="mt-4 space-y-3">
+                  {aiSuggestions.map((s, i) => (
+                    <div key={i} className="flex items-start gap-3 p-3 bg-purple-950/50 rounded-lg">
+                      <span className={`px-2 py-0.5 rounded text-xs font-medium shrink-0 ${
+                        s.priority === 'high' ? 'bg-red-900 text-red-200' :
+                        s.priority === 'medium' ? 'bg-yellow-900 text-yellow-200' :
+                        'bg-zinc-700 text-zinc-300'
+                      }`}>
+                        {s.priority || 'tip'}
+                      </span>
+                      <span className="text-purple-200/90 text-sm">{s.message}</span>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
 
             {/* Budget Summary */}
             <div className="bg-zinc-800/50 rounded-xl p-6">
