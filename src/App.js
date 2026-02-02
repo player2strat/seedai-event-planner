@@ -1,8 +1,8 @@
 import React, { useState, useEffect, useCallback, useRef } from 'react';
 
 // ============================================================================
-// SEEDAI EVENT PLANNER V7
-// Added: Congressional calendar, .ics export, smart sharing, rule-based hints
+// SEEDAI EVENT PLANNER V8
+// Fixed: Input focus bug (components moved outside main function)
 // ============================================================================
 
 // ============================================================================
@@ -77,10 +77,6 @@ const DEFAULT_COSTS = {
   collateral: { 'Name Badges': 5, 'Printed Agenda': 3, 'Branded Folders': 8, 'Note Pads/Pens': 6, 'Gift Bags': 25, 'Promotional Items': 15, 'Policy Briefs/Reports': 12, 'Speaker Bios': 2 },
   marketing: { 'Save the Date': 500, 'Email Invitations': 300, 'Event Website': 2500, 'Social Media Campaign': 1500, 'Press Release': 800, 'Media Advisory': 500, 'Paid Advertising': 5000, 'Partner Outreach': 1000 }
 };
-
-// ============================================================================
-// EVENT TEMPLATES
-// ============================================================================
 
 const EVENT_TEMPLATES = {
   congressionalBriefing: {
@@ -239,10 +235,6 @@ const EVENT_TEMPLATES = {
   }
 };
 
-// ============================================================================
-// CONGRESSIONAL CALENDAR (2026)
-// ============================================================================
-
 const CONGRESSIONAL_CALENDAR_2026 = {
   recesses: [
     { start: '2026-01-01', end: '2026-01-05', name: 'New Year' },
@@ -255,9 +247,7 @@ const CONGRESSIONAL_CALENDAR_2026 = {
     { start: '2026-11-21', end: '2026-11-29', name: 'Thanksgiving Recess' },
     { start: '2026-12-12', end: '2026-12-31', name: 'Holiday Recess' }
   ],
-  // Election day 2026
   electionDay: '2026-11-03',
-  // Budget cycle key dates
   budgetDates: [
     { date: '2026-02-01', event: 'President\'s Budget typically released' },
     { date: '2026-04-15', event: 'Tax Day' },
@@ -266,92 +256,95 @@ const CONGRESSIONAL_CALENDAR_2026 = {
   ]
 };
 
+const PHASES = [
+  { id: 'vision', name: 'Vision', title: 'Define Your Vision', description: 'Start with the big picture — what are you trying to achieve?', icon: '💡' },
+  { id: 'audience', name: 'Audience', title: 'Know Your Audience', description: 'Who are you bringing together and why does it matter to them?', icon: '👥' },
+  { id: 'logistics', name: 'Logistics', title: 'Set the Stage', description: 'Where and when will this happen?', icon: '📍' },
+  { id: 'program', name: 'Program', title: 'Design the Experience', description: 'What will attendees do and experience?', icon: '📝' },
+  { id: 'services', name: 'Services', title: 'Plan the Details', description: 'Food, AV, materials — the practical elements that make it work.', icon: '🔧' },
+  { id: 'review', name: 'Review', title: 'Review & Generate', description: 'See your complete plan and generate documents.', icon: '✨' }
+];
+
+const PROMPTS = {
+  name: "What's the working title for your event? This can evolve as planning progresses.",
+  type: "What type of event best describes what you're planning?",
+  description: "In 2-3 sentences, describe what this event is about. What's the core theme or focus?",
+  objectives: "What does success look like? What should attendees walk away with? What impact do you want to create?",
+  size: "How many people do you realistically expect to attend?",
+  audience: "Who specifically are you trying to reach? Think about job titles, sectors, and why they'd want to attend.",
+  vips: "Are there specific high-profile individuals you're hoping to attract? Members of Congress, executives, thought leaders?",
+  speakers: "Who would be ideal to present, moderate, or lead discussions? Dream big, but also consider realistic options.",
+  date: "When are you planning to hold this event? Consider seasonality and competing events.",
+  duration: "How long do you need to accomplish your goals?",
+  format: "Will attendees gather in person, join virtually, or both?",
+  venue: "What type of space fits your event's tone and needs?",
+  region: "Where will this event take place? This helps us estimate local market costs.",
+  spaces: "Beyond the main room, what other spaces might you need?",
+  program: "What elements will make up your agenda? Think about variety and pacing.",
+  fnb: "Food and beverage sets the tone. What level of hospitality fits your event?",
+  av: "What technology do you need to deliver your content effectively?",
+  production: "What visual and design elements will enhance the experience?",
+  collateral: "What materials will attendees receive or take home?",
+  marketing: "How will you spread the word and drive registration?",
+  postEvent: "What happens after the event to extend its impact?",
+  team: "Who are the key people responsible for making this happen?",
+  funding: "Where is the budget coming from? Sponsors, organizational budget, grants?",
+  notes: "Anything else important to remember as planning progresses?"
+};
+
+// ============================================================================
+// HELPER FUNCTIONS
+// ============================================================================
+
+const fmt = (n) => new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD', minimumFractionDigits: 0, maximumFractionDigits: 0 }).format(n);
+
 function checkCongressionalCalendar(dateStr) {
   if (!dateStr) return [];
-  
   const date = new Date(dateStr);
   const warnings = [];
   
-  // Check recesses
   for (const recess of CONGRESSIONAL_CALENDAR_2026.recesses) {
     const start = new Date(recess.start);
     const end = new Date(recess.end);
     if (date >= start && date <= end) {
-      warnings.push({
-        type: 'recess',
-        severity: 'high',
-        message: `During ${recess.name} — Congress not in session, Hill staff may be traveling`
-      });
+      warnings.push({ type: 'recess', severity: 'high', message: `During ${recess.name} — Congress not in session, Hill staff may be traveling` });
     }
   }
   
-  // Check if during August (general warning)
-  if (date.getMonth() === 7) {
-    if (!warnings.some(w => w.type === 'recess')) {
-      warnings.push({
-        type: 'august',
-        severity: 'medium',
-        message: 'August is traditionally slow in DC — many contacts may be away'
-      });
-    }
+  if (date.getMonth() === 7 && !warnings.some(w => w.type === 'recess')) {
+    warnings.push({ type: 'august', severity: 'medium', message: 'August is traditionally slow in DC — many contacts may be away' });
   }
   
-  // Thursday/Friday warning for Hill events
   const dayOfWeek = date.getDay();
   if (dayOfWeek === 4 || dayOfWeek === 5) {
-    warnings.push({
-      type: 'endOfWeek',
-      severity: 'low',
-      message: 'Thu/Fri can be tricky — Members often travel to districts'
-    });
+    warnings.push({ type: 'endOfWeek', severity: 'low', message: 'Thu/Fri can be tricky — Members often travel to districts' });
   }
-  
-  // Monday morning warning
   if (dayOfWeek === 1) {
-    warnings.push({
-      type: 'monday',
-      severity: 'low',
-      message: 'Monday mornings can have lower Hill attendance — afternoon may work better'
-    });
+    warnings.push({ type: 'monday', severity: 'low', message: 'Monday mornings can have lower Hill attendance — afternoon may work better' });
   }
   
-  // Check proximity to election (within 4 weeks)
   const election = new Date(CONGRESSIONAL_CALENDAR_2026.electionDay);
   const daysToElection = Math.ceil((election - date) / (1000 * 60 * 60 * 24));
   if (daysToElection > 0 && daysToElection <= 28) {
-    warnings.push({
-      type: 'election',
-      severity: 'high',
-      message: `${daysToElection} days before Election Day — political figures will be campaigning`
-    });
+    warnings.push({ type: 'election', severity: 'high', message: `${daysToElection} days before Election Day — political figures will be campaigning` });
   }
   
-  // Check budget cycle dates
   for (const bd of CONGRESSIONAL_CALENDAR_2026.budgetDates) {
     const budgetDate = new Date(bd.date);
     const daysDiff = Math.abs(Math.ceil((date - budgetDate) / (1000 * 60 * 60 * 24)));
     if (daysDiff <= 7) {
-      warnings.push({
-        type: 'budget',
-        severity: 'medium',
-        message: `Near ${bd.event} — budget-related events may compete for attention`
-      });
+      warnings.push({ type: 'budget', severity: 'medium', message: `Near ${bd.event} — budget-related events may compete for attention` });
     }
   }
   
   return warnings;
 }
 
-// ============================================================================
-// SMART SUGGESTIONS (Rule-Based)
-// ============================================================================
-
 function generateSuggestions(data, budget) {
   const suggestions = [];
   const size = SIZE_CONFIG[data.size];
   const guestCount = size ? Math.round((size.min + size.max) / 2) : 50;
   
-  // Event insurance recommendations
   const budgetMax = budget?.total?.max || 0;
   const hasAlcohol = (data.fnb || []).some(f => f.includes('Cocktail') || f.includes('Happy Hour') || f.includes('Reception'));
   const isOutdoor = data.venue === 'Rooftop/Outdoor';
@@ -359,169 +352,92 @@ function generateSuggestions(data, budget) {
   const hasVIPs = data.vips && data.vips.trim().length > 20;
   
   if (budgetMax >= 50000) {
-    suggestions.push({
-      category: 'insurance',
-      priority: 'high',
-      message: `Budget exceeds $50k — event insurance is strongly recommended. Consider general liability, cancellation, and property coverage.`
-    });
+    suggestions.push({ category: 'insurance', priority: 'high', message: `Budget exceeds $50k — event insurance is strongly recommended. Consider general liability, cancellation, and property coverage.` });
   } else if (budgetMax >= 25000 || (isLargeEvent && hasAlcohol)) {
-    suggestions.push({
-      category: 'insurance',
-      priority: 'medium',
-      message: `Consider event insurance for liability protection, especially with ${hasAlcohol ? 'alcohol service' : 'this budget level'}.`
-    });
+    suggestions.push({ category: 'insurance', priority: 'medium', message: `Consider event insurance for liability protection, especially with ${hasAlcohol ? 'alcohol service' : 'this budget level'}.` });
   }
   
   if (isOutdoor && budgetMax >= 15000) {
-    suggestions.push({
-      category: 'insurance',
-      priority: 'medium',
-      message: 'Outdoor events should consider weather-related cancellation coverage.'
-    });
+    suggestions.push({ category: 'insurance', priority: 'medium', message: 'Outdoor events should consider weather-related cancellation coverage.' });
   }
   
   if (hasVIPs && isLargeEvent) {
-    suggestions.push({
-      category: 'insurance',
-      priority: 'low',
-      message: 'High-profile attendees may warrant additional security and liability coverage.'
-    });
+    suggestions.push({ category: 'insurance', priority: 'low', message: 'High-profile attendees may warrant additional security and liability coverage.' });
   }
   
-  // AV suggestions based on size
   if (['large', 'major', 'flagship'].includes(data.size)) {
     if (!(data.av || []).includes('Wireless Microphones')) {
-      suggestions.push({
-        category: 'av',
-        message: 'Events over 100 guests typically need wireless mics for Q&A and speaker mobility'
-      });
+      suggestions.push({ category: 'av', message: 'Events over 100 guests typically need wireless mics for Q&A and speaker mobility' });
     }
     if (!(data.av || []).includes('Recording Equipment') && !(data.av || []).includes('Livestream Setup')) {
-      suggestions.push({
-        category: 'av',
-        message: 'Consider recording larger events — useful for absent stakeholders and content repurposing'
-      });
+      suggestions.push({ category: 'av', message: 'Consider recording larger events — useful for absent stakeholders and content repurposing' });
     }
   }
   
-  // Hybrid format requirements
   if (data.format === 'Hybrid') {
     if (!(data.av || []).includes('Livestream Setup')) {
-      suggestions.push({
-        category: 'av',
-        message: 'Hybrid events require livestream capability for remote attendees'
-      });
+      suggestions.push({ category: 'av', message: 'Hybrid events require livestream capability for remote attendees' });
     }
     if (!(data.production || []).includes('Videographer')) {
-      suggestions.push({
-        category: 'production',
-        message: 'A videographer helps ensure professional quality for your virtual audience'
-      });
+      suggestions.push({ category: 'production', message: 'A videographer helps ensure professional quality for your virtual audience' });
     }
   }
   
-  // Government audience considerations
   if ((data.audience || []).some(a => ['Congressional Staff', 'Federal Agency Officials'].includes(a))) {
     if ((data.fnb || []).includes('Plated Dinner') || (data.fnb || []).includes('Cocktail Reception')) {
-      suggestions.push({
-        category: 'compliance',
-        message: 'Note: Federal ethics rules limit gifts to $20/item, $50/year from single source — verify meal costs comply'
-      });
+      suggestions.push({ category: 'compliance', message: 'Note: Federal ethics rules limit gifts to $20/item, $50/year from single source — verify meal costs comply' });
     }
     if (!(data.spaces || []).includes('Registration Area')) {
-      suggestions.push({
-        category: 'logistics',
-        message: 'Government attendees often need sign-in for ethics compliance — consider a registration area'
-      });
+      suggestions.push({ category: 'logistics', message: 'Government attendees often need sign-in for ethics compliance — consider a registration area' });
     }
   }
   
-  // Press event needs
   if (data.type === 'Press Event / Media Briefing' || (data.audience || []).includes('Journalists/Media')) {
     if (!(data.spaces || []).includes('Press/Media Room')) {
-      suggestions.push({
-        category: 'logistics',
-        message: 'Press events benefit from a dedicated media room for interviews and filing'
-      });
+      suggestions.push({ category: 'logistics', message: 'Press events benefit from a dedicated media room for interviews and filing' });
     }
     if (!(data.production || []).includes('Step & Repeat')) {
-      suggestions.push({
-        category: 'production',
-        message: 'A branded step & repeat creates professional photo opportunities for media'
-      });
+      suggestions.push({ category: 'production', message: 'A branded step & repeat creates professional photo opportunities for media' });
     }
   }
   
-  // VIP considerations
   if (data.vips && data.vips.trim().length > 0) {
     if (!(data.spaces || []).includes('VIP Green Room')) {
-      suggestions.push({
-        category: 'logistics',
-        message: 'VIP speakers often need a green room for prep and private conversations'
-      });
+      suggestions.push({ category: 'logistics', message: 'VIP speakers often need a green room for prep and private conversations' });
     }
   }
   
-  // Multi-day event suggestions
   if (['two', 'three'].includes(data.duration)) {
     if (!(data.program || []).includes('Networking Breaks')) {
-      suggestions.push({
-        category: 'program',
-        message: 'Multi-day events need dedicated networking time to prevent fatigue'
-      });
+      suggestions.push({ category: 'program', message: 'Multi-day events need dedicated networking time to prevent fatigue' });
     }
   }
   
-  // Gala specifics
   if (data.type === 'Fundraising Gala') {
     if (!(data.fnb || []).includes('Cocktail Reception')) {
-      suggestions.push({
-        category: 'fnb',
-        message: 'Galas typically open with a cocktail reception for arrival and mingling'
-      });
+      suggestions.push({ category: 'fnb', message: 'Galas typically open with a cocktail reception for arrival and mingling' });
     }
     if (!(data.production || []).includes('Lighting Design')) {
-      suggestions.push({
-        category: 'production',
-        message: 'Lighting design transforms a space for gala atmosphere'
-      });
+      suggestions.push({ category: 'production', message: 'Lighting design transforms a space for gala atmosphere' });
     }
   }
   
-  // Outdoor venue backup
   if (data.venue === 'Rooftop/Outdoor') {
-    suggestions.push({
-      category: 'logistics',
-      message: 'Outdoor venues need a weather backup plan — confirm indoor alternative with venue'
-    });
+    suggestions.push({ category: 'logistics', message: 'Outdoor venues need a weather backup plan — confirm indoor alternative with venue' });
   }
   
-  // International delegates
   if ((data.audience || []).includes('International Delegates')) {
     if (!(data.av || []).includes('Interpretation Equipment')) {
-      suggestions.push({
-        category: 'av',
-        message: 'International attendees may need interpretation services'
-      });
+      suggestions.push({ category: 'av', message: 'International attendees may need interpretation services' });
     }
   }
   
-  // Post-event gaps
   if ((data.postEvent || []).length === 0 && data.type) {
-    suggestions.push({
-      category: 'postEvent',
-      message: 'Don\'t forget post-event follow-up — thank you notes and surveys extend your impact'
-    });
+    suggestions.push({ category: 'postEvent', message: 'Don\'t forget post-event follow-up — thank you notes and surveys extend your impact' });
   }
   
   return suggestions;
 }
-
-// ============================================================================
-// BUDGET CALCULATION
-// ============================================================================
-
-const fmt = (n) => new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD', minimumFractionDigits: 0, maximumFractionDigits: 0 }).format(n);
 
 function calculateBudget(data, vendorData) {
   const size = SIZE_CONFIG[data.size] || SIZE_CONFIG.medium;
@@ -581,10 +497,6 @@ function calculateBudget(data, vendorData) {
   };
 }
 
-// ============================================================================
-// TIMELINE GENERATION
-// ============================================================================
-
 function generateTimeline(data) {
   const eventDate = data.date ? new Date(data.date) : new Date(Date.now() + 90 * 24 * 60 * 60 * 1000);
   const today = new Date();
@@ -611,10 +523,6 @@ function generateTimeline(data) {
   });
 }
 
-// ============================================================================
-// RISK ANALYSIS
-// ============================================================================
-
 function analyzeRisks(data) {
   const risks = [];
   const eventDate = data.date ? new Date(data.date) : null;
@@ -635,24 +543,12 @@ function analyzeRisks(data) {
   return risks;
 }
 
-// ============================================================================
-// CALENDAR EXPORT (.ics)
-// ============================================================================
-
 function generateICS(data, timeline) {
   const eventDate = data.date ? new Date(data.date) : new Date();
-  const formatICSDate = (date) => {
-    return date.toISOString().replace(/[-:]/g, '').split('.')[0] + 'Z';
-  };
+  const formatICSDate = (date) => date.toISOString().replace(/[-:]/g, '').split('.')[0] + 'Z';
   
-  let icsContent = `BEGIN:VCALENDAR
-VERSION:2.0
-PRODID:-//SeedAI//Event Planner//EN
-CALSCALE:GREGORIAN
-METHOD:PUBLISH
-`;
+  let icsContent = `BEGIN:VCALENDAR\nVERSION:2.0\nPRODID:-//SeedAI//Event Planner//EN\nCALSCALE:GREGORIAN\nMETHOD:PUBLISH\n`;
 
-  // Main event
   const eventEnd = new Date(eventDate);
   const duration = DURATION_OPTIONS.find(d => d.value === data.duration);
   if (duration && duration.days >= 1) {
@@ -661,18 +557,8 @@ METHOD:PUBLISH
     eventEnd.setHours(eventEnd.getHours() + 4);
   }
   
-  icsContent += `BEGIN:VEVENT
-DTSTART:${formatICSDate(eventDate)}
-DTEND:${formatICSDate(eventEnd)}
-SUMMARY:${data.name || 'Event'}
-DESCRIPTION:${data.description || ''}
-LOCATION:${REGIONS[data.region]?.name || 'TBD'}
-STATUS:CONFIRMED
-UID:${Date.now()}-event@seedai.org
-END:VEVENT
-`;
+  icsContent += `BEGIN:VEVENT\nDTSTART:${formatICSDate(eventDate)}\nDTEND:${formatICSDate(eventEnd)}\nSUMMARY:${data.name || 'Event'}\nDESCRIPTION:${data.description || ''}\nLOCATION:${REGIONS[data.region]?.name || 'TBD'}\nSTATUS:CONFIRMED\nUID:${Date.now()}-event@seedai.org\nEND:VEVENT\n`;
 
-  // Add milestone reminders
   timeline.forEach((milestone, index) => {
     if (milestone.weeks < 0) {
       const reminderDate = new Date(milestone.date);
@@ -680,15 +566,7 @@ END:VEVENT
       const reminderEnd = new Date(reminderDate);
       reminderEnd.setHours(10, 0, 0, 0);
       
-      icsContent += `BEGIN:VEVENT
-DTSTART:${formatICSDate(reminderDate)}
-DTEND:${formatICSDate(reminderEnd)}
-SUMMARY:[${data.name || 'Event'}] ${milestone.label}: ${milestone.task}
-DESCRIPTION:Planning milestone for ${data.name || 'your event'}
-STATUS:TENTATIVE
-UID:${Date.now()}-milestone-${index}@seedai.org
-END:VEVENT
-`;
+      icsContent += `BEGIN:VEVENT\nDTSTART:${formatICSDate(reminderDate)}\nDTEND:${formatICSDate(reminderEnd)}\nSUMMARY:[${data.name || 'Event'}] ${milestone.label}: ${milestone.task}\nDESCRIPTION:Planning milestone for ${data.name || 'your event'}\nSTATUS:TENTATIVE\nUID:${Date.now()}-milestone-${index}@seedai.org\nEND:VEVENT\n`;
     }
   });
 
@@ -766,7 +644,7 @@ const generateRunOfShow = (data, budget) => {
 02:30 PM  Break
 02:45 PM  ${(data.program || []).includes('Breakout Sessions') ? 'Breakout Sessions' : 'Continued Programming'}
 04:00 PM  Closing remarks
-04:30 PM  ${(data.fnb || []).includes('Cocktail Reception') ? 'Networking Reception' : 'Event Concludes'}
+04:30 PM  ${(data.fnb || []).some(f => f.includes('Reception') || f.includes('Happy Hour')) ? 'Networking Reception' : 'Event Concludes'}
 06:00 PM  Venue breakdown`;
   } else {
     schedule = `
@@ -1185,10 +1063,6 @@ const DOCUMENTS = {
   contacts: { name: 'Day-Of Contacts', icon: '📞', generate: generateContacts }
 };
 
-// ============================================================================
-// AI PROMPT GENERATOR (for Copy for AI)
-// ============================================================================
-
 function generateAIPrompt(data, budget) {
   const size = SIZE_CONFIG[data.size] || SIZE_CONFIG.medium;
   
@@ -1247,90 +1121,160 @@ Please help me with:
 }
 
 // ============================================================================
-// PHASE DEFINITIONS
+// REUSABLE UI COMPONENTS (defined outside main component to prevent re-creation)
 // ============================================================================
 
-const PHASES = [
-  {
-    id: 'vision',
-    name: 'Vision',
-    title: 'Define Your Vision',
-    description: 'Start with the big picture — what are you trying to achieve?',
-    icon: '💡'
-  },
-  {
-    id: 'audience',
-    name: 'Audience',
-    title: 'Know Your Audience',
-    description: 'Who are you bringing together and why does it matter to them?',
-    icon: '👥'
-  },
-  {
-    id: 'logistics',
-    name: 'Logistics',
-    title: 'Set the Stage',
-    description: 'Where and when will this happen?',
-    icon: '📍'
-  },
-  {
-    id: 'program',
-    name: 'Program',
-    title: 'Design the Experience',
-    description: 'What will attendees do and experience?',
-    icon: '📝'
-  },
-  {
-    id: 'services',
-    name: 'Services',
-    title: 'Plan the Details',
-    description: 'Food, AV, materials — the practical elements that make it work.',
-    icon: '🔧'
-  },
-  {
-    id: 'review',
-    name: 'Review',
-    title: 'Review & Generate',
-    description: 'See your complete plan and generate documents.',
-    icon: '✨'
-  }
-];
+const Prompt = ({ text }) => (
+  <p className="text-zinc-400 text-sm mb-3 italic">{text}</p>
+);
 
-// ============================================================================
-// GUIDING PROMPTS
-// ============================================================================
+const FormInput = ({ label, value, onChange, type = 'text', options, required, placeholder, prompt }) => (
+  <div className="mb-4">
+    <label className="block text-sm font-medium text-zinc-300 mb-1">
+      {label} {required && <span className="text-red-400">*</span>}
+    </label>
+    {prompt && <Prompt text={prompt} />}
+    {type === 'select' ? (
+      <select
+        value={value}
+        onChange={(e) => onChange(e.target.value)}
+        className="w-full bg-zinc-900 border border-zinc-700 rounded-lg px-4 py-3 text-white focus:border-emerald-500 focus:outline-none"
+      >
+        <option value="">{placeholder || 'Select...'}</option>
+        {options.map(opt => (
+          <option key={typeof opt === 'string' ? opt : opt.value} value={typeof opt === 'string' ? opt : opt.value}>
+            {typeof opt === 'string' ? opt : opt.label}
+          </option>
+        ))}
+      </select>
+    ) : type === 'textarea' ? (
+      <textarea
+        value={value}
+        onChange={(e) => onChange(e.target.value)}
+        placeholder={placeholder}
+        rows={4}
+        className="w-full bg-zinc-900 border border-zinc-700 rounded-lg px-4 py-3 text-white focus:border-emerald-500 focus:outline-none resize-none"
+      />
+    ) : (
+      <input
+        type={type}
+        value={value}
+        onChange={(e) => onChange(e.target.value)}
+        placeholder={placeholder}
+        className="w-full bg-zinc-900 border border-zinc-700 rounded-lg px-4 py-3 text-white focus:border-emerald-500 focus:outline-none"
+      />
+    )}
+  </div>
+);
 
-const PROMPTS = {
-  name: "What's the working title for your event? This can evolve as planning progresses.",
-  type: "What type of event best describes what you're planning?",
-  description: "In 2-3 sentences, describe what this event is about. What's the core theme or focus?",
-  objectives: "What does success look like? What should attendees walk away with? What impact do you want to create?",
-  size: "How many people do you realistically expect to attend?",
-  audience: "Who specifically are you trying to reach? Think about job titles, sectors, and why they'd want to attend.",
-  vips: "Are there specific high-profile individuals you're hoping to attract? Members of Congress, executives, thought leaders?",
-  speakers: "Who would be ideal to present, moderate, or lead discussions? Dream big, but also consider realistic options.",
-  date: "When are you planning to hold this event? Consider seasonality and competing events.",
-  duration: "How long do you need to accomplish your goals?",
-  format: "Will attendees gather in person, join virtually, or both?",
-  venue: "What type of space fits your event's tone and needs?",
-  region: "Where will this event take place? This helps us estimate local market costs.",
-  spaces: "Beyond the main room, what other spaces might you need?",
-  program: "What elements will make up your agenda? Think about variety and pacing.",
-  fnb: "Food and beverage sets the tone. What level of hospitality fits your event?",
-  av: "What technology do you need to deliver your content effectively?",
-  production: "What visual and design elements will enhance the experience?",
-  collateral: "What materials will attendees receive or take home?",
-  marketing: "How will you spread the word and drive registration?",
-  postEvent: "What happens after the event to extend its impact?",
-  team: "Who are the key people responsible for making this happen?",
-  funding: "Where is the budget coming from? Sponsors, organizational budget, grants?",
-  notes: "Anything else important to remember as planning progresses?"
-};
+const DateInput = ({ label, value, onChange, required, prompt }) => (
+  <div className="mb-4">
+    <label className="block text-sm font-medium text-zinc-300 mb-1">
+      {label} {required && <span className="text-red-400">*</span>}
+    </label>
+    {prompt && <Prompt text={prompt} />}
+    <div className="flex gap-2">
+      <input
+        type="date"
+        value={value}
+        onChange={(e) => onChange(e.target.value)}
+        className="flex-1 bg-zinc-900 border border-zinc-700 rounded-lg px-4 py-3 text-white focus:border-emerald-500 focus:outline-none [&::-webkit-calendar-picker-indicator]:invert"
+      />
+      <input
+        type="text"
+        value={value ? new Date(value + 'T00:00:00').toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }) : ''}
+        onChange={(e) => {
+          const input = e.target.value;
+          const parsed = new Date(input);
+          if (!isNaN(parsed.getTime())) {
+            const yyyy = parsed.getFullYear();
+            const mm = String(parsed.getMonth() + 1).padStart(2, '0');
+            const dd = String(parsed.getDate()).padStart(2, '0');
+            onChange(`${yyyy}-${mm}-${dd}`);
+          }
+        }}
+        placeholder="or type: Mar 15, 2026"
+        className="flex-1 bg-zinc-900 border border-zinc-700 rounded-lg px-4 py-3 text-white focus:border-emerald-500 focus:outline-none"
+      />
+    </div>
+  </div>
+);
+
+const CheckboxGroup = ({ label, options, selected, onToggle, prompt }) => (
+  <div className="mb-6">
+    <label className="block text-sm font-medium text-zinc-300 mb-1">{label}</label>
+    {prompt && <Prompt text={prompt} />}
+    <div className="flex flex-wrap gap-2">
+      {options.map(opt => (
+        <button
+          key={opt}
+          type="button"
+          onClick={() => onToggle(opt)}
+          className={`px-3 py-2 rounded-lg text-sm transition-all ${
+            selected.includes(opt)
+              ? 'bg-emerald-600 text-white'
+              : 'bg-zinc-800 text-zinc-300 hover:bg-zinc-700'
+          }`}
+        >
+          {opt}
+        </button>
+      ))}
+    </div>
+  </div>
+);
+
+const TeamMemberInput = ({ members, onChange, prompt }) => (
+  <div className="mb-6">
+    <label className="block text-sm font-medium text-zinc-300 mb-1">Planning Team</label>
+    {prompt && <Prompt text={prompt} />}
+    {members.map((member, i) => (
+      <div key={i} className="flex gap-2 mb-2">
+        <input
+          placeholder="Name"
+          value={member.name}
+          onChange={(e) => {
+            const newTeam = [...members];
+            newTeam[i] = { ...newTeam[i], name: e.target.value };
+            onChange(newTeam);
+          }}
+          className="flex-1 bg-zinc-900 border border-zinc-700 rounded-lg px-3 py-2 text-white focus:border-emerald-500 focus:outline-none"
+        />
+        <input
+          placeholder="Role"
+          value={member.role}
+          onChange={(e) => {
+            const newTeam = [...members];
+            newTeam[i] = { ...newTeam[i], role: e.target.value };
+            onChange(newTeam);
+          }}
+          className="flex-1 bg-zinc-900 border border-zinc-700 rounded-lg px-3 py-2 text-white focus:border-emerald-500 focus:outline-none"
+        />
+        {members.length > 1 && (
+          <button
+            type="button"
+            onClick={() => onChange(members.filter((_, j) => j !== i))}
+            className="px-3 py-2 bg-red-900/50 text-red-400 rounded-lg hover:bg-red-900"
+          >
+            ×
+          </button>
+        )}
+      </div>
+    ))}
+    <button
+      type="button"
+      onClick={() => onChange([...members, { name: '', role: '' }])}
+      className="text-emerald-400 text-sm hover:text-emerald-300"
+    >
+      + Add team member
+    </button>
+  </div>
+);
 
 // ============================================================================
 // MAIN COMPONENT
 // ============================================================================
 
-export default function EventPlannerV7() {
+export default function EventPlannerV8() {
   const [currentPhase, setCurrentPhase] = useState(0);
   const [data, setData] = useState({
     name: '', type: '', size: '', duration: '', date: '', format: '', venue: '', region: 'dc-metro',
@@ -1348,7 +1292,7 @@ export default function EventPlannerV7() {
   // Load saved data
   useEffect(() => {
     try {
-      const saved = localStorage.getItem('seedai-planner-v7');
+      const saved = localStorage.getItem('seedai-planner-v8');
       if (saved) {
         const parsed = JSON.parse(saved);
         setData(prev => ({ ...prev, ...parsed }));
@@ -1362,7 +1306,7 @@ export default function EventPlannerV7() {
   useEffect(() => {
     const timer = setTimeout(() => {
       try {
-        localStorage.setItem('seedai-planner-v7', JSON.stringify(data));
+        localStorage.setItem('seedai-planner-v8', JSON.stringify(data));
       } catch (e) {
         console.error('Failed to save:', e);
       }
@@ -1370,15 +1314,18 @@ export default function EventPlannerV7() {
     return () => clearTimeout(timer);
   }, [data]);
 
-  const update = (field, value) => setData(prev => ({ ...prev, [field]: value }));
-  const toggle = (field, value) => {
+  const update = useCallback((field, value) => {
+    setData(prev => ({ ...prev, [field]: value }));
+  }, []);
+
+  const toggle = useCallback((field, value) => {
     setData(prev => ({
       ...prev,
       [field]: prev[field].includes(value)
         ? prev[field].filter(v => v !== value)
         : [...prev[field], value]
     }));
-  };
+  }, []);
 
   const budget = calculateBudget(data, vendorData);
   const timeline = generateTimeline(data);
@@ -1386,7 +1333,6 @@ export default function EventPlannerV7() {
   const suggestions = generateSuggestions(data, budget);
   const calendarWarnings = checkCongressionalCalendar(data.date);
 
-  // Phase completion checks
   const phaseComplete = {
     vision: !!(data.name && data.type && data.description && data.objectives),
     audience: !!(data.size && data.audience.length > 0),
@@ -1398,7 +1344,6 @@ export default function EventPlannerV7() {
 
   const completedPhases = Object.values(phaseComplete).filter(Boolean).length;
 
-  // Handlers
   const handleCopy = useCallback(async (text) => {
     try {
       await navigator.clipboard.writeText(text);
@@ -1420,11 +1365,7 @@ export default function EventPlannerV7() {
   }, []);
 
   const handleExportJSON = useCallback(() => {
-    const exportData = {
-      version: 'v7',
-      exportedAt: new Date().toISOString(),
-      data
-    };
+    const exportData = { version: 'v8', exportedAt: new Date().toISOString(), data };
     const blob = new Blob([JSON.stringify(exportData, null, 2)], { type: 'application/json' });
     const url = URL.createObjectURL(blob);
     const a = document.createElement('a');
@@ -1475,11 +1416,11 @@ export default function EventPlannerV7() {
       setData(prev => ({
         ...prev,
         ...template.data,
-        name: '', // Keep name blank for user to fill
-        description: '', // Keep description blank
-        objectives: '', // Keep objectives blank
-        date: '', // Keep date blank
-        region: prev.region || 'dc-metro', // Keep their region or default
+        name: '',
+        description: '',
+        objectives: '',
+        date: '',
+        region: prev.region || 'dc-metro',
         vips: '',
         speakers: '',
         team: [{ name: '', role: '' }],
@@ -1487,152 +1428,14 @@ export default function EventPlannerV7() {
         funding: ''
       }));
       setShowTemplates(false);
-      setCurrentPhase(0); // Go to first phase
+      setCurrentPhase(0);
     }
   }, []);
 
-  // Components
-  const Prompt = ({ text }) => (
-    <p className="text-zinc-400 text-sm mb-3 italic">{text}</p>
-  );
-
-  const Input = ({ label, field, type = 'text', options, required, placeholder }) => (
-    <div className="mb-4">
-      <label className="block text-sm font-medium text-zinc-300 mb-1">
-        {label} {required && <span className="text-red-400">*</span>}
-      </label>
-      {PROMPTS[field] && <Prompt text={PROMPTS[field]} />}
-      {type === 'select' ? (
-        <select
-          value={data[field]}
-          onChange={(e) => update(field, e.target.value)}
-          className="w-full bg-zinc-900 border border-zinc-700 rounded-lg px-4 py-3 text-white focus:border-emerald-500 focus:outline-none"
-        >
-          <option value="">{placeholder || 'Select...'}</option>
-          {options.map(opt => (
-            <option key={typeof opt === 'string' ? opt : opt.value} value={typeof opt === 'string' ? opt : opt.value}>
-              {typeof opt === 'string' ? opt : opt.label}
-            </option>
-          ))}
-        </select>
-      ) : type === 'textarea' ? (
-        <textarea
-          value={data[field]}
-          onChange={(e) => update(field, e.target.value)}
-          placeholder={placeholder}
-          rows={4}
-          className="w-full bg-zinc-900 border border-zinc-700 rounded-lg px-4 py-3 text-white focus:border-emerald-500 focus:outline-none resize-none"
-        />
-      ) : type === 'date' ? (
-        <div className="flex gap-2">
-          <input
-            type="date"
-            value={data[field]}
-            onChange={(e) => update(field, e.target.value)}
-            className="flex-1 bg-zinc-900 border border-zinc-700 rounded-lg px-4 py-3 text-white focus:border-emerald-500 focus:outline-none [&::-webkit-calendar-picker-indicator]:invert"
-          />
-          <input
-            type="text"
-            value={data[field] ? new Date(data[field] + 'T00:00:00').toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }) : ''}
-            onChange={(e) => {
-              // Try to parse common date formats
-              const input = e.target.value;
-              const parsed = new Date(input);
-              if (!isNaN(parsed.getTime())) {
-                const yyyy = parsed.getFullYear();
-                const mm = String(parsed.getMonth() + 1).padStart(2, '0');
-                const dd = String(parsed.getDate()).padStart(2, '0');
-                update(field, `${yyyy}-${mm}-${dd}`);
-              }
-            }}
-            placeholder="or type: Mar 15, 2026"
-            className="flex-1 bg-zinc-900 border border-zinc-700 rounded-lg px-4 py-3 text-white focus:border-emerald-500 focus:outline-none"
-          />
-        </div>
-      ) : (
-        <input
-          type={type}
-          value={data[field]}
-          onChange={(e) => update(field, e.target.value)}
-          placeholder={placeholder}
-          className="w-full bg-zinc-900 border border-zinc-700 rounded-lg px-4 py-3 text-white focus:border-emerald-500 focus:outline-none"
-        />
-      )}
-    </div>
-  );
-
-  const CheckboxGroup = ({ label, field, options }) => (
-    <div className="mb-6">
-      <label className="block text-sm font-medium text-zinc-300 mb-1">{label}</label>
-      {PROMPTS[field] && <Prompt text={PROMPTS[field]} />}
-      <div className="flex flex-wrap gap-2">
-        {options.map(opt => (
-          <button
-            key={opt}
-            onClick={() => toggle(field, opt)}
-            className={`px-3 py-2 rounded-lg text-sm transition-all ${
-              data[field].includes(opt)
-                ? 'bg-emerald-600 text-white'
-                : 'bg-zinc-800 text-zinc-300 hover:bg-zinc-700'
-            }`}
-          >
-            {opt}
-          </button>
-        ))}
-      </div>
-    </div>
-  );
-
-  const TeamMembers = () => (
-    <div className="mb-6">
-      <label className="block text-sm font-medium text-zinc-300 mb-1">Planning Team</label>
-      {PROMPTS.team && <Prompt text={PROMPTS.team} />}
-      {data.team.map((member, i) => (
-        <div key={i} className="flex gap-2 mb-2">
-          <input
-            placeholder="Name"
-            value={member.name}
-            onChange={(e) => {
-              const newTeam = [...data.team];
-              newTeam[i].name = e.target.value;
-              update('team', newTeam);
-            }}
-            className="flex-1 bg-zinc-900 border border-zinc-700 rounded-lg px-3 py-2 text-white focus:border-emerald-500 focus:outline-none"
-          />
-          <input
-            placeholder="Role"
-            value={member.role}
-            onChange={(e) => {
-              const newTeam = [...data.team];
-              newTeam[i].role = e.target.value;
-              update('team', newTeam);
-            }}
-            className="flex-1 bg-zinc-900 border border-zinc-700 rounded-lg px-3 py-2 text-white focus:border-emerald-500 focus:outline-none"
-          />
-          {data.team.length > 1 && (
-            <button
-              onClick={() => update('team', data.team.filter((_, j) => j !== i))}
-              className="px-3 py-2 bg-red-900/50 text-red-400 rounded-lg hover:bg-red-900"
-            >
-              ×
-            </button>
-          )}
-        </div>
-      ))}
-      <button
-        onClick={() => update('team', [...data.team, { name: '', role: '' }])}
-        className="text-emerald-400 text-sm hover:text-emerald-300"
-      >
-        + Add team member
-      </button>
-    </div>
-  );
-
-  // Suggestions Component
-  const SuggestionsPanel = () => {
+  // Suggestions Panel
+  const SuggestionsPanel = ({ phase }) => {
     const currentPhaseSuggestions = suggestions.filter(s => {
-      const phase = PHASES[currentPhase].id;
-      if (phase === 'services') return ['av', 'fnb', 'production', 'collateral'].includes(s.category);
+      if (phase === 'services') return ['av', 'fnb', 'production', 'collateral', 'insurance'].includes(s.category);
       if (phase === 'logistics') return ['logistics', 'compliance'].includes(s.category);
       if (phase === 'program') return ['program', 'postEvent'].includes(s.category);
       return false;
@@ -1654,7 +1457,7 @@ export default function EventPlannerV7() {
     );
   };
 
-  // Calendar Warnings Component
+  // Calendar Warnings
   const CalendarWarnings = () => {
     if (calendarWarnings.length === 0) return null;
 
@@ -1665,10 +1468,7 @@ export default function EventPlannerV7() {
         </h4>
         <ul className="space-y-2">
           {calendarWarnings.map((w, i) => (
-            <li key={i} className={`text-sm ${
-              w.severity === 'high' ? 'text-red-300' : 
-              w.severity === 'medium' ? 'text-yellow-300' : 'text-blue-200/80'
-            }`}>
+            <li key={i} className={`text-sm ${w.severity === 'high' ? 'text-red-300' : w.severity === 'medium' ? 'text-yellow-300' : 'text-blue-200/80'}`}>
               {w.message}
             </li>
           ))}
@@ -1695,16 +1495,10 @@ export default function EventPlannerV7() {
             <pre className="text-sm text-zinc-300 whitespace-pre-wrap font-mono bg-zinc-950 p-4 rounded-lg">{content}</pre>
           </div>
           <div className="flex gap-2 p-4 border-t border-zinc-700">
-            <button
-              onClick={() => handleCopy(content)}
-              className="flex-1 bg-emerald-600 text-white py-2 rounded-lg hover:bg-emerald-500"
-            >
+            <button onClick={() => handleCopy(content)} className="flex-1 bg-emerald-600 text-white py-2 rounded-lg hover:bg-emerald-500">
               {copySuccess ? '✓ Copied!' : 'Copy to Clipboard'}
             </button>
-            <button
-              onClick={() => handleDownload(content, filename)}
-              className="flex-1 bg-zinc-700 text-white py-2 rounded-lg hover:bg-zinc-600"
-            >
+            <button onClick={() => handleDownload(content, filename)} className="flex-1 bg-zinc-700 text-white py-2 rounded-lg hover:bg-zinc-600">
               Download .txt
             </button>
           </div>
@@ -1721,47 +1515,25 @@ export default function EventPlannerV7() {
       <div className="fixed inset-0 bg-black/80 flex items-center justify-center z-50 p-4" onClick={() => setShowShareMenu(false)}>
         <div className="bg-zinc-900 rounded-xl max-w-md w-full p-6" onClick={e => e.stopPropagation()}>
           <h3 className="text-xl font-semibold text-white mb-6">Share & Export</h3>
-          
           <div className="space-y-4">
-            <button
-              onClick={() => { handleCopyForAI(); setShowShareMenu(false); }}
-              className="w-full bg-purple-600 hover:bg-purple-500 text-white p-4 rounded-lg text-left"
-            >
+            <button onClick={() => { handleCopyForAI(); setShowShareMenu(false); }} className="w-full bg-purple-600 hover:bg-purple-500 text-white p-4 rounded-lg text-left">
               <div className="font-medium">🤖 Copy for AI Refinement</div>
               <div className="text-sm text-purple-200 mt-1">Pre-formatted prompt to paste into Claude for feedback</div>
             </button>
-            
-            <button
-              onClick={() => { handleExportJSON(); setShowShareMenu(false); }}
-              className="w-full bg-zinc-700 hover:bg-zinc-600 text-white p-4 rounded-lg text-left"
-            >
+            <button onClick={() => { handleExportJSON(); setShowShareMenu(false); }} className="w-full bg-zinc-700 hover:bg-zinc-600 text-white p-4 rounded-lg text-left">
               <div className="font-medium">📦 Export Plan (JSON)</div>
               <div className="text-sm text-zinc-400 mt-1">Share with team members or backup your plan</div>
             </button>
-            
-            <button
-              onClick={() => fileInputRef.current?.click()}
-              className="w-full bg-zinc-700 hover:bg-zinc-600 text-white p-4 rounded-lg text-left"
-            >
+            <button onClick={() => fileInputRef.current?.click()} className="w-full bg-zinc-700 hover:bg-zinc-600 text-white p-4 rounded-lg text-left">
               <div className="font-medium">📥 Import Plan (JSON)</div>
               <div className="text-sm text-zinc-400 mt-1">Load a shared plan from a teammate</div>
             </button>
-            
-            <button
-              onClick={() => { handleExportCalendar(); setShowShareMenu(false); }}
-              className="w-full bg-zinc-700 hover:bg-zinc-600 text-white p-4 rounded-lg text-left"
-            >
+            <button onClick={() => { handleExportCalendar(); setShowShareMenu(false); }} className="w-full bg-zinc-700 hover:bg-zinc-600 text-white p-4 rounded-lg text-left">
               <div className="font-medium">📅 Export to Calendar (.ics)</div>
               <div className="text-sm text-zinc-400 mt-1">Add event + milestones to Outlook/Google Calendar</div>
             </button>
           </div>
-          
-          <button
-            onClick={() => setShowShareMenu(false)}
-            className="w-full mt-6 text-zinc-400 hover:text-white"
-          >
-            Cancel
-          </button>
+          <button onClick={() => setShowShareMenu(false)} className="w-full mt-6 text-zinc-400 hover:text-white">Cancel</button>
         </div>
       </div>
     );
@@ -1778,7 +1550,6 @@ export default function EventPlannerV7() {
             <h3 className="text-xl font-semibold text-white">Start from a Template</h3>
             <p className="text-zinc-400 mt-1">Choose a template to pre-fill common settings. You'll still customize the details.</p>
           </div>
-          
           <div className="flex-1 overflow-auto p-6">
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
               {Object.entries(EVENT_TEMPLATES).map(([key, template]) => (
@@ -1795,15 +1566,9 @@ export default function EventPlannerV7() {
               ))}
             </div>
           </div>
-          
           <div className="p-4 border-t border-zinc-700 flex justify-between items-center">
             <span className="text-zinc-500 text-sm">Templates pre-fill logistics — you'll still add your unique details</span>
-            <button
-              onClick={() => setShowTemplates(false)}
-              className="px-4 py-2 text-zinc-400 hover:text-white"
-            >
-              Cancel
-            </button>
+            <button onClick={() => setShowTemplates(false)} className="px-4 py-2 text-zinc-400 hover:text-white">Cancel</button>
           </div>
         </div>
       </div>
@@ -1818,71 +1583,65 @@ export default function EventPlannerV7() {
       case 'vision':
         return (
           <div className="space-y-6">
-            <Input label="Event Name" field="name" required placeholder="e.g., 2026 Climate Policy Summit" />
-            <Input label="Event Type" field="type" type="select" options={EVENT_TYPES} required />
-            <Input label="Description" field="description" type="textarea" required placeholder="Describe the event's purpose and focus..." />
-            <Input label="Objectives" field="objectives" type="textarea" required placeholder="What outcomes are you working toward?" />
+            <FormInput label="Event Name" value={data.name} onChange={(v) => update('name', v)} required placeholder="e.g., 2026 Climate Policy Summit" prompt={PROMPTS.name} />
+            <FormInput label="Event Type" value={data.type} onChange={(v) => update('type', v)} type="select" options={EVENT_TYPES} required prompt={PROMPTS.type} />
+            <FormInput label="Description" value={data.description} onChange={(v) => update('description', v)} type="textarea" required placeholder="Describe the event's purpose and focus..." prompt={PROMPTS.description} />
+            <FormInput label="Objectives" value={data.objectives} onChange={(v) => update('objectives', v)} type="textarea" required placeholder="What outcomes are you working toward?" prompt={PROMPTS.objectives} />
           </div>
         );
 
       case 'audience':
         return (
           <div className="space-y-6">
-            <Input label="Expected Size" field="size" type="select" required options={Object.entries(SIZE_CONFIG).map(([k, v]) => ({ value: k, label: v.label }))} />
-            <CheckboxGroup label="Target Audience" field="audience" options={OPTIONS.audience} />
-            <SuggestionsPanel />
-            <Input label="VIP Attendees" field="vips" type="textarea" placeholder="List specific high-profile individuals you're targeting..." />
-            <Input label="Speakers / Presenters" field="speakers" type="textarea" placeholder="Who do you want to present or lead sessions?" />
+            <FormInput label="Expected Size" value={data.size} onChange={(v) => update('size', v)} type="select" required options={Object.entries(SIZE_CONFIG).map(([k, v]) => ({ value: k, label: v.label }))} prompt={PROMPTS.size} />
+            <CheckboxGroup label="Target Audience" options={OPTIONS.audience} selected={data.audience} onToggle={(v) => toggle('audience', v)} prompt={PROMPTS.audience} />
+            <SuggestionsPanel phase="audience" />
+            <FormInput label="VIP Attendees" value={data.vips} onChange={(v) => update('vips', v)} type="textarea" placeholder="List specific high-profile individuals you're targeting..." prompt={PROMPTS.vips} />
+            <FormInput label="Speakers / Presenters" value={data.speakers} onChange={(v) => update('speakers', v)} type="textarea" placeholder="Who do you want to present or lead sessions?" prompt={PROMPTS.speakers} />
           </div>
         );
 
       case 'logistics':
         return (
           <div className="space-y-6">
-            <Input label="Event Date" field="date" type="date" required />
+            <DateInput label="Event Date" value={data.date} onChange={(v) => update('date', v)} required prompt={PROMPTS.date} />
             {data.date && <CalendarWarnings />}
-            <Input label="Duration" field="duration" type="select" required options={DURATION_OPTIONS} />
-            <Input label="Format" field="format" type="select" required options={OPTIONS.format} />
-            <Input label="Venue Type" field="venue" type="select" required options={OPTIONS.venue} />
-            <Input 
-              label="Location" 
-              field="region" 
-              type="select" 
-              required 
-              options={Object.entries(REGIONS).map(([k, v]) => ({ value: k, label: v.name }))} 
-            />
-            <CheckboxGroup label="Spaces Needed" field="spaces" options={OPTIONS.spaces} />
-            <SuggestionsPanel />
+            <FormInput label="Duration" value={data.duration} onChange={(v) => update('duration', v)} type="select" required options={DURATION_OPTIONS} prompt={PROMPTS.duration} />
+            <FormInput label="Format" value={data.format} onChange={(v) => update('format', v)} type="select" required options={OPTIONS.format} prompt={PROMPTS.format} />
+            <FormInput label="Venue Type" value={data.venue} onChange={(v) => update('venue', v)} type="select" required options={OPTIONS.venue} prompt={PROMPTS.venue} />
+            <FormInput label="Location" value={data.region} onChange={(v) => update('region', v)} type="select" required options={Object.entries(REGIONS).map(([k, v]) => ({ value: k, label: v.name }))} prompt={PROMPTS.region} />
+            <CheckboxGroup label="Spaces Needed" options={OPTIONS.spaces} selected={data.spaces} onToggle={(v) => toggle('spaces', v)} prompt={PROMPTS.spaces} />
+            <SuggestionsPanel phase="logistics" />
           </div>
         );
 
       case 'program':
         return (
           <div className="space-y-6">
-            <CheckboxGroup label="Program Elements" field="program" options={OPTIONS.program} />
-            <CheckboxGroup label="Post-Event Activities" field="postEvent" options={OPTIONS.postEvent} />
-            <SuggestionsPanel />
+            <CheckboxGroup label="Program Elements" options={OPTIONS.program} selected={data.program} onToggle={(v) => toggle('program', v)} prompt={PROMPTS.program} />
+            <CheckboxGroup label="Post-Event Activities" options={OPTIONS.postEvent} selected={data.postEvent} onToggle={(v) => toggle('postEvent', v)} prompt={PROMPTS.postEvent} />
+            <SuggestionsPanel phase="program" />
           </div>
         );
 
       case 'services':
         return (
           <div className="space-y-6">
-            <CheckboxGroup label="Food & Beverage" field="fnb" options={OPTIONS.fnb} />
-            <CheckboxGroup label="Audio/Visual" field="av" options={OPTIONS.av} />
-            <CheckboxGroup label="Production & Design" field="production" options={OPTIONS.production} />
-            <CheckboxGroup label="Collateral & Materials" field="collateral" options={OPTIONS.collateral} />
-            <CheckboxGroup label="Marketing & Promotion" field="marketing" options={OPTIONS.marketing} />
-            <SuggestionsPanel />
+            <CheckboxGroup label="Food & Beverage" options={OPTIONS.fnb} selected={data.fnb} onToggle={(v) => toggle('fnb', v)} prompt={PROMPTS.fnb} />
+            <CheckboxGroup label="Audio/Visual" options={OPTIONS.av} selected={data.av} onToggle={(v) => toggle('av', v)} prompt={PROMPTS.av} />
+            <CheckboxGroup label="Production & Design" options={OPTIONS.production} selected={data.production} onToggle={(v) => toggle('production', v)} prompt={PROMPTS.production} />
+            <CheckboxGroup label="Collateral & Materials" options={OPTIONS.collateral} selected={data.collateral} onToggle={(v) => toggle('collateral', v)} prompt={PROMPTS.collateral} />
+            <CheckboxGroup label="Marketing & Promotion" options={OPTIONS.marketing} selected={data.marketing} onToggle={(v) => toggle('marketing', v)} prompt={PROMPTS.marketing} />
+            <SuggestionsPanel phase="services" />
           </div>
         );
 
       case 'review':
         return (
           <div className="space-y-6">
-            <TeamMembers />
-            <Input label="Funding Sources" field="funding" type="textarea" placeholder="Where is the budget coming from?" />
-            <Input label="Additional Notes" field="notes" type="textarea" placeholder="Anything else to remember?" />
+            <TeamMemberInput members={data.team} onChange={(v) => update('team', v)} prompt={PROMPTS.team} />
+            <FormInput label="Funding Sources" value={data.funding} onChange={(v) => update('funding', v)} type="textarea" placeholder="Where is the budget coming from?" prompt={PROMPTS.funding} />
+            <FormInput label="Additional Notes" value={data.notes} onChange={(v) => update('notes', v)} type="textarea" placeholder="Anything else to remember?" prompt={PROMPTS.notes} />
 
             {/* All Suggestions */}
             {suggestions.length > 0 && (
@@ -1934,10 +1693,7 @@ export default function EventPlannerV7() {
             <div className="bg-zinc-800/50 rounded-xl p-6">
               <div className="flex justify-between items-center mb-4">
                 <h3 className="text-lg font-semibold text-white">📅 Planning Timeline</h3>
-                <button
-                  onClick={handleExportCalendar}
-                  className="text-sm text-emerald-400 hover:text-emerald-300"
-                >
+                <button onClick={handleExportCalendar} className="text-sm text-emerald-400 hover:text-emerald-300">
                   Export to Calendar →
                 </button>
               </div>
@@ -1978,14 +1734,7 @@ export default function EventPlannerV7() {
 
   return (
     <div className="min-h-screen bg-black text-white">
-      {/* Hidden file input for import */}
-      <input
-        type="file"
-        ref={fileInputRef}
-        onChange={handleImportJSON}
-        accept=".json"
-        className="hidden"
-      />
+      <input type="file" ref={fileInputRef} onChange={handleImportJSON} accept=".json" className="hidden" />
 
       {/* Header */}
       <div className="bg-zinc-900 border-b border-zinc-800">
@@ -1996,22 +1745,16 @@ export default function EventPlannerV7() {
               <p className="text-zinc-400 text-sm">Professional event planning for policy professionals</p>
             </div>
             <div className="flex items-center gap-3">
-              <button
-                onClick={() => setShowTemplates(true)}
-                className="px-4 py-2 bg-emerald-600 hover:bg-emerald-500 rounded-lg text-sm font-medium"
-              >
+              <button onClick={() => setShowTemplates(true)} className="px-4 py-2 bg-emerald-600 hover:bg-emerald-500 rounded-lg text-sm font-medium">
                 Templates
               </button>
-              <button
-                onClick={() => setShowShareMenu(true)}
-                className="px-4 py-2 bg-zinc-800 hover:bg-zinc-700 rounded-lg text-sm font-medium"
-              >
+              <button onClick={() => setShowShareMenu(true)} className="px-4 py-2 bg-zinc-800 hover:bg-zinc-700 rounded-lg text-sm font-medium">
                 Share / Export
               </button>
               <button
                 onClick={() => {
                   if (confirm('Clear all data and start over?')) {
-                    localStorage.removeItem('seedai-planner-v7');
+                    localStorage.removeItem('seedai-planner-v8');
                     setData({
                       name: '', type: '', size: '', duration: '', date: '', format: '', venue: '', region: 'dc-metro',
                       description: '', objectives: '', audience: [], vips: '', speakers: '',
@@ -2059,10 +1802,7 @@ export default function EventPlannerV7() {
       <div className="bg-zinc-900/30">
         <div className="max-w-4xl mx-auto px-6">
           <div className="h-1 bg-zinc-800 rounded-full overflow-hidden">
-            <div
-              className="h-full bg-emerald-500 transition-all duration-500"
-              style={{ width: `${(completedPhases / PHASES.length) * 100}%` }}
-            />
+            <div className="h-full bg-emerald-500 transition-all duration-500" style={{ width: `${(completedPhases / PHASES.length) * 100}%` }} />
           </div>
         </div>
       </div>
@@ -2092,19 +1832,14 @@ export default function EventPlannerV7() {
             onClick={() => setCurrentPhase(Math.max(0, currentPhase - 1))}
             disabled={currentPhase === 0}
             className={`px-6 py-3 rounded-lg font-medium transition-all ${
-              currentPhase === 0
-                ? 'bg-zinc-800 text-zinc-600 cursor-not-allowed'
-                : 'bg-zinc-700 text-white hover:bg-zinc-600'
+              currentPhase === 0 ? 'bg-zinc-800 text-zinc-600 cursor-not-allowed' : 'bg-zinc-700 text-white hover:bg-zinc-600'
             }`}
           >
             ← Previous
           </button>
 
           {currentPhase < PHASES.length - 1 ? (
-            <button
-              onClick={() => setCurrentPhase(currentPhase + 1)}
-              className="px-6 py-3 bg-emerald-600 text-white rounded-lg font-medium hover:bg-emerald-500 transition-all"
-            >
+            <button onClick={() => setCurrentPhase(currentPhase + 1)} className="px-6 py-3 bg-emerald-600 text-white rounded-lg font-medium hover:bg-emerald-500 transition-all">
               Continue →
             </button>
           ) : (
