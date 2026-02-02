@@ -58,7 +58,7 @@ const DURATION_OPTIONS = [
 const OPTIONS = {
   format: ['In-Person', 'Virtual', 'Hybrid'],
   venue: ['Hotel Ballroom', 'Conference Center', 'Historic Venue', 'Government Building', 'University/Academic', 'Museum/Cultural', 'Rooftop/Outdoor', 'Restaurant/Private Dining', 'Corporate Office', 'Other'],
-  audience: ['Congressional Staff', 'Federal Agency Officials', 'State/Local Officials', 'Industry Executives', 'Nonprofit Leaders', 'Academics/Researchers', 'Journalists/Media', 'General Public', 'International Delegates', 'Small Business Owners', 'Students/Young Professionals'],
+  audience: ['Congressional Staff', 'Federal Agency Officials', 'State/Local Officials', 'Industry Executives', 'Nonprofit Leaders', 'Small Business Owners', 'Academics/Researchers', 'Journalists/Media', 'General Public', 'International Delegates', 'Students/Young Professionals'],
   program: ['Keynote Address', 'Panel Discussion', 'Fireside Chat', 'Breakout Sessions', 'Workshops', 'Networking Breaks', 'Awards/Recognition', 'Press Conference', 'VIP Reception', 'Group Photo'],
   spaces: ['Main Plenary Hall', 'Breakout Rooms', 'VIP Green Room', 'Press/Media Room', 'Registration Area', 'Networking Lounge', 'Outdoor Terrace', 'Executive Boardroom'],
   fnb: ['Continental Breakfast', 'Hot Breakfast', 'Morning Coffee/Tea', 'Working Lunch (Boxed)', 'Plated Lunch', 'Afternoon Break', 'Cocktail Reception', 'Happy Hour / Reception', 'Plated Dinner', 'Dessert Reception'],
@@ -1290,6 +1290,9 @@ export default function EventPlannerV8() {
   const [aiSuggestions, setAiSuggestions] = useState([]);
   const [isLoadingAI, setIsLoadingAI] = useState(false);
   const [aiError, setAiError] = useState(null);
+  const [marketData, setMarketData] = useState(null);
+  const [isLoadingMarket, setIsLoadingMarket] = useState(false);
+  const [marketError, setMarketError] = useState(null);
   const fileInputRef = useRef(null);
 
   // Fetch AI Suggestions from API
@@ -1324,6 +1327,44 @@ export default function EventPlannerV8() {
       setAiError(error.message);
     } finally {
       setIsLoadingAI(false);
+    }
+  };
+
+  // Fetch Market Data from API
+  const fetchMarketData = async () => {
+    setIsLoadingMarket(true);
+    setMarketError(null);
+    try {
+      const regionName = REGIONS[data.region]?.name || data.region;
+      const sizeName = SIZE_CONFIG[data.size]?.label || data.size;
+      const durationName = DURATION_OPTIONS.find(d => d.value === data.duration)?.label || data.duration;
+      
+      const response = await fetch('/api/market-data', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          region: regionName,
+          venueType: data.venue,
+          size: sizeName,
+          eventType: data.type,
+          duration: durationName,
+          fnb: data.fnb,
+          av: data.av
+        })
+      });
+      
+      if (!response.ok) {
+        const errorData = await response.json().catch(() => ({}));
+        throw new Error(errorData.error || 'Failed to fetch market data');
+      }
+      
+      const result = await response.json();
+      setMarketData(result);
+    } catch (error) {
+      console.error('Error fetching market data:', error);
+      setMarketError(error.message);
+    } finally {
+      setIsLoadingMarket(false);
     }
   };
 
@@ -1746,7 +1787,19 @@ export default function EventPlannerV8() {
 
             {/* Budget Summary */}
             <div className="bg-zinc-800/50 rounded-xl p-6">
-              <h3 className="text-lg font-semibold text-white mb-4">💰 Budget Estimate</h3>
+              <div className="flex justify-between items-center mb-4">
+                <h3 className="text-lg font-semibold text-white">💰 Budget Estimate</h3>
+                {data.region && data.size && (
+                  <button
+                    onClick={fetchMarketData}
+                    disabled={isLoadingMarket}
+                    className="text-sm bg-emerald-600 hover:bg-emerald-500 disabled:bg-emerald-800 px-3 py-1.5 rounded-lg transition-all"
+                  >
+                    {isLoadingMarket ? 'Loading...' : '📊 Get Live Market Rates'}
+                  </button>
+                )}
+              </div>
+              
               <div className="text-3xl font-bold text-emerald-400 mb-4">
                 {fmt(budget.total.min)} – {fmt(budget.total.max)}
               </div>
@@ -1761,6 +1814,66 @@ export default function EventPlannerV8() {
               <div className="mt-4 pt-4 border-t border-zinc-700 text-sm text-zinc-400">
                 + 10% staffing + 15% contingency included
               </div>
+
+              {marketError && (
+                <div className="mt-4 p-3 bg-red-900/30 border border-red-700/50 rounded-lg text-red-300 text-sm">
+                  <strong>Error:</strong> {marketError}
+                </div>
+              )}
+
+              {marketData && (
+                <div className="mt-6 pt-6 border-t border-zinc-700">
+                  <h4 className="text-md font-semibold text-emerald-400 mb-4 flex items-center gap-2">
+                    📊 Live Market Data for {REGIONS[data.region]?.name || data.region}
+                    <span className={`text-xs px-2 py-0.5 rounded ${
+                      marketData.confidence === 'high' ? 'bg-green-900 text-green-300' :
+                      marketData.confidence === 'medium' ? 'bg-yellow-900 text-yellow-300' :
+                      'bg-zinc-700 text-zinc-300'
+                    }`}>
+                      {marketData.confidence} confidence
+                    </span>
+                  </h4>
+                  
+                  <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-4">
+                    {marketData.venue && (
+                      <div className="bg-zinc-900/50 rounded-lg p-4">
+                        <div className="text-zinc-400 text-xs uppercase tracking-wide mb-1">Venue (Market Rate)</div>
+                        <div className="text-white font-semibold">{fmt(marketData.venue.min)} - {fmt(marketData.venue.max)}</div>
+                        {marketData.venue.notes && (
+                          <div className="text-zinc-500 text-xs mt-2">{marketData.venue.notes}</div>
+                        )}
+                      </div>
+                    )}
+                    
+                    {marketData.fnbPerPerson && (
+                      <div className="bg-zinc-900/50 rounded-lg p-4">
+                        <div className="text-zinc-400 text-xs uppercase tracking-wide mb-1">F&B Per Person</div>
+                        <div className="text-white font-semibold">{fmt(marketData.fnbPerPerson.min)} - {fmt(marketData.fnbPerPerson.max)}</div>
+                        {marketData.fnbPerPerson.notes && (
+                          <div className="text-zinc-500 text-xs mt-2">{marketData.fnbPerPerson.notes}</div>
+                        )}
+                      </div>
+                    )}
+                    
+                    {marketData.avDaily && (
+                      <div className="bg-zinc-900/50 rounded-lg p-4">
+                        <div className="text-zinc-400 text-xs uppercase tracking-wide mb-1">AV Daily Rate</div>
+                        <div className="text-white font-semibold">{fmt(marketData.avDaily.min)} - {fmt(marketData.avDaily.max)}</div>
+                        {marketData.avDaily.notes && (
+                          <div className="text-zinc-500 text-xs mt-2">{marketData.avDaily.notes}</div>
+                        )}
+                      </div>
+                    )}
+                  </div>
+                  
+                  {marketData.marketInsights && (
+                    <div className="bg-emerald-900/20 border border-emerald-700/30 rounded-lg p-4">
+                      <div className="text-emerald-400 text-sm font-medium mb-1">💡 Market Insights</div>
+                      <div className="text-emerald-200/80 text-sm">{marketData.marketInsights}</div>
+                    </div>
+                  )}
+                </div>
+              )}
             </div>
 
             {/* Risks */}
