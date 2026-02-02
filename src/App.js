@@ -1489,6 +1489,340 @@ export default function EventPlannerV8() {
     handleCopy(prompt);
   }, [data, budget, handleCopy]);
 
+  // PDF Export Handler
+  const handleExportPDF = useCallback(async () => {
+    // Dynamically load jsPDF
+    if (!window.jspdf) {
+      const script = document.createElement('script');
+      script.src = 'https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js';
+      document.head.appendChild(script);
+      await new Promise(resolve => script.onload = resolve);
+    }
+
+    const { jsPDF } = window.jspdf;
+    const doc = new jsPDF();
+    const pageWidth = doc.internal.pageSize.getWidth();
+    const margin = 20;
+    const contentWidth = pageWidth - (margin * 2);
+    let y = 20;
+
+    const addText = (text, size = 11, style = 'normal', color = [0, 0, 0]) => {
+      doc.setFontSize(size);
+      doc.setFont('helvetica', style);
+      doc.setTextColor(...color);
+      const lines = doc.splitTextToSize(text, contentWidth);
+      
+      // Check if we need a new page
+      if (y + (lines.length * size * 0.4) > doc.internal.pageSize.getHeight() - 20) {
+        doc.addPage();
+        y = 20;
+      }
+      
+      doc.text(lines, margin, y);
+      y += lines.length * size * 0.4 + 4;
+    };
+
+    const addSection = (title) => {
+      y += 6;
+      if (y > doc.internal.pageSize.getHeight() - 40) {
+        doc.addPage();
+        y = 20;
+      }
+      doc.setFillColor(16, 185, 129); // emerald-500
+      doc.rect(margin, y - 6, contentWidth, 10, 'F');
+      doc.setFontSize(12);
+      doc.setFont('helvetica', 'bold');
+      doc.setTextColor(255, 255, 255);
+      doc.text(title, margin + 4, y);
+      y += 12;
+    };
+
+    const addField = (label, value) => {
+      if (!value || (Array.isArray(value) && value.length === 0)) return;
+      const displayValue = Array.isArray(value) ? value.join(', ') : value;
+      addText(`${label}: ${displayValue}`, 10, 'normal', [60, 60, 60]);
+    };
+
+    // Header
+    doc.setFillColor(24, 24, 27); // zinc-900
+    doc.rect(0, 0, pageWidth, 40, 'F');
+    doc.setFontSize(20);
+    doc.setFont('helvetica', 'bold');
+    doc.setTextColor(16, 185, 129); // emerald
+    doc.text('SeedAI Event Planner', margin, 18);
+    doc.setFontSize(10);
+    doc.setTextColor(161, 161, 170); // zinc-400
+    doc.text(`Generated: ${new Date().toLocaleDateString()}`, margin, 28);
+    y = 50;
+
+    // Event Title
+    doc.setFontSize(18);
+    doc.setFont('helvetica', 'bold');
+    doc.setTextColor(0, 0, 0);
+    doc.text(data.name || 'Untitled Event', margin, y);
+    y += 10;
+
+    // Event Type & Date
+    const size = SIZE_CONFIG[data.size] || {};
+    doc.setFontSize(11);
+    doc.setFont('helvetica', 'normal');
+    doc.setTextColor(100, 100, 100);
+    doc.text(`${data.type || 'Event'} | ${data.date || 'Date TBD'} | ${size.label || 'Size TBD'}`, margin, y);
+    y += 14;
+
+    // Overview Section
+    addSection('EVENT OVERVIEW');
+    if (data.description) {
+      addText(data.description, 10);
+    }
+    addField('Format', data.format);
+    addField('Venue Type', data.venue);
+    addField('Location', REGIONS[data.region]?.name);
+    addField('Duration', DURATION_OPTIONS.find(d => d.value === data.duration)?.label);
+
+    // Objectives
+    if (data.objectives) {
+      addSection('OBJECTIVES');
+      addText(data.objectives, 10);
+    }
+
+    // Audience
+    addSection('TARGET AUDIENCE');
+    addField('Audience', data.audience);
+    if (data.vips) addField('VIPs', data.vips);
+    if (data.speakers) addField('Speakers', data.speakers);
+
+    // Program
+    if (data.program?.length > 0) {
+      addSection('PROGRAM ELEMENTS');
+      addField('Program', data.program);
+      if (data.spaces?.length > 0) addField('Spaces', data.spaces);
+    }
+
+    // Services
+    if (data.fnb?.length > 0 || data.av?.length > 0) {
+      addSection('SERVICES & LOGISTICS');
+      addField('Food & Beverage', data.fnb);
+      addField('Audio/Visual', data.av);
+      addField('Production', data.production);
+      addField('Collateral', data.collateral);
+      addField('Marketing', data.marketing);
+    }
+
+    // Budget
+    addSection('BUDGET ESTIMATE');
+    doc.setFontSize(14);
+    doc.setFont('helvetica', 'bold');
+    doc.setTextColor(16, 185, 129);
+    doc.text(`${fmt(budget.total.min)} - ${fmt(budget.total.max)}`, margin, y);
+    y += 8;
+    doc.setFontSize(9);
+    doc.setTextColor(100, 100, 100);
+    doc.setFont('helvetica', 'normal');
+    doc.text(`Venue: ${fmt(budget.costs.venue.min)}-${fmt(budget.costs.venue.max)} | F&B: ${fmt(budget.costs.fnb)} | AV: ${fmt(budget.costs.av)}`, margin, y);
+    y += 5;
+    doc.text(`Production: ${fmt(budget.costs.production)} | Collateral: ${fmt(budget.costs.collateral)} | Marketing: ${fmt(budget.costs.marketing)}`, margin, y);
+    y += 5;
+    doc.text('Includes 10% staffing + 15% contingency', margin, y);
+    y += 10;
+
+    // Team
+    if (data.team?.some(t => t.name)) {
+      addSection('PLANNING TEAM');
+      data.team.filter(t => t.name).forEach(t => {
+        addText(`${t.name}${t.role ? ` - ${t.role}` : ''}`, 10);
+      });
+    }
+
+    // Notes
+    if (data.notes) {
+      addSection('ADDITIONAL NOTES');
+      addText(data.notes, 10);
+    }
+
+    // Footer on last page
+    const pageCount = doc.internal.getNumberOfPages();
+    for (let i = 1; i <= pageCount; i++) {
+      doc.setPage(i);
+      doc.setFontSize(8);
+      doc.setTextColor(150, 150, 150);
+      doc.text(`Page ${i} of ${pageCount}`, pageWidth - margin - 20, doc.internal.pageSize.getHeight() - 10);
+      doc.text('SeedAI Event Planner', margin, doc.internal.pageSize.getHeight() - 10);
+    }
+
+    doc.save(`${data.name || 'event'}-plan.pdf`.toLowerCase().replace(/\s+/g, '-'));
+  }, [data, budget]);
+
+  // DOCX Export Handler
+  const handleExportDOCX = useCallback(async () => {
+    // Dynamically load docx library
+    if (!window.docx) {
+      const script = document.createElement('script');
+      script.src = 'https://unpkg.com/docx@8.2.2/build/index.umd.js';
+      document.head.appendChild(script);
+      await new Promise(resolve => script.onload = resolve);
+    }
+
+    const { Document, Packer, Paragraph, TextRun, Table, TableRow, TableCell, 
+            HeadingLevel, AlignmentType, BorderStyle, WidthType, ShadingType } = window.docx;
+
+    const size = SIZE_CONFIG[data.size] || {};
+    const duration = DURATION_OPTIONS.find(d => d.value === data.duration);
+
+    // Helper to create section header
+    const sectionHeader = (text) => new Paragraph({
+      children: [new TextRun({ text, bold: true, size: 24, color: 'FFFFFF' })],
+      shading: { fill: '10B981', type: ShadingType.CLEAR },
+      spacing: { before: 300, after: 200 },
+      heading: HeadingLevel.HEADING_2
+    });
+
+    // Helper to create field
+    const field = (label, value) => {
+      if (!value || (Array.isArray(value) && value.length === 0)) return null;
+      const displayValue = Array.isArray(value) ? value.join(', ') : value;
+      return new Paragraph({
+        children: [
+          new TextRun({ text: `${label}: `, bold: true, size: 22 }),
+          new TextRun({ text: displayValue, size: 22 })
+        ],
+        spacing: { after: 120 }
+      });
+    };
+
+    const children = [
+      // Title
+      new Paragraph({
+        children: [new TextRun({ text: '🌱 SeedAI Event Planner', bold: true, size: 36, color: '10B981' })],
+        spacing: { after: 100 }
+      }),
+      new Paragraph({
+        children: [new TextRun({ text: `Generated: ${new Date().toLocaleDateString()}`, size: 20, color: '71717A' })],
+        spacing: { after: 400 }
+      }),
+
+      // Event Name
+      new Paragraph({
+        children: [new TextRun({ text: data.name || 'Untitled Event', bold: true, size: 44 })],
+        heading: HeadingLevel.HEADING_1,
+        spacing: { after: 100 }
+      }),
+      new Paragraph({
+        children: [new TextRun({ text: `${data.type || 'Event'} | ${data.date || 'Date TBD'} | ${size.label || 'Size TBD'}`, size: 24, color: '71717A' })],
+        spacing: { after: 400 }
+      }),
+
+      // Overview
+      sectionHeader('EVENT OVERVIEW'),
+      data.description ? new Paragraph({ children: [new TextRun({ text: data.description, size: 22 })], spacing: { after: 200 } }) : null,
+      field('Format', data.format),
+      field('Venue Type', data.venue),
+      field('Location', REGIONS[data.region]?.name),
+      field('Duration', duration?.label),
+
+      // Objectives
+      data.objectives ? sectionHeader('OBJECTIVES') : null,
+      data.objectives ? new Paragraph({ children: [new TextRun({ text: data.objectives, size: 22 })], spacing: { after: 200 } }) : null,
+
+      // Audience
+      sectionHeader('TARGET AUDIENCE'),
+      field('Audience', data.audience),
+      field('VIPs', data.vips),
+      field('Speakers', data.speakers),
+
+      // Program
+      data.program?.length > 0 ? sectionHeader('PROGRAM ELEMENTS') : null,
+      field('Program', data.program),
+      field('Spaces', data.spaces),
+
+      // Services
+      (data.fnb?.length > 0 || data.av?.length > 0) ? sectionHeader('SERVICES & LOGISTICS') : null,
+      field('Food & Beverage', data.fnb),
+      field('Audio/Visual', data.av),
+      field('Production', data.production),
+      field('Collateral', data.collateral),
+      field('Marketing', data.marketing),
+      field('Post-Event', data.postEvent),
+
+      // Budget
+      sectionHeader('BUDGET ESTIMATE'),
+      new Paragraph({
+        children: [new TextRun({ text: `${fmt(budget.total.min)} - ${fmt(budget.total.max)}`, bold: true, size: 32, color: '10B981' })],
+        spacing: { after: 200 }
+      }),
+      new Table({
+        width: { size: 100, type: WidthType.PERCENTAGE },
+        rows: [
+          new TableRow({
+            children: ['Category', 'Estimate'].map(text => new TableCell({
+              children: [new Paragraph({ children: [new TextRun({ text, bold: true, size: 20 })] })],
+              shading: { fill: 'E5E7EB', type: ShadingType.CLEAR },
+              borders: { top: { style: BorderStyle.SINGLE, size: 1, color: 'D1D5DB' }, bottom: { style: BorderStyle.SINGLE, size: 1, color: 'D1D5DB' }, left: { style: BorderStyle.SINGLE, size: 1, color: 'D1D5DB' }, right: { style: BorderStyle.SINGLE, size: 1, color: 'D1D5DB' } }
+            }))
+          }),
+          ...[ 
+            ['Venue', `${fmt(budget.costs.venue.min)} - ${fmt(budget.costs.venue.max)}`],
+            ['Food & Beverage', fmt(budget.costs.fnb)],
+            ['Audio/Visual', fmt(budget.costs.av)],
+            ['Production', fmt(budget.costs.production)],
+            ['Collateral', fmt(budget.costs.collateral)],
+            ['Marketing', fmt(budget.costs.marketing)],
+            ['Staffing (10%)', `${fmt(budget.staffing.min)} - ${fmt(budget.staffing.max)}`],
+            ['Contingency (15%)', `${fmt(budget.contingency.min)} - ${fmt(budget.contingency.max)}`]
+          ].map(([label, value]) => new TableRow({
+            children: [label, value].map(text => new TableCell({
+              children: [new Paragraph({ children: [new TextRun({ text, size: 20 })] })],
+              borders: { top: { style: BorderStyle.SINGLE, size: 1, color: 'D1D5DB' }, bottom: { style: BorderStyle.SINGLE, size: 1, color: 'D1D5DB' }, left: { style: BorderStyle.SINGLE, size: 1, color: 'D1D5DB' }, right: { style: BorderStyle.SINGLE, size: 1, color: 'D1D5DB' } }
+            }))
+          }))
+        ]
+      }),
+
+      // Team
+      data.team?.some(t => t.name) ? sectionHeader('PLANNING TEAM') : null,
+      ...(data.team?.filter(t => t.name).map(t => new Paragraph({
+        children: [new TextRun({ text: `${t.name}${t.role ? ` - ${t.role}` : ''}`, size: 22 })],
+        spacing: { after: 80 }
+      })) || []),
+
+      // Notes
+      data.notes ? sectionHeader('ADDITIONAL NOTES') : null,
+      data.notes ? new Paragraph({ children: [new TextRun({ text: data.notes, size: 22 })], spacing: { after: 200 } }) : null,
+
+      // Funding
+      data.funding ? sectionHeader('FUNDING SOURCES') : null,
+      data.funding ? new Paragraph({ children: [new TextRun({ text: data.funding, size: 22 })], spacing: { after: 200 } }) : null,
+
+    ].filter(Boolean);
+
+    const doc = new Document({
+      styles: {
+        default: {
+          document: {
+            run: { font: 'Arial', size: 22 }
+          }
+        }
+      },
+      sections: [{
+        properties: {
+          page: {
+            size: { width: 12240, height: 15840 },
+            margin: { top: 1440, right: 1440, bottom: 1440, left: 1440 }
+          }
+        },
+        children
+      }]
+    });
+
+    const blob = await Packer.toBlob(doc);
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `${data.name || 'event'}-plan.docx`.toLowerCase().replace(/\s+/g, '-');
+    a.click();
+    URL.revokeObjectURL(url);
+  }, [data, budget]);
+
   const applyTemplate = useCallback((templateKey) => {
     const template = EVENT_TEMPLATES[templateKey];
     if (template) {
@@ -1594,7 +1928,15 @@ export default function EventPlannerV8() {
       <div className="fixed inset-0 bg-black/80 flex items-center justify-center z-50 p-4" onClick={() => setShowShareMenu(false)}>
         <div className="bg-zinc-900 rounded-xl max-w-md w-full p-6" onClick={e => e.stopPropagation()}>
           <h3 className="text-xl font-semibold text-white mb-6">Share & Export</h3>
-          <div className="space-y-4">
+          <div className="space-y-3">
+            <button onClick={() => { handleExportPDF(); setShowShareMenu(false); }} className="w-full bg-red-600 hover:bg-red-500 text-white p-4 rounded-lg text-left">
+              <div className="font-medium">📄 Export as PDF</div>
+              <div className="text-sm text-red-200 mt-1">Professional formatted document for sharing</div>
+            </button>
+            <button onClick={() => { handleExportDOCX(); setShowShareMenu(false); }} className="w-full bg-blue-600 hover:bg-blue-500 text-white p-4 rounded-lg text-left">
+              <div className="font-medium">📝 Export as Word (.docx)</div>
+              <div className="text-sm text-blue-200 mt-1">Editable document for further customization</div>
+            </button>
             <button onClick={() => { handleCopyForAI(); setShowShareMenu(false); }} className="w-full bg-purple-600 hover:bg-purple-500 text-white p-4 rounded-lg text-left">
               <div className="font-medium">🤖 Copy for AI Refinement</div>
               <div className="text-sm text-purple-200 mt-1">Pre-formatted prompt to paste into Claude for feedback</div>
