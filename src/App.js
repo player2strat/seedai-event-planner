@@ -62,22 +62,23 @@ const OPTIONS = {
   inviteStrategy: ['Open Registration', 'Invite Only', 'Application-Based', 'Tiered (VIP invite + open registration)'],
   program: ['Keynote Address', 'Panel Discussion', 'Fireside Chat', 'Breakout Sessions', 'Workshops', 'Networking Breaks', 'Awards/Recognition', 'Press Conference', 'VIP Reception', 'Group Photo', 'Demo / Exhibition / Hands-On', 'Lightning Talks', 'Roundtable Discussion', 'Private Dinner'],
   agendaFormats: ['Keynote', 'Panel', 'Fireside Chat', 'Breakout', 'Workshop', 'Networking', 'Meal/Reception', 'Demo/Hands-On', 'Roundtable', 'Lightning Talks', 'Press Availability', 'Private Dinner', 'Registration/Arrival', 'Break', 'Other'],
-  spaces: ['Main Plenary Hall', 'Breakout Rooms', 'VIP Green Room', 'Press/Media Room', 'Registration Area', 'Networking Lounge', 'Outdoor Terrace', 'Executive Boardroom', 'Demo/Exhibition Area', 'Prayer/Quiet Room'],
-  fnb: ['Continental Breakfast', 'Hot Breakfast', 'Morning Coffee/Tea', 'Working Lunch (Boxed)', 'Plated Lunch', 'Afternoon Break', 'Cocktail Reception', 'Happy Hour / Reception', 'Plated Dinner', 'Dessert Reception'],
-  av: ['Projector/Screen', 'Confidence Monitor', 'Wireless Microphones', 'Podium with Mic', 'Livestream Setup', 'Recording Equipment', 'Video Playback', 'LED Wall/Display', 'Interpretation Equipment'],
-  production: ['Stage Design', 'Custom Backdrop', 'Step & Repeat', 'Branded Signage', 'Floral Arrangements', 'Lighting Design', 'Event Photographer', 'Videographer'],
-  collateral: ['Name Badges', 'Printed Agenda', 'Branded Folders', 'Note Pads/Pens', 'Gift Bags', 'Promotional Items', 'Policy Briefs/Reports', 'Speaker Bios'],
+  spaces: ['Main Plenary Hall', 'Breakout Rooms', 'VIP Green Room', 'Press/Media Room', 'Registration Area', 'Networking Lounge', 'Outdoor Terrace', 'Executive Boardroom', 'Demo/Exhibition Area', 'Prayer/Quiet Room', 'Coat Check Area'],
+  fnb: ['Continental Breakfast', 'Hot Breakfast', 'Morning Coffee/Tea', 'Working Lunch (Boxed)', 'Plated Lunch', 'Afternoon Break', 'Cocktail Reception', 'Happy Hour / Reception', 'Plated Dinner', 'Dessert Reception', 'Water Service (tables)', 'Speaker Refreshments (podium water, mints)'],
+  av: ['Projector/Screen', 'Confidence Monitor', 'Wireless Microphones', 'Podium with Mic', 'Livestream Setup', 'Recording Equipment', 'Video Playback', 'LED Wall/Display', 'Interpretation Equipment', 'Presenter Timer / Countdown', 'AV Adapters Kit (HDMI, USB-C)', 'Power Strips / Extension Cords', 'WiFi for Speakers/Staff'],
+  production: ['Stage Design', 'Custom Backdrop', 'Step & Repeat', 'Branded Signage', 'Directional Signage / Wayfinding', 'Floral Arrangements', 'Lighting Design', 'Event Photographer', 'Videographer', 'Easels / Sign Stands', 'Table Numbers'],
+  collateral: ['Name Badges', 'Lanyards / Badge Holders', 'Printed Agenda', 'Branded Folders', 'Note Pads/Pens', 'Gift Bags', 'Promotional Items', 'Policy Briefs/Reports', 'Speaker Bios', 'Place Cards / Name Tents', 'Panelist Tent Cards', 'WiFi Info Cards', 'Seating Chart / Table Assignments', 'Feedback Cards'],
   marketing: ['Save the Date', 'Email Invitations', 'Event Website', 'Social Media Campaign', 'Press Release', 'Media Advisory', 'Paid Advertising', 'Partner Outreach'],
   postEvent: ['Thank You Emails', 'Event Recording', 'Photo Gallery', 'Summary Report', 'Survey/Feedback', 'Social Media Recap', 'Media Clips Package', 'Follow-Up Meetings', 'Impact Report for Funders'],
+  onsite: ['Registration Table & Supplies', 'Coat Check', 'Parking Info / Validation', 'Phone Charging Station', 'Emergency Kit (tape, scissors, markers, first aid)', 'Trash / Recycling Stations', 'Attendee Welcome Packets'],
   accessibility: ['Wheelchair Accessible Venue', 'Sign Language Interpretation', 'Live Captioning / CART', 'Assistive Listening Devices', 'Large Print Materials', 'Dietary Accommodations Collected', 'Gender-Neutral Restrooms', 'Nursing/Lactation Room', 'Quiet Room Available']
 };
 
 const DEFAULT_COSTS = {
   venue: { 'intimate': [2000, 5000], 'small': [3000, 8000], 'medium': [5000, 15000], 'large': [10000, 30000], 'major': [20000, 50000], 'flagship': [35000, 100000] },
-  fnb: { 'Continental Breakfast': 25, 'Hot Breakfast': 45, 'Morning Coffee/Tea': 12, 'Working Lunch (Boxed)': 35, 'Plated Lunch': 55, 'Afternoon Break': 18, 'Cocktail Reception': 65, 'Happy Hour / Reception': 55, 'Plated Dinner': 95, 'Dessert Reception': 30 },
-  av: { 'Projector/Screen': 500, 'Confidence Monitor': 400, 'Wireless Microphones': 300, 'Podium with Mic': 250, 'Livestream Setup': 2500, 'Recording Equipment': 1500, 'Video Playback': 400, 'LED Wall/Display': 5000, 'Interpretation Equipment': 2000 },
-  production: { 'Stage Design': 5000, 'Custom Backdrop': 3000, 'Step & Repeat': 1500, 'Branded Signage': 2000, 'Floral Arrangements': 1500, 'Lighting Design': 4000, 'Event Photographer': 2500, 'Videographer': 4000 },
-  collateral: { 'Name Badges': 5, 'Printed Agenda': 3, 'Branded Folders': 8, 'Note Pads/Pens': 6, 'Gift Bags': 25, 'Promotional Items': 15, 'Policy Briefs/Reports': 12, 'Speaker Bios': 2 },
+  fnb: { 'Continental Breakfast': 25, 'Hot Breakfast': 45, 'Morning Coffee/Tea': 12, 'Working Lunch (Boxed)': 35, 'Plated Lunch': 55, 'Afternoon Break': 18, 'Cocktail Reception': 65, 'Happy Hour / Reception': 55, 'Plated Dinner': 95, 'Dessert Reception': 30, 'Water Service (tables)': 5, 'Speaker Refreshments (podium water, mints)': 3 },
+  av: { 'Projector/Screen': 500, 'Confidence Monitor': 400, 'Wireless Microphones': 300, 'Podium with Mic': 250, 'Livestream Setup': 2500, 'Recording Equipment': 1500, 'Video Playback': 400, 'LED Wall/Display': 5000, 'Interpretation Equipment': 2000, 'Presenter Timer / Countdown': 200, 'AV Adapters Kit (HDMI, USB-C)': 50, 'Power Strips / Extension Cords': 75, 'WiFi for Speakers/Staff': 200 },
+  production: { 'Stage Design': 5000, 'Custom Backdrop': 3000, 'Step & Repeat': 1500, 'Branded Signage': 2000, 'Directional Signage / Wayfinding': 800, 'Floral Arrangements': 1500, 'Lighting Design': 4000, 'Event Photographer': 2500, 'Videographer': 4000, 'Easels / Sign Stands': 200, 'Table Numbers': 100 },
+  collateral: { 'Name Badges': 5, 'Lanyards / Badge Holders': 3, 'Printed Agenda': 3, 'Branded Folders': 8, 'Note Pads/Pens': 6, 'Gift Bags': 25, 'Promotional Items': 15, 'Policy Briefs/Reports': 12, 'Speaker Bios': 2, 'Place Cards / Name Tents': 2, 'Panelist Tent Cards': 3, 'WiFi Info Cards': 1, 'Seating Chart / Table Assignments': 1, 'Feedback Cards': 1 },
   marketing: { 'Save the Date': 500, 'Email Invitations': 300, 'Event Website': 2500, 'Social Media Campaign': 1500, 'Press Release': 800, 'Media Advisory': 500, 'Paid Advertising': 5000, 'Partner Outreach': 1000 }
 };
 
@@ -279,21 +280,22 @@ const PROMPTS = {
   audience: "Who specifically needs to be in the room for this event to succeed? Think about the conversations you want to happen between attendees.",
   vips: "Who are the 3-5 people whose attendance would make this event a success? What would make them say yes?",
   speakers: "Who would be ideal to present, moderate, or lead discussions? Consider who your target audience would rearrange their schedule to hear.",
-  date: "When are you planning to hold this event? Consider recess schedules, competing events, and lead time for invitations.",
-  duration: "How long do you need to accomplish your goals? Shorter events get better Hill attendance; longer events allow deeper engagement.",
+  date: "When are you planning to hold this event? Consider competing events, holidays, and lead time for invitations. If targeting government audiences, check recess schedules.",
+  duration: "How long do you need to accomplish your goals? Shorter events tend to get better government attendance; longer events allow deeper engagement.",
   format: "Will attendees gather in person, join virtually, or both? Hybrid requires separate production planning for each audience.",
   venue: "What type of space fits your event's tone? Government buildings signal official credibility; hotels signal neutrality; universities signal academic rigor.",
   region: "Where will this event take place? This helps us estimate local market costs.",
   spaces: "Beyond the main room, what other spaces might you need? Think about where informal conversations happen.",
   program: "What elements will make up your agenda? Think about variety, pacing, and what the signature moment will be.",
   agenda: "Jot down what you're thinking so far — even 'panel on something about evals' counts. The AI will help flesh it out.",
-  fnb: "Food and beverage sets the tone and affects compliance. Note: federal ethics rules limit gifts to $20/item for government attendees.",
+  fnb: "Food and beverage sets the tone and affects compliance. Note: if hosting government attendees, federal ethics rules limit gifts to $20/item.",
   av: "What technology do you need to deliver your content effectively?",
   production: "What visual and design elements will enhance the experience?",
   collateral: "What materials will attendees receive or take home?",
   marketing: "How will you spread the word and drive registration?",
   postEvent: "What happens after the event to extend its impact? The best events create follow-up opportunities that wouldn't have existed otherwise.",
-  accessibility: "What accommodations should you provide? Many DC venues have ADA requirements, and federal attendees may need specific accommodations.",
+  accessibility: "What accommodations should you provide? Check ADA requirements for your venue, and consider what your specific attendees may need.",
+  onsite: "The operational details that keep the day running smoothly. Easy to overlook during planning, hard to improvise on event day.",
   team: "Who are the key people responsible for making this happen?",
   funding: "Where is the budget coming from? Sponsors, organizational budget, grants? Note any restrictions on how funds can be used.",
   notes: "Anything else important to remember as planning progresses?"
@@ -310,128 +312,165 @@ const VENDOR_MAP = {
   // F&B
   'Continental Breakfast': { vendor: 'Caterer', category: 'Food & Beverage' },
   'Hot Breakfast': { vendor: 'Caterer', category: 'Food & Beverage' },
-  'Morning Coffee/Tea': { vendor: 'Caterer / Venue', category: 'Food & Beverage' },
+  'Morning Coffee/Tea': { vendor: 'Caterer or Venue', category: 'Food & Beverage' },
   'Working Lunch (Boxed)': { vendor: 'Caterer', category: 'Food & Beverage' },
   'Plated Lunch': { vendor: 'Caterer', category: 'Food & Beverage' },
-  'Afternoon Break': { vendor: 'Caterer / Venue', category: 'Food & Beverage' },
-  'Cocktail Reception': { vendor: 'Caterer / Bar Service', category: 'Food & Beverage' },
-  'Happy Hour / Reception': { vendor: 'Caterer / Bar Service', category: 'Food & Beverage' },
+  'Afternoon Break': { vendor: 'Caterer or Venue', category: 'Food & Beverage' },
+  'Cocktail Reception': { vendor: 'Caterer + Bar Service', category: 'Food & Beverage' },
+  'Happy Hour / Reception': { vendor: 'Caterer + Bar Service', category: 'Food & Beverage' },
   'Plated Dinner': { vendor: 'Caterer', category: 'Food & Beverage' },
   'Dessert Reception': { vendor: 'Caterer', category: 'Food & Beverage' },
+  'Water Service (tables)': { vendor: 'Caterer or Venue', category: 'Food & Beverage' },
+  'Speaker Refreshments (podium water, mints)': { vendor: 'Caterer or Venue', category: 'Food & Beverage' },
   // AV
-  'Projector/Screen': { vendor: 'AV Vendor / Venue', category: 'Audio/Visual' },
+  'Projector/Screen': { vendor: 'AV Vendor or Venue', category: 'Audio/Visual' },
   'Confidence Monitor': { vendor: 'AV Vendor', category: 'Audio/Visual' },
-  'Wireless Microphones': { vendor: 'AV Vendor / Venue', category: 'Audio/Visual' },
-  'Podium with Mic': { vendor: 'AV Vendor / Venue', category: 'Audio/Visual' },
-  'Livestream Setup': { vendor: 'AV Vendor / Production Company', category: 'Audio/Visual' },
-  'Recording Equipment': { vendor: 'AV Vendor / Videographer', category: 'Audio/Visual' },
+  'Wireless Microphones': { vendor: 'AV Vendor or Venue', category: 'Audio/Visual' },
+  'Podium with Mic': { vendor: 'AV Vendor or Venue', category: 'Audio/Visual' },
+  'Livestream Setup': { vendor: 'AV Vendor or Production Co.', category: 'Audio/Visual' },
+  'Recording Equipment': { vendor: 'AV Vendor or Videographer', category: 'Audio/Visual' },
   'Video Playback': { vendor: 'AV Vendor', category: 'Audio/Visual' },
-  'LED Wall/Display': { vendor: 'AV Vendor / Production Company', category: 'Audio/Visual' },
-  'Interpretation Equipment': { vendor: 'AV Vendor / Interpretation Service', category: 'Audio/Visual' },
+  'LED Wall/Display': { vendor: 'AV Vendor or Production Co.', category: 'Audio/Visual' },
+  'Interpretation Equipment': { vendor: 'AV Vendor or Interpretation Service', category: 'Audio/Visual' },
+  'Presenter Timer / Countdown': { vendor: 'AV Vendor', category: 'Audio/Visual' },
+  'AV Adapters Kit (HDMI, USB-C)': { vendor: 'AV Vendor or In-House', category: 'Audio/Visual' },
+  'Power Strips / Extension Cords': { vendor: 'Venue or In-House', category: 'Audio/Visual' },
+  'WiFi for Speakers/Staff': { vendor: 'Venue', category: 'Audio/Visual' },
   // Production
   'Stage Design': { vendor: 'Production Company', category: 'Production' },
-  'Custom Backdrop': { vendor: 'Production Company / Print Vendor', category: 'Production' },
+  'Custom Backdrop': { vendor: 'Production Co. or Print Vendor', category: 'Production' },
   'Step & Repeat': { vendor: 'Print Vendor', category: 'Production' },
-  'Branded Signage': { vendor: 'Print Vendor / Graphic Designer', category: 'Production' },
+  'Branded Signage': { vendor: 'Print Vendor or Graphic Designer', category: 'Production' },
   'Floral Arrangements': { vendor: 'Florist', category: 'Production' },
-  'Lighting Design': { vendor: 'Lighting Vendor / Production Company', category: 'Production' },
+  'Lighting Design': { vendor: 'Lighting Vendor or Production Co.', category: 'Production' },
   'Event Photographer': { vendor: 'Photographer', category: 'Production' },
-  'Videographer': { vendor: 'Videographer / Production Company', category: 'Production' },
+  'Videographer': { vendor: 'Videographer or Production Co.', category: 'Production' },
+  'Directional Signage / Wayfinding': { vendor: 'Print Vendor or In-House', category: 'Production' },
+  'Easels / Sign Stands': { vendor: 'Venue or Rental Company', category: 'Production' },
+  'Table Numbers': { vendor: 'Print Vendor or In-House', category: 'Production' },
   // Collateral
-  'Name Badges': { vendor: 'Print Vendor / In-House', category: 'Collateral' },
-  'Printed Agenda': { vendor: 'Print Vendor / In-House', category: 'Collateral' },
+  'Name Badges': { vendor: 'Print Vendor or In-House', category: 'Collateral' },
+  'Lanyards / Badge Holders': { vendor: 'Promo Products Vendor or In-House', category: 'Collateral' },
+  'Printed Agenda': { vendor: 'Print Vendor or In-House', category: 'Collateral' },
   'Branded Folders': { vendor: 'Print Vendor', category: 'Collateral' },
-  'Note Pads/Pens': { vendor: 'Promotional Products Vendor', category: 'Collateral' },
-  'Gift Bags': { vendor: 'Promotional Products Vendor', category: 'Collateral' },
-  'Promotional Items': { vendor: 'Promotional Products Vendor', category: 'Collateral' },
-  'Policy Briefs/Reports': { vendor: 'Print Vendor / In-House', category: 'Collateral' },
-  'Speaker Bios': { vendor: 'In-House / Graphic Designer', category: 'Collateral' },
+  'Note Pads/Pens': { vendor: 'Promo Products Vendor', category: 'Collateral' },
+  'Gift Bags': { vendor: 'Promo Products Vendor', category: 'Collateral' },
+  'Promotional Items': { vendor: 'Promo Products Vendor', category: 'Collateral' },
+  'Policy Briefs/Reports': { vendor: 'Print Vendor or In-House', category: 'Collateral' },
+  'Speaker Bios': { vendor: 'In-House or Graphic Designer', category: 'Collateral' },
+  'Place Cards / Name Tents': { vendor: 'Print Vendor or In-House', category: 'Collateral' },
+  'Panelist Tent Cards': { vendor: 'Print Vendor or In-House', category: 'Collateral' },
+  'WiFi Info Cards': { vendor: 'In-House', category: 'Collateral' },
+  'Seating Chart / Table Assignments': { vendor: 'In-House', category: 'Collateral' },
+  'Feedback Cards': { vendor: 'Print Vendor or In-House', category: 'Collateral' },
   // Accessibility
-  'Sign Language Interpretation': { vendor: 'Sign Language Interpretation Service', category: 'Accessibility' },
-  'Live Captioning / CART': { vendor: 'CART / Captioning Service', category: 'Accessibility' },
-  'Assistive Listening Devices': { vendor: 'AV Vendor / Venue', category: 'Accessibility' },
+  'Sign Language Interpretation': { vendor: 'Interpretation Service', category: 'Accessibility' },
+  'Live Captioning / CART': { vendor: 'CART Provider', category: 'Accessibility' },
+  'Assistive Listening Devices': { vendor: 'AV Vendor or Venue', category: 'Accessibility' },
+  // On-Site
+  'Registration Table & Supplies': { vendor: 'In-House or Rental Company', category: 'On-Site' },
+  'Coat Check': { vendor: 'Venue or Staffing Agency', category: 'On-Site' },
+  'Parking Info / Validation': { vendor: 'Venue', category: 'On-Site' },
+  'Phone Charging Station': { vendor: 'Rental Company or In-House', category: 'On-Site' },
 };
 
-function getRequiredVendors(data) {
+function generateVendorSection(data) {
   const allSelections = [
     ...(data.fnb || []),
     ...(data.av || []),
     ...(data.production || []),
     ...(data.collateral || []),
+    ...(data.onsite || []),
     ...(data.accessibility || []),
   ];
   
-  // Deduplicate by vendor role within each category
-  const byCategory = {};
+  if (allSelections.length === 0) return '';
+  
+  // Group by vendor type — collect all items that need that vendor
+  const vendorGroups = {};
   for (const item of allSelections) {
     const mapping = VENDOR_MAP[item];
     if (!mapping) continue;
-    if (!byCategory[mapping.category]) byCategory[mapping.category] = {};
-    const vendors = mapping.vendor.split(' / ');
-    for (const v of vendors) {
-      const vt = v.trim();
-      if (!byCategory[mapping.category][vt]) byCategory[mapping.category][vt] = [];
-      byCategory[mapping.category][vt].push(item);
-    }
+    const key = mapping.vendor;
+    if (!vendorGroups[key]) vendorGroups[key] = { category: mapping.category, items: [] };
+    vendorGroups[key].items.push(item);
   }
   
-  return byCategory;
-}
-
-function generateVendorSection(data) {
-  const vendors = getRequiredVendors(data);
-  if (Object.keys(vendors).length === 0) return '';
+  if (Object.keys(vendorGroups).length === 0) return '';
   
-  let section = `VENDORS & ASSIGNMENTS\n${'-'.repeat(40)}\nBased on your selections, you'll need the following vendors or responsible parties:\n\n`;
-  section += `Category | Vendor / Role Needed | For | Assigned To\n`;
+  let section = `VENDORS & ASSIGNMENTS\n${'-'.repeat(40)}\nBased on your selections, you'll need to source the following:\n\n`;
+  section += `What You Need | Who to Hire | Services They'll Cover | Confirmed Vendor\n`;
   
-  for (const [category, roles] of Object.entries(vendors)) {
-    for (const [role, items] of Object.entries(roles)) {
-      section += `${category} | ${role} | ${items.join(', ')} | ___________\n`;
-    }
+  for (const [vendorType, info] of Object.entries(vendorGroups)) {
+    section += `${info.category} | ${vendorType} | ${info.items.join(', ')} | ___________\n`;
   }
   
-  section += `\nTip: Fill in the "Assigned To" column as you confirm vendors. Use "Refine with AI" to get vendor outreach suggestions.`;
+  section += `\nFill in the "Confirmed Vendor" column as you book. Use "Refine with AI" for outreach suggestions.`;
   return section;
 }
 
-function checkCongressionalCalendar(dateStr) {
+function checkCongressionalCalendar(dateStr, data) {
   if (!dateStr) return [];
   const date = new Date(dateStr);
   const warnings = [];
+  const hasGovAudience = (data?.audience || []).some(a => 
+    ['Congressional Staff', 'Members of Congress', 'Federal Agency Officials', 'State/Local Officials'].includes(a)
+  );
   
-  for (const recess of CONGRESSIONAL_CALENDAR_2026.recesses) {
-    const start = new Date(recess.start);
-    const end = new Date(recess.end);
-    if (date >= start && date <= end) {
-      warnings.push({ type: 'recess', severity: 'high', message: `During ${recess.name} — Congress not in session, Hill staff may be traveling` });
+  // Congressional recess — only relevant if targeting government audiences
+  if (hasGovAudience) {
+    for (const recess of CONGRESSIONAL_CALENDAR_2026.recesses) {
+      const start = new Date(recess.start);
+      const end = new Date(recess.end);
+      if (date >= start && date <= end) {
+        warnings.push({ type: 'recess', severity: 'high', message: `During ${recess.name} — Congress not in session, government staff may be traveling` });
+      }
     }
   }
   
+  // August — universally slow, but frame differently based on audience
   if (date.getMonth() === 7 && !warnings.some(w => w.type === 'recess')) {
-    warnings.push({ type: 'august', severity: 'medium', message: 'August is traditionally slow in DC — many contacts may be away' });
+    warnings.push({ type: 'august', severity: 'medium', message: 'August is traditionally slow — many people take vacation, which can affect attendance' });
   }
   
+  // Day-of-week warnings — only for government audiences
   const dayOfWeek = date.getDay();
-  if (dayOfWeek === 4 || dayOfWeek === 5) {
-    warnings.push({ type: 'endOfWeek', severity: 'low', message: 'Thu/Fri can be tricky — Members often travel to districts' });
-  }
-  if (dayOfWeek === 1) {
-    warnings.push({ type: 'monday', severity: 'low', message: 'Monday mornings can have lower Hill attendance — afternoon may work better' });
+  if (hasGovAudience) {
+    if (dayOfWeek === 4 || dayOfWeek === 5) {
+      warnings.push({ type: 'endOfWeek', severity: 'low', message: 'Thu/Fri can be tricky for government audiences — officials often travel to districts' });
+    }
+    if (dayOfWeek === 1) {
+      warnings.push({ type: 'monday', severity: 'low', message: 'Monday mornings can have lower government attendance — afternoon may work better' });
+    }
   }
   
+  // Election proximity — relevant for all political/policy events
   const election = new Date(CONGRESSIONAL_CALENDAR_2026.electionDay);
   const daysToElection = Math.ceil((election - date) / (1000 * 60 * 60 * 24));
   if (daysToElection > 0 && daysToElection <= 28) {
-    warnings.push({ type: 'election', severity: 'high', message: `${daysToElection} days before Election Day — political figures will be campaigning` });
+    warnings.push({ type: 'election', severity: 'high', message: `${daysToElection} days before Election Day — political figures and staff will be focused on campaigns` });
   }
   
-  for (const bd of CONGRESSIONAL_CALENDAR_2026.budgetDates) {
-    const budgetDate = new Date(bd.date);
-    const daysDiff = Math.abs(Math.ceil((date - budgetDate) / (1000 * 60 * 60 * 24)));
-    if (daysDiff <= 7) {
-      warnings.push({ type: 'budget', severity: 'medium', message: `Near ${bd.event} — budget-related events may compete for attention` });
+  // Budget dates — only for government audiences
+  if (hasGovAudience) {
+    for (const bd of CONGRESSIONAL_CALENDAR_2026.budgetDates) {
+      const budgetDate = new Date(bd.date);
+      const daysDiff = Math.abs(Math.ceil((date - budgetDate) / (1000 * 60 * 60 * 24)));
+      if (daysDiff <= 7) {
+        warnings.push({ type: 'budget', severity: 'medium', message: `Near ${bd.event} — budget-related events may compete for government attention` });
+      }
     }
+  }
+  
+  // Universal date warnings
+  const month = date.getMonth();
+  const day = date.getDate();
+  // Major holidays / long weekends
+  if (month === 11 && day >= 20 && day <= 31) {
+    warnings.push({ type: 'holiday', severity: 'high', message: 'Late December — holiday season will significantly impact attendance' });
+  }
+  if (month === 10 && day >= 20 && day <= 28) {
+    warnings.push({ type: 'holiday', severity: 'medium', message: 'Thanksgiving week — many people traveling, attendance may be lower' });
   }
   
   return warnings;
@@ -735,6 +774,7 @@ ${'-'.repeat(40)}
 ${(data.program || []).join(', ') || 'Program not finalized'}
 ${(data.agenda || []).filter(a => a.title && a.title.trim()).length > 0 ? `\nAGENDA SKETCH (WORKING DRAFT)\n${'-'.repeat(40)}\n${data.agenda.filter(a => a.title && a.title.trim()).map(a => `${a.time || 'TBD'} — ${a.title}${a.format ? ` [${a.format}]` : ''}${a.notes ? ` (${a.notes})` : ''}`).join('\n')}` : ''}
 ${(data.accessibility || []).length > 0 ? `\nACCESSIBILITY\n${'-'.repeat(40)}\n${data.accessibility.join(', ')}` : ''}
+${(data.onsite || []).length > 0 ? `\nON-SITE ESSENTIALS\n${'-'.repeat(40)}\n${data.onsite.join(', ')}` : ''}
 
 ${generateVendorSection(data)}
 
@@ -955,6 +995,12 @@ const generateChecklist = (data) => {
   const hasBreakouts = has('program', 'Breakout Sessions') || has('program', 'Workshops');
   const hasVIP = has('program', 'VIP Reception') || has('program', 'Private Dinner');
   const hasDemo = has('program', 'Demo / Exhibition / Hands-On');
+  const hasCoatCheck = has('onsite', 'Coat Check');
+  const hasCharging = has('onsite', 'Phone Charging Station');
+  const hasParking = has('onsite', 'Parking Info / Validation');
+  const hasEmergencyKit = has('onsite', 'Emergency Kit (tape, scissors, markers, first aid)');
+  const hasWelcomePacks = has('onsite', 'Attendee Welcome Packets');
+  const hasRegTable = has('onsite', 'Registration Table & Supplies');
 
   // Build tasks per phase
   let checklist = `PLANNING CHECKLIST
@@ -1032,8 +1078,12 @@ ${'-'.repeat(40)}
 [ ] Finalize seating/room layout
 [ ] Create run of show
 ${has('collateral', 'Name Badges') ? '[ ] Prepare and print name badges' : ''}
+${has('collateral', 'Place Cards / Name Tents') ? '[ ] Prepare place cards / name tents' : ''}
+${has('collateral', 'Seating Chart / Table Assignments') ? '[ ] Finalize seating chart and table assignments' : ''}
 ${hasLivestream ? '[ ] Test livestream setup and confirm streaming URL' : ''}
 ${hasDemo ? '[ ] Confirm demo equipment, power, and WiFi requirements' : ''}
+${hasCharging ? '[ ] Confirm charging station rental/setup' : ''}
+${hasParking ? '[ ] Confirm parking arrangements with venue' : ''}
 
 ${dayLabel(2)}
 ${'-'.repeat(40)}
@@ -1048,15 +1098,21 @@ ${dayLabel(1)}
 ${'-'.repeat(40)}
 [ ] Final vendor confirmations (call each one)
 ${hasPrint ? '[ ] Confirm print materials received and correct' : ''}
-[ ] Prepare emergency kit (tape, markers, chargers, first aid)
+${hasEmergencyKit ? '[ ] Prepare emergency kit (tape, markers, chargers, first aid)' : ''}
 [ ] Send final attendee communication with directions and schedule
 ${hasLivestream ? '[ ] Confirm stream is scheduled and test URL works' : ''}
+${hasParking ? '[ ] Confirm parking validation process and prepare info for attendees' : ''}
+${hasCoatCheck ? '[ ] Confirm coat check staffing and setup' : ''}
+${hasWelcomePacks ? '[ ] Assemble attendee welcome packets' : ''}
 
 EVENT DAY${eventDate ? ` — ${eventDate.toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric' })}` : ''}
 ${'-'.repeat(40)}
 [ ] Early arrival for setup
 [ ] Staff briefing and role assignments
 [ ] Vendor check-ins as they arrive
+${hasRegTable ? '[ ] Set up registration table with supplies, badge display, pens' : ''}
+${hasCoatCheck ? '[ ] Open coat check' : ''}
+${hasCharging ? '[ ] Set up and power on charging station' : ''}
 ${hasPhotographer ? '[ ] Brief photographer on key moments and shot list' : ''}
 ${hasVideographer ? '[ ] Brief videographer on recording plan' : ''}
 ${hasLivestream ? '[ ] Go live — confirm stream is running' : ''}
@@ -1348,13 +1404,13 @@ const DOCUMENTS = {
 function generateAIPrompt(data, budget) {
   const size = SIZE_CONFIG[data.size] || SIZE_CONFIG.medium;
   
-  return `I'm planning a policy event and need help refining my plan. Here are the details:
+  return `I'm planning an event and need help refining my plan. Here are the details:
 
 ## Event Overview
 - **Name:** ${data.name || '[Not yet named]'}
 - **Type:** ${data.type || '[Not specified]'}
 - **Date:** ${data.date || '[TBD]'}
-- **Location:** ${REGIONS[data.region]?.name || 'Washington, DC'}
+- **Location:** ${REGIONS[data.region]?.name || '[Location TBD]'}
 - **Format:** ${data.format || '[Not specified]'}
 - **Expected Size:** ${size ? `${size.min}-${size.max} guests` : '[Not specified]'}
 - **Duration:** ${DURATION_OPTIONS.find(d => d.value === data.duration)?.label || '[Not specified]'}
@@ -1398,7 +1454,7 @@ ${data.notes || '[None]'}
 
 Please help me with:
 1. Review this plan for any gaps or risks I might have missed
-2. Suggest improvements based on DC policy event best practices
+2. Suggest improvements based on policy event best practices
 3. [Add your specific question here]`;
 }
 
@@ -1871,6 +1927,7 @@ export default function EventPlannerV8() {
     agenda: [{ time: '', title: '', format: '', notes: '' }],
     program: [], spaces: [], fnb: [], av: [], production: [], collateral: [], marketing: [], postEvent: [],
     accessibility: [],
+    onsite: [],
     team: [{ name: '', role: '' }], notes: '', funding: ''
   });
   const [vendorData, setVendorData] = useState(null);
@@ -2271,7 +2328,7 @@ export default function EventPlannerV8() {
   const timeline = generateTimeline(data);
   const risks = analyzeRisks(data);
   const suggestions = generateSuggestions(data, budget);
-  const calendarWarnings = checkCongressionalCalendar(data.date);
+  const calendarWarnings = checkCongressionalCalendar(data.date, data);
 
   const phaseComplete = {
     vision: !!(data.name && data.type && data.description && data.objectives),
@@ -2855,7 +2912,7 @@ export default function EventPlannerV8() {
     return (
       <div className="bg-blue-900/20 border border-blue-700/50 rounded-lg p-4 mt-4">
         <h4 className="text-blue-400 font-medium mb-2 flex items-center gap-2">
-          <span>📅</span> DC Calendar Notes
+          <span>📅</span> Calendar Notes
         </h4>
         <ul className="space-y-2">
           {calendarWarnings.map((w, i) => (
@@ -3125,6 +3182,7 @@ export default function EventPlannerV8() {
             <CheckboxGroup label="Production & Design" options={OPTIONS.production} selected={data.production} onToggle={(v) => toggle('production', v)} prompt={PROMPTS.production} />
             <CheckboxGroup label="Collateral & Materials" options={OPTIONS.collateral} selected={data.collateral} onToggle={(v) => toggle('collateral', v)} prompt={PROMPTS.collateral} />
             <CheckboxGroup label="Marketing & Promotion" options={OPTIONS.marketing} selected={data.marketing} onToggle={(v) => toggle('marketing', v)} prompt={PROMPTS.marketing} />
+            <CheckboxGroup label="On-Site Essentials" options={OPTIONS.onsite} selected={data.onsite || []} onToggle={(v) => toggle('onsite', v)} prompt={PROMPTS.onsite} />
             <CheckboxGroup label="Accessibility & Accommodations" options={OPTIONS.accessibility} selected={data.accessibility || []} onToggle={(v) => toggle('accessibility', v)} prompt={PROMPTS.accessibility} />
             <SuggestionsPanel phase="services" />
           </div>
@@ -3156,7 +3214,7 @@ export default function EventPlannerV8() {
             <div className="bg-purple-900/20 border border-purple-700/50 rounded-xl p-6">
               <h3 className="text-lg font-semibold text-purple-400 mb-4">🤖 AI-Powered Analysis</h3>
               <p className="text-purple-200/70 text-sm mb-4">
-                Get personalized suggestions based on DC policy event best practices, your specific audience, and timing considerations.
+                Get personalized suggestions based on policy event best practices, your specific audience, and timing considerations.
               </p>
               
               <button
@@ -3376,6 +3434,7 @@ export default function EventPlannerV8() {
                       agenda: [{ time: '', title: '', format: '', notes: '' }],
                       program: [], spaces: [], fnb: [], av: [], production: [], collateral: [], marketing: [], postEvent: [],
                       accessibility: [],
+                      onsite: [],
                       team: [{ name: '', role: '' }], notes: '', funding: ''
                     });
                     setCurrentPhase(0);
