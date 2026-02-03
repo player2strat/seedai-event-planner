@@ -57,16 +57,20 @@ const DURATION_OPTIONS = [
 
 const OPTIONS = {
   format: ['In-Person', 'Virtual', 'Hybrid'],
-  venue: ['Hotel Ballroom', 'Conference Center', 'Historic Venue', 'Government Building', 'University/Academic', 'Museum/Cultural', 'Rooftop/Outdoor', 'Restaurant/Private Dining', 'Corporate Office', 'Other'],
-  audience: ['Congressional Staff', 'Federal Agency Officials', 'State/Local Officials', 'Industry Executives', 'Small Business Owners', 'Nonprofit Leaders', 'Academics/Researchers', 'Journalists/Media', 'General Public', 'International Delegates', 'Students/Young Professionals'],
-  program: ['Keynote Address', 'Panel Discussion', 'Fireside Chat', 'Breakout Sessions', 'Workshops', 'Networking Breaks', 'Awards/Recognition', 'Press Conference', 'VIP Reception', 'Group Photo'],
-  spaces: ['Main Plenary Hall', 'Breakout Rooms', 'VIP Green Room', 'Press/Media Room', 'Registration Area', 'Networking Lounge', 'Outdoor Terrace', 'Executive Boardroom'],
+  venue: ['Hotel Ballroom', 'Conference Center', 'Historic Venue', 'Government Building', 'University/Academic', 'Museum/Cultural', 'Rooftop/Outdoor', 'Restaurant/Private Dining', 'Corporate Office', 'Embassy/Diplomatic', 'Other'],
+  audience: ['Congressional Staff', 'Members of Congress', 'Federal Agency Officials', 'State/Local Officials', 'Industry Executives', 'AI/Tech Company Representatives', 'Frontier AI Lab Staff', 'Think Tank / Policy Researchers', 'Small Business Owners', 'Nonprofit Leaders', 'Academics/Researchers', 'Coalition Members', 'Journalists/Media', 'General Public', 'International Delegates', 'Students/Young Professionals'],
+  recordPolicy: ['On the Record', 'Off the Record (Chatham House)', 'Background Only', 'Mixed (varies by session)', 'Not Applicable'],
+  inviteStrategy: ['Open Registration', 'Invite Only', 'Application-Based', 'Tiered (VIP invite + open registration)'],
+  program: ['Keynote Address', 'Panel Discussion', 'Fireside Chat', 'Breakout Sessions', 'Workshops', 'Networking Breaks', 'Awards/Recognition', 'Press Conference', 'VIP Reception', 'Group Photo', 'Demo / Exhibition / Hands-On', 'Lightning Talks', 'Roundtable Discussion', 'Private Dinner'],
+  agendaFormats: ['Keynote', 'Panel', 'Fireside Chat', 'Breakout', 'Workshop', 'Networking', 'Meal/Reception', 'Demo/Hands-On', 'Roundtable', 'Lightning Talks', 'Press Availability', 'Private Dinner', 'Registration/Arrival', 'Break', 'Other'],
+  spaces: ['Main Plenary Hall', 'Breakout Rooms', 'VIP Green Room', 'Press/Media Room', 'Registration Area', 'Networking Lounge', 'Outdoor Terrace', 'Executive Boardroom', 'Demo/Exhibition Area', 'Prayer/Quiet Room'],
   fnb: ['Continental Breakfast', 'Hot Breakfast', 'Morning Coffee/Tea', 'Working Lunch (Boxed)', 'Plated Lunch', 'Afternoon Break', 'Cocktail Reception', 'Happy Hour / Reception', 'Plated Dinner', 'Dessert Reception'],
   av: ['Projector/Screen', 'Confidence Monitor', 'Wireless Microphones', 'Podium with Mic', 'Livestream Setup', 'Recording Equipment', 'Video Playback', 'LED Wall/Display', 'Interpretation Equipment'],
   production: ['Stage Design', 'Custom Backdrop', 'Step & Repeat', 'Branded Signage', 'Floral Arrangements', 'Lighting Design', 'Event Photographer', 'Videographer'],
   collateral: ['Name Badges', 'Printed Agenda', 'Branded Folders', 'Note Pads/Pens', 'Gift Bags', 'Promotional Items', 'Policy Briefs/Reports', 'Speaker Bios'],
   marketing: ['Save the Date', 'Email Invitations', 'Event Website', 'Social Media Campaign', 'Press Release', 'Media Advisory', 'Paid Advertising', 'Partner Outreach'],
-  postEvent: ['Thank You Emails', 'Event Recording', 'Photo Gallery', 'Summary Report', 'Survey/Feedback', 'Social Media Recap', 'Media Clips Package']
+  postEvent: ['Thank You Emails', 'Event Recording', 'Photo Gallery', 'Summary Report', 'Survey/Feedback', 'Social Media Recap', 'Media Clips Package', 'Follow-Up Meetings', 'Impact Report for Funders'],
+  accessibility: ['Wheelchair Accessible Venue', 'Sign Language Interpretation', 'Live Captioning / CART', 'Assistive Listening Devices', 'Large Print Materials', 'Dietary Accommodations Collected', 'Gender-Neutral Restrooms', 'Nursing/Lactation Room', 'Quiet Room Available']
 };
 
 const DEFAULT_COSTS = {
@@ -269,26 +273,31 @@ const PROMPTS = {
   name: "What's the working title for your event? This can evolve as planning progresses.",
   type: "What type of event best describes what you're planning?",
   description: "In 2-3 sentences, describe what this event is about. What's the core theme or focus?",
-  objectives: "What does success look like? What should attendees walk away with? What impact do you want to create?",
-  size: "How many people do you realistically expect to attend?",
-  audience: "Who specifically are you trying to reach? Think about job titles, sectors, and why they'd want to attend.",
-  vips: "Are there specific high-profile individuals you're hoping to attract? Members of Congress, executives, thought leaders?",
-  speakers: "Who would be ideal to present, moderate, or lead discussions? Dream big, but also consider realistic options.",
-  date: "When are you planning to hold this event? Consider seasonality and competing events.",
-  duration: "How long do you need to accomplish your goals?",
-  format: "Will attendees gather in person, join virtually, or both?",
-  venue: "What type of space fits your event's tone and needs?",
+  objectives: "If one attendee tells a colleague about this event next week, what do you want them to say? What decisions or actions should this event drive?",
+  recordPolicy: "Will conversations be on or off the record? This shapes who says yes, how candid speakers are, and whether media can attend.",
+  partners: "Who are you co-hosting or co-presenting with? Partners change the invite list, credibility, branding, and sometimes the budget split.",
+  inviteStrategy: "How are you controlling who attends? Open events maximize reach; invite-only builds exclusivity and trust.",
+  size: "How many people do you realistically expect to attend? If invite-only, plan to invite 2-3x your target.",
+  audience: "Who specifically needs to be in the room for this event to succeed? Think about the conversations you want to happen between attendees.",
+  vips: "Who are the 3-5 people whose attendance would make this event a success? What would make them say yes?",
+  speakers: "Who would be ideal to present, moderate, or lead discussions? Consider who your target audience would rearrange their schedule to hear.",
+  date: "When are you planning to hold this event? Consider recess schedules, competing events, and lead time for invitations.",
+  duration: "How long do you need to accomplish your goals? Shorter events get better Hill attendance; longer events allow deeper engagement.",
+  format: "Will attendees gather in person, join virtually, or both? Hybrid requires separate production planning for each audience.",
+  venue: "What type of space fits your event's tone? Government buildings signal official credibility; hotels signal neutrality; universities signal academic rigor.",
   region: "Where will this event take place? This helps us estimate local market costs.",
-  spaces: "Beyond the main room, what other spaces might you need?",
-  program: "What elements will make up your agenda? Think about variety and pacing.",
-  fnb: "Food and beverage sets the tone. What level of hospitality fits your event?",
+  spaces: "Beyond the main room, what other spaces might you need? Think about where informal conversations happen.",
+  program: "What elements will make up your agenda? Think about variety, pacing, and what the signature moment will be.",
+  agenda: "Sketch your agenda flow — even rough timing helps. This feeds directly into your Run of Show document.",
+  fnb: "Food and beverage sets the tone and affects compliance. Note: federal ethics rules limit gifts to $20/item for government attendees.",
   av: "What technology do you need to deliver your content effectively?",
   production: "What visual and design elements will enhance the experience?",
   collateral: "What materials will attendees receive or take home?",
   marketing: "How will you spread the word and drive registration?",
-  postEvent: "What happens after the event to extend its impact?",
+  postEvent: "What happens after the event to extend its impact? The best events create follow-up opportunities that wouldn't have existed otherwise.",
+  accessibility: "What accommodations should you provide? Many DC venues have ADA requirements, and federal attendees may need specific accommodations.",
   team: "Who are the key people responsible for making this happen?",
-  funding: "Where is the budget coming from? Sponsors, organizational budget, grants?",
+  funding: "Where is the budget coming from? Sponsors, organizational budget, grants? Note any restrictions on how funds can be used.",
   notes: "Anything else important to remember as planning progresses?"
 };
 
@@ -615,8 +624,10 @@ Expected Attendance: ${size.min}-${size.max} guests
 Duration: ${DURATION_OPTIONS.find(d => d.value === data.duration)?.label || 'TBD'}
 Location: ${budget.region}
 Venue Type: ${data.venue || 'TBD'}
+${data.recordPolicy ? `Record Policy: ${data.recordPolicy}` : ''}
+${data.inviteStrategy ? `Invitation Strategy: ${data.inviteStrategy}` : ''}
 
-BUDGET SUMMARY
+${data.partners ? `PARTNERS & CO-HOSTS\n${'-'.repeat(40)}\n${data.partners}\n` : ''}BUDGET SUMMARY
 ${'-'.repeat(40)}
 Estimated Range: ${fmt(budget.total.min)} - ${fmt(budget.total.max)}
 
@@ -635,6 +646,8 @@ ${data.speakers || 'Not confirmed'}
 PROGRAM HIGHLIGHTS
 ${'-'.repeat(40)}
 ${(data.program || []).join(', ') || 'Program not finalized'}
+${(data.agenda || []).filter(a => a.title).length > 0 ? `\nAGENDA SKETCH\n${'-'.repeat(40)}\n${data.agenda.filter(a => a.title).map(a => `${a.time || 'TBD'} — ${a.title}${a.format ? ` [${a.format}]` : ''}`).join('\n')}` : ''}
+${(data.accessibility || []).length > 0 ? `\nACCESSIBILITY\n${'-'.repeat(40)}\n${data.accessibility.join(', ')}` : ''}
 
 ---
 Generated by SeedAI Event Planner | ${new Date().toLocaleDateString()}`;
@@ -642,9 +655,21 @@ Generated by SeedAI Event Planner | ${new Date().toLocaleDateString()}`;
 
 const generateRunOfShow = (data, budget) => {
   const duration = DURATION_OPTIONS.find(d => d.value === data.duration) || DURATION_OPTIONS[1];
+  const agendaItems = (data.agenda || []).filter(a => a.time || a.title);
   let schedule = '';
-  
-  if (duration.days <= 1) {
+
+  if (agendaItems.length > 0) {
+    // Use the user's actual agenda sketch
+    schedule = `\n08:00 AM  Staff arrival and setup\n08:30 AM  Vendor check-in, AV testing`;
+    for (const item of agendaItems) {
+      const time = item.time ? item.time.padEnd(10) : '          ';
+      const title = item.title || 'TBD';
+      const fmt = item.format ? ` [${item.format}]` : '';
+      const notes = item.notes ? `\n          Notes: ${item.notes}` : '';
+      schedule += `\n${time}${title}${fmt}${notes}`;
+    }
+    schedule += `\n          Closing & wrap-up\n          Venue breakdown`;
+  } else if (duration.days <= 1) {
     schedule = `
 08:00 AM  Staff arrival and setup
 08:30 AM  Vendor check-in, AV testing
@@ -698,11 +723,15 @@ DAY 3
     }
   }
 
+  const recordLine = data.recordPolicy ? `Record Policy: ${data.recordPolicy}` : '';
+  const partnersLine = data.partners ? `Partners: ${data.partners}` : '';
+
   return `RUN OF SHOW
 ${'='.repeat(60)}
 
 ${data.name || 'Untitled Event'}
 ${data.date || 'Date TBD'} | ${budget.region}
+${recordLine ? recordLine + '\n' : ''}${partnersLine ? partnersLine + '\n' : ''}
 ${schedule}
 
 KEY CONTACTS
@@ -781,14 +810,18 @@ ${'-'.repeat(40)}
 [ ] Define event goals and success metrics
 [ ] Establish preliminary budget
 [ ] Identify key stakeholders
+${data.partners ? '[ ] Confirm co-host/partner commitments and roles' : ''}
 [ ] Begin venue research
+${data.recordPolicy && data.recordPolicy !== 'Not Applicable' ? `[ ] Establish record policy (${data.recordPolicy}) and communicate to speakers` : ''}
 
 14 WEEKS OUT
 ${'-'.repeat(40)}
 [ ] Secure venue contract
+${(data.accessibility || []).length > 0 ? '[ ] Confirm venue accessibility requirements' : ''}
 [ ] Confirm event date
 [ ] Draft speaker wish list
 [ ] Create project timeline
+${data.inviteStrategy === 'Application-Based' ? '[ ] Design and launch application process' : ''}
 
 12 WEEKS OUT
 ${'-'.repeat(40)}
@@ -796,6 +829,9 @@ ${'-'.repeat(40)}
 [ ] Finalize program outline
 [ ] Select catering vendor
 [ ] Book AV provider
+${(data.audience || []).some(a => ['Congressional Staff', 'Members of Congress', 'Federal Agency Officials'].includes(a)) ? '[ ] Verify federal ethics compliance for meals/gifts' : ''}
+${(data.accessibility || []).includes('Sign Language Interpretation') ? '[ ] Book sign language interpreters' : ''}
+${(data.accessibility || []).includes('Live Captioning / CART') ? '[ ] Book CART / live captioning services' : ''}
 
 10 WEEKS OUT
 ${'-'.repeat(40)}
@@ -884,6 +920,7 @@ Format: ${data.format || 'In-Person'}
 SPACE REQUIREMENTS
 ${'-'.repeat(40)}
 ${(data.spaces || []).map(s => `• ${s}`).join('\n') || '• Main event space\n• Registration area'}
+${(data.accessibility || []).length > 0 ? `\nACCESSIBILITY REQUIREMENTS\n${'-'.repeat(40)}\n${data.accessibility.map(a => `• ${a}`).join('\n')}` : ''}
 
 CATERING NEEDS
 ${'-'.repeat(40)}
@@ -1284,6 +1321,79 @@ const TeamMemberInput = ({ members, onChange, prompt }) => (
   </div>
 );
 
+const AgendaSketch = ({ agenda, onChange, prompt }) => (
+  <div className="mb-6">
+    <label className="block text-sm font-medium text-zinc-300 mb-1">Agenda Sketch</label>
+    {prompt && <Prompt text={prompt} />}
+    <div className="space-y-3">
+      {agenda.map((item, i) => (
+        <div key={i} className="bg-zinc-900/50 border border-zinc-800 rounded-lg p-3">
+          <div className="flex gap-2 mb-2">
+            <input
+              placeholder="Time (e.g. 9:00 AM)"
+              value={item.time}
+              onChange={(e) => {
+                const updated = [...agenda];
+                updated[i] = { ...updated[i], time: e.target.value };
+                onChange(updated);
+              }}
+              className="w-32 bg-zinc-900 border border-zinc-700 rounded-lg px-3 py-2 text-white text-sm focus:border-emerald-500 focus:outline-none"
+            />
+            <input
+              placeholder="Session title"
+              value={item.title}
+              onChange={(e) => {
+                const updated = [...agenda];
+                updated[i] = { ...updated[i], title: e.target.value };
+                onChange(updated);
+              }}
+              className="flex-1 bg-zinc-900 border border-zinc-700 rounded-lg px-3 py-2 text-white text-sm focus:border-emerald-500 focus:outline-none"
+            />
+            <select
+              value={item.format}
+              onChange={(e) => {
+                const updated = [...agenda];
+                updated[i] = { ...updated[i], format: e.target.value };
+                onChange(updated);
+              }}
+              className="w-40 bg-zinc-900 border border-zinc-700 rounded-lg px-3 py-2 text-white text-sm focus:border-emerald-500 focus:outline-none"
+            >
+              <option value="">Format...</option>
+              {OPTIONS.agendaFormats.map(f => <option key={f} value={f}>{f}</option>)}
+            </select>
+            {agenda.length > 1 && (
+              <button
+                type="button"
+                onClick={() => onChange(agenda.filter((_, j) => j !== i))}
+                className="px-3 py-2 bg-red-900/50 text-red-400 rounded-lg hover:bg-red-900 text-sm"
+              >
+                ×
+              </button>
+            )}
+          </div>
+          <input
+            placeholder="Notes — speaker names, key topics, special setup..."
+            value={item.notes}
+            onChange={(e) => {
+              const updated = [...agenda];
+              updated[i] = { ...updated[i], notes: e.target.value };
+              onChange(updated);
+            }}
+            className="w-full bg-zinc-900 border border-zinc-700 rounded-lg px-3 py-2 text-white text-sm focus:border-emerald-500 focus:outline-none"
+          />
+        </div>
+      ))}
+    </div>
+    <button
+      type="button"
+      onClick={() => onChange([...agenda, { time: '', title: '', format: '', notes: '' }])}
+      className="text-emerald-400 text-sm hover:text-emerald-300 mt-2"
+    >
+      + Add session
+    </button>
+  </div>
+);
+
 // ============================================================================
 // MAIN COMPONENT
 // ============================================================================
@@ -1293,7 +1403,10 @@ export default function EventPlannerV8() {
   const [data, setData] = useState({
     name: '', type: '', size: '', duration: '', date: '', format: '', venue: '', region: 'dc-metro',
     description: '', objectives: '', audience: [], vips: '', speakers: '',
+    recordPolicy: '', partners: '', inviteStrategy: '',
+    agenda: [{ time: '', title: '', format: '', notes: '' }],
     program: [], spaces: [], fnb: [], av: [], production: [], collateral: [], marketing: [], postEvent: [],
+    accessibility: [],
     team: [{ name: '', role: '' }], notes: '', funding: ''
   });
   const [vendorData, setVendorData] = useState(null);
@@ -1413,7 +1526,11 @@ export default function EventPlannerV8() {
             size: sizeName,
             duration: durationName,
             format: data.format,
-            venue: data.venue
+            venue: data.venue,
+            recordPolicy: data.recordPolicy,
+            partners: data.partners,
+            inviteStrategy: data.inviteStrategy,
+            accessibility: data.accessibility
           }
         })
       });
@@ -2366,7 +2483,9 @@ export default function EventPlannerV8() {
             <FormInput label="Event Name" value={data.name} onChange={(v) => update('name', v)} required placeholder="e.g., 2026 Climate Policy Summit" prompt={PROMPTS.name} />
             <FormInput label="Event Type" value={data.type} onChange={(v) => update('type', v)} type="select" options={EVENT_TYPES} required prompt={PROMPTS.type} />
             <FormInput label="Description" value={data.description} onChange={(v) => update('description', v)} type="textarea" required placeholder="Describe the event's purpose and focus..." prompt={PROMPTS.description} />
-            <FormInput label="Objectives" value={data.objectives} onChange={(v) => update('objectives', v)} type="textarea" required placeholder="What outcomes are you working toward?" prompt={PROMPTS.objectives} />
+            <FormInput label="Objectives" value={data.objectives} onChange={(v) => update('objectives', v)} type="textarea" required placeholder="If one attendee tells a colleague about this event, what should they say?" prompt={PROMPTS.objectives} />
+            <FormInput label="Record Policy" value={data.recordPolicy} onChange={(v) => update('recordPolicy', v)} type="select" options={OPTIONS.recordPolicy} prompt={PROMPTS.recordPolicy} />
+            <FormInput label="Partners & Co-Hosts" value={data.partners} onChange={(v) => update('partners', v)} type="textarea" placeholder="e.g., Co-hosted with FAS and IFP. ASN coalition members invited to participate." prompt={PROMPTS.partners} />
           </div>
         );
 
@@ -2374,10 +2493,11 @@ export default function EventPlannerV8() {
         return (
           <div className="space-y-6">
             <FormInput label="Expected Size" value={data.size} onChange={(v) => update('size', v)} type="select" required options={Object.entries(SIZE_CONFIG).map(([k, v]) => ({ value: k, label: v.label }))} prompt={PROMPTS.size} />
+            <FormInput label="Invitation Strategy" value={data.inviteStrategy} onChange={(v) => update('inviteStrategy', v)} type="select" options={OPTIONS.inviteStrategy} prompt={PROMPTS.inviteStrategy} />
             <CheckboxGroup label="Target Audience" options={OPTIONS.audience} selected={data.audience} onToggle={(v) => toggle('audience', v)} prompt={PROMPTS.audience} />
             <SuggestionsPanel phase="audience" />
-            <FormInput label="VIP Attendees" value={data.vips} onChange={(v) => update('vips', v)} type="textarea" placeholder="List specific high-profile individuals you're targeting..." prompt={PROMPTS.vips} />
-            <FormInput label="Speakers / Presenters" value={data.speakers} onChange={(v) => update('speakers', v)} type="textarea" placeholder="Who do you want to present or lead sessions?" prompt={PROMPTS.speakers} />
+            <FormInput label="VIP Attendees" value={data.vips} onChange={(v) => update('vips', v)} type="textarea" placeholder="Who are the 3-5 people whose attendance would make this event a success?" prompt={PROMPTS.vips} />
+            <FormInput label="Speakers / Presenters" value={data.speakers} onChange={(v) => update('speakers', v)} type="textarea" placeholder="Who would your target audience rearrange their schedule to hear?" prompt={PROMPTS.speakers} />
           </div>
         );
 
@@ -2412,6 +2532,7 @@ export default function EventPlannerV8() {
         return (
           <div className="space-y-6">
             <CheckboxGroup label="Program Elements" options={OPTIONS.program} selected={data.program} onToggle={(v) => toggle('program', v)} prompt={PROMPTS.program} />
+            <AgendaSketch agenda={data.agenda || [{ time: '', title: '', format: '', notes: '' }]} onChange={(v) => update('agenda', v)} prompt={PROMPTS.agenda} />
             <CheckboxGroup label="Post-Event Activities" options={OPTIONS.postEvent} selected={data.postEvent} onToggle={(v) => toggle('postEvent', v)} prompt={PROMPTS.postEvent} />
             <SuggestionsPanel phase="program" />
           </div>
@@ -2425,6 +2546,7 @@ export default function EventPlannerV8() {
             <CheckboxGroup label="Production & Design" options={OPTIONS.production} selected={data.production} onToggle={(v) => toggle('production', v)} prompt={PROMPTS.production} />
             <CheckboxGroup label="Collateral & Materials" options={OPTIONS.collateral} selected={data.collateral} onToggle={(v) => toggle('collateral', v)} prompt={PROMPTS.collateral} />
             <CheckboxGroup label="Marketing & Promotion" options={OPTIONS.marketing} selected={data.marketing} onToggle={(v) => toggle('marketing', v)} prompt={PROMPTS.marketing} />
+            <CheckboxGroup label="Accessibility & Accommodations" options={OPTIONS.accessibility} selected={data.accessibility || []} onToggle={(v) => toggle('accessibility', v)} prompt={PROMPTS.accessibility} />
             <SuggestionsPanel phase="services" />
           </div>
         );
@@ -2671,7 +2793,10 @@ export default function EventPlannerV8() {
                     setData({
                       name: '', type: '', size: '', duration: '', date: '', format: '', venue: '', region: 'dc-metro',
                       description: '', objectives: '', audience: [], vips: '', speakers: '',
+                      recordPolicy: '', partners: '', inviteStrategy: '',
+                      agenda: [{ time: '', title: '', format: '', notes: '' }],
                       program: [], spaces: [], fnb: [], av: [], production: [], collateral: [], marketing: [], postEvent: [],
+                      accessibility: [],
                       team: [{ name: '', role: '' }], notes: '', funding: ''
                     });
                     setCurrentPhase(0);
