@@ -440,16 +440,30 @@ function generateSuggestions(data, budget) {
 }
 
 function calculateBudget(data, vendorData) {
-  const size = SIZE_CONFIG[data.size] || SIZE_CONFIG.medium;
+  // If no size selected, return zeros
+  if (!data.size) {
+    return {
+      costs: { venue: { min: 0, max: 0 }, fnb: 0, av: 0, production: 0, collateral: 0, marketing: 0 },
+      subtotal: { min: 0, max: 0 },
+      staffing: { min: 0, max: 0 },
+      contingency: { min: 0, max: 0 },
+      total: { min: 0, max: 0 },
+      guests: 0,
+      days: 1,
+      region: (REGIONS[data.region] || REGIONS['dc-metro']).name
+    };
+  }
+
+  const size = SIZE_CONFIG[data.size];
   const guests = Math.round((size.min + size.max) / 2);
   const duration = DURATION_OPTIONS.find(d => d.value === data.duration) || DURATION_OPTIONS[1];
   const days = duration.days;
   const region = REGIONS[data.region] || REGIONS['dc-metro'];
-  const multiplier = region.multiplier;
+  const multiplier = data.customCity ? 1.0 : region.multiplier;
 
   const costs = { venue: { min: 0, max: 0 }, fnb: 0, av: 0, production: 0, collateral: 0, marketing: 0 };
 
-  const venueRange = DEFAULT_COSTS.venue[data.size] || [5000, 15000];
+  const venueRange = DEFAULT_COSTS.venue[data.size] || [0, 0];
   costs.venue.min = Math.round(venueRange[0] * days * multiplier);
   costs.venue.max = Math.round(venueRange[1] * days * multiplier);
 
@@ -493,7 +507,7 @@ function calculateBudget(data, vendorData) {
     total: { min: subtotalMin + staffingMin + contingencyMin, max: subtotalMax + staffingMax + contingencyMax },
     guests,
     days,
-    region: region.name
+    region: data.customCity || region.name
   };
 }
 
@@ -1335,7 +1349,7 @@ export default function EventPlannerV8() {
     setIsLoadingMarket(true);
     setMarketError(null);
     try {
-      const regionName = REGIONS[data.region]?.name || data.region;
+      const regionName = data.customCity || REGIONS[data.region]?.name || data.region;
       const sizeName = SIZE_CONFIG[data.size]?.label || data.size;
       const durationName = DURATION_OPTIONS.find(d => d.value === data.duration)?.label || data.duration;
       
@@ -2030,7 +2044,20 @@ export default function EventPlannerV8() {
             <FormInput label="Duration" value={data.duration} onChange={(v) => update('duration', v)} type="select" required options={DURATION_OPTIONS} prompt={PROMPTS.duration} />
             <FormInput label="Format" value={data.format} onChange={(v) => update('format', v)} type="select" required options={OPTIONS.format} prompt={PROMPTS.format} />
             <FormInput label="Venue Type" value={data.venue} onChange={(v) => update('venue', v)} type="select" required options={OPTIONS.venue} prompt={PROMPTS.venue} />
-            <FormInput label="Location" value={data.region} onChange={(v) => update('region', v)} type="select" required options={Object.entries(REGIONS).map(([k, v]) => ({ value: k, label: v.name }))} prompt={PROMPTS.region} />
+            <FormInput label="Location" value={data.region} onChange={(v) => { update('region', v); if (v !== 'other') update('customCity', ''); }} type="select" required options={Object.entries(REGIONS).map(([k, v]) => ({ value: k, label: v.name }))} prompt={PROMPTS.region} />
+            {data.region === 'other' && (
+              <div>
+                <label className="block text-sm font-medium text-zinc-300 mb-1">City / Metro Area</label>
+                <input
+                  type="text"
+                  value={data.customCity || ''}
+                  onChange={(e) => update('customCity', e.target.value)}
+                  placeholder="e.g., Nashville, TN"
+                  className="w-full bg-zinc-900 border border-zinc-700 rounded-lg px-4 py-3 text-white focus:border-emerald-500 focus:outline-none"
+                />
+                <p className="text-zinc-500 text-xs mt-1">Use "Get Live Market Rates" on the Review page for pricing specific to this city</p>
+              </div>
+            )}
             <CheckboxGroup label="Spaces Needed" options={OPTIONS.spaces} selected={data.spaces} onToggle={(v) => toggle('spaces', v)} prompt={PROMPTS.spaces} />
             <SuggestionsPanel phase="logistics" />
           </div>
@@ -2166,7 +2193,7 @@ export default function EventPlannerV8() {
               {marketData && (
                 <div className="mt-6 pt-6 border-t border-zinc-700">
                   <h4 className="text-md font-semibold text-emerald-400 mb-4 flex items-center gap-2">
-                    📊 Live Market Data for {REGIONS[data.region]?.name || data.region}
+                    📊 Live Market Data for {data.customCity || REGIONS[data.region]?.name || data.region}
                     <span className={`text-xs px-2 py-0.5 rounded ${
                       marketData.confidence === 'high' ? 'bg-green-900 text-green-300' :
                       marketData.confidence === 'medium' ? 'bg-yellow-900 text-yellow-300' :
