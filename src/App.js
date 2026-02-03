@@ -59,7 +59,6 @@ const OPTIONS = {
   format: ['In-Person', 'Virtual', 'Hybrid'],
   venue: ['Hotel Ballroom', 'Conference Center', 'Historic Venue', 'Government Building', 'University/Academic', 'Museum/Cultural', 'Rooftop/Outdoor', 'Restaurant/Private Dining', 'Corporate Office', 'Embassy/Diplomatic', 'Other'],
   audience: ['Congressional Staff', 'Members of Congress', 'Federal Agency Officials', 'State/Local Officials', 'Industry Executives', 'AI/Tech Company Representatives', 'Frontier AI Lab Staff', 'Think Tank / Policy Researchers', 'Small Business Owners', 'Nonprofit Leaders', 'Academics/Researchers', 'Coalition Members', 'Journalists/Media', 'General Public', 'International Delegates', 'Students/Young Professionals'],
-  recordPolicy: ['On the Record', 'Off the Record (Chatham House)', 'Background Only', 'Mixed (varies by session)', 'Not Applicable'],
   inviteStrategy: ['Open Registration', 'Invite Only', 'Application-Based', 'Tiered (VIP invite + open registration)'],
   program: ['Keynote Address', 'Panel Discussion', 'Fireside Chat', 'Breakout Sessions', 'Workshops', 'Networking Breaks', 'Awards/Recognition', 'Press Conference', 'VIP Reception', 'Group Photo', 'Demo / Exhibition / Hands-On', 'Lightning Talks', 'Roundtable Discussion', 'Private Dinner'],
   agendaFormats: ['Keynote', 'Panel', 'Fireside Chat', 'Breakout', 'Workshop', 'Networking', 'Meal/Reception', 'Demo/Hands-On', 'Roundtable', 'Lightning Talks', 'Press Availability', 'Private Dinner', 'Registration/Arrival', 'Break', 'Other'],
