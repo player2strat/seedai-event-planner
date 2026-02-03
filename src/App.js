@@ -1307,6 +1307,10 @@ export default function EventPlannerV8() {
   const [marketData, setMarketData] = useState(null);
   const [isLoadingMarket, setIsLoadingMarket] = useState(false);
   const [marketError, setMarketError] = useState(null);
+  const [refinedDocs, setRefinedDocs] = useState({});
+  const [refiningDoc, setRefiningDoc] = useState(null);
+  const [refineError, setRefineError] = useState(null);
+  const [docViewMode, setDocViewMode] = useState({});
   const fileInputRef = useRef(null);
 
   // Fetch AI Suggestions from API
@@ -1381,6 +1385,269 @@ export default function EventPlannerV8() {
       setIsLoadingMarket(false);
     }
   };
+
+  // Refine Document with AI
+  const refineDocument = async (docKey) => {
+    setRefiningDoc(docKey);
+    setRefineError(null);
+    try {
+      const docDef = DOCUMENTS[docKey];
+      const draft = docDef.generate(data, budget);
+      
+      const regionName = data.customCity || REGIONS[data.region]?.name || data.region;
+      const sizeName = SIZE_CONFIG[data.size]?.label || data.size;
+      const durationName = DURATION_OPTIONS.find(d => d.value === data.duration)?.label || data.duration;
+
+      const response = await fetch('/api/refine-document', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          documentType: docKey,
+          draft,
+          teamMembers: data.team,
+          eventData: {
+            name: data.name,
+            type: data.type,
+            date: data.date,
+            region: regionName,
+            size: sizeName,
+            duration: durationName,
+            format: data.format,
+            venue: data.venue
+          }
+        })
+      });
+      
+      if (!response.ok) {
+        const errorData = await response.json().catch(() => ({}));
+        throw new Error(errorData.error || 'Failed to refine document');
+      }
+      
+      const result = await response.json();
+      setRefinedDocs(prev => ({ ...prev, [docKey]: result.refined }));
+      setDocViewMode(prev => ({ ...prev, [docKey]: 'refined' }));
+    } catch (error) {
+      console.error('Error refining document:', error);
+      setRefineError(error.message);
+    } finally {
+      setRefiningDoc(null);
+    }
+  };
+
+  // Per-document PDF export
+  const exportDocPDF = useCallback(async (title, content, filename) => {
+    if (!window.jspdf) {
+      const script = document.createElement('script');
+      script.src = 'https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js';
+      document.head.appendChild(script);
+      await new Promise(resolve => script.onload = resolve);
+    }
+
+    const { jsPDF } = window.jspdf;
+    const pdf = new jsPDF();
+    const pageWidth = pdf.internal.pageSize.getWidth();
+    const margin = 20;
+    const contentWidth = pageWidth - (margin * 2);
+    let y = 20;
+
+    // Header bar
+    pdf.setFillColor(24, 24, 27);
+    pdf.rect(0, 0, pageWidth, 35, 'F');
+    pdf.setFontSize(16);
+    pdf.setFont('helvetica', 'bold');
+    pdf.setTextColor(16, 185, 129);
+    pdf.text(title, margin, 15);
+    pdf.setFontSize(9);
+    pdf.setTextColor(161, 161, 170);
+    pdf.text(`${data.name || 'Event'} | Generated: ${new Date().toLocaleDateString()}`, margin, 25);
+    y = 45;
+
+    pdf.setFontSize(10);
+    pdf.setFont('helvetica', 'normal');
+    pdf.setTextColor(30, 30, 30);
+
+    const textLines = pdf.splitTextToSize(content, contentWidth);
+    for (const line of textLines) {
+      if (y > pdf.internal.pageSize.getHeight() - 20) {
+        pdf.addPage();
+        y = 20;
+      }
+      if (line.match(/^[A-Z][A-Z\s\-—|:]{5,}$/) || line.match(/^(TIME|TASK|NAME|CATEGORY)\s*\|/)) {
+        pdf.setFont('helvetica', 'bold');
+        pdf.setTextColor(16, 185, 129);
+        pdf.text(line, margin, y);
+        pdf.setFont('helvetica', 'normal');
+        pdf.setTextColor(30, 30, 30);
+      } else if (line.startsWith('---') || line.startsWith('===')) {
+        pdf.setDrawColor(200, 200, 200);
+        pdf.line(margin, y - 2, pageWidth - margin, y - 2);
+      } else {
+        pdf.text(line, margin, y);
+      }
+      y += 5;
+    }
+
+    const pageCount = pdf.internal.getNumberOfPages();
+    for (let i = 1; i <= pageCount; i++) {
+      pdf.setPage(i);
+      pdf.setFontSize(8);
+      pdf.setTextColor(150, 150, 150);
+      pdf.text(`Page ${i} of ${pageCount}`, pageWidth - margin - 20, pdf.internal.pageSize.getHeight() - 10);
+      pdf.text('SeedAI Event Planner', margin, pdf.internal.pageSize.getHeight() - 10);
+    }
+
+    pdf.save(filename);
+  }, [data]);
+
+  // Per-document DOCX export
+  const exportDocDOCX = useCallback(async (docKey, title, content) => {
+    if (!window.docx) {
+      const script = document.createElement('script');
+      script.src = 'https://unpkg.com/docx@8.2.2/build/index.umd.js';
+      document.head.appendChild(script);
+      await new Promise(resolve => script.onload = resolve);
+    }
+
+    const { Document: DocxDoc, Packer, Paragraph, TextRun, Table, TableRow, TableCell,
+            HeadingLevel, BorderStyle, WidthType, ShadingType } = window.docx;
+
+    const bdr = { style: BorderStyle.SINGLE, size: 1, color: 'D1D5DB' };
+    const bdrs = { top: bdr, bottom: bdr, left: bdr, right: bdr };
+    const cellMg = { top: 60, bottom: 60, left: 100, right: 100 };
+
+    const contentLines = content.split('\n');
+    const docChildren = [];
+
+    // Document header
+    docChildren.push(new Paragraph({
+      children: [new TextRun({ text: '🌱 SeedAI Event Planner', bold: true, size: 28, color: '10B981' })],
+      spacing: { after: 80 }
+    }));
+    docChildren.push(new Paragraph({
+      children: [new TextRun({ text: `${data.name || 'Event'} — ${title}`, bold: true, size: 40 })],
+      heading: HeadingLevel.HEADING_1,
+      spacing: { after: 80 }
+    }));
+    docChildren.push(new Paragraph({
+      children: [new TextRun({ text: `Generated: ${new Date().toLocaleDateString()} | ${data.type || 'Event'} | ${data.date || 'Date TBD'}`, size: 20, color: '71717A' })],
+      spacing: { after: 400 }
+    }));
+
+    // Parse content — detect tables, headers, body text
+    const pendingTable = [];
+
+    const flushTable = () => {
+      if (pendingTable.length === 0) return;
+      const hdrCells = pendingTable[0].split('|').map(c => c.trim()).filter(Boolean);
+      const cols = hdrCells.length;
+      const cw = Math.floor(9360 / cols);
+
+      const tblRows = [
+        new TableRow({
+          children: hdrCells.map(cell => new TableCell({
+            borders: bdrs, width: { size: cw, type: WidthType.DXA }, margins: cellMg,
+            shading: { fill: '10B981', type: ShadingType.CLEAR },
+            children: [new Paragraph({ children: [new TextRun({ text: cell, bold: true, size: 18, color: 'FFFFFF' })] })]
+          }))
+        })
+      ];
+
+      for (let i = 1; i < pendingTable.length; i++) {
+        const cells = pendingTable[i].split('|').map(c => c.trim()).filter(Boolean);
+        while (cells.length < cols) cells.push('');
+        tblRows.push(new TableRow({
+          children: cells.slice(0, cols).map(cell => new TableCell({
+            borders: bdrs, width: { size: cw, type: WidthType.DXA }, margins: cellMg,
+            children: [new Paragraph({ children: [new TextRun({ text: cell, size: 18 })] })]
+          }))
+        }));
+      }
+
+      docChildren.push(new Table({
+        width: { size: 100, type: WidthType.PERCENTAGE },
+        columnWidths: Array(cols).fill(cw),
+        rows: tblRows
+      }));
+      docChildren.push(new Paragraph({ spacing: { after: 200 }, children: [] }));
+      pendingTable.length = 0;
+    };
+
+    for (const line of contentLines) {
+      const t = line.trim();
+
+      if (!t) {
+        flushTable();
+        docChildren.push(new Paragraph({ spacing: { after: 120 }, children: [] }));
+        continue;
+      }
+
+      // Table row detection
+      if (t.includes('|') && t.split('|').filter(Boolean).length >= 2 && !t.match(/^[\s|:-]+$/)) {
+        pendingTable.push(t);
+        continue;
+      }
+      if (t.match(/^[\s|:-]+$/)) continue; // separator line
+
+      flushTable();
+
+      if (t.match(/^[A-Z][A-Z\s\-—&/()]{4,}$/) || t.match(/^#{1,3}\s/)) {
+        docChildren.push(new Paragraph({
+          children: [new TextRun({ text: t.replace(/^#+\s*/, ''), bold: true, size: 24, color: 'FFFFFF' })],
+          shading: { fill: '10B981', type: ShadingType.CLEAR },
+          spacing: { before: 300, after: 200 },
+          heading: HeadingLevel.HEADING_2
+        }));
+      } else if (t.startsWith('---') || t.startsWith('===')) {
+        // skip
+      } else if (t.startsWith('- ') || t.startsWith('• ')) {
+        docChildren.push(new Paragraph({
+          children: [new TextRun({ text: `  ${t}`, size: 20 })],
+          spacing: { after: 60 }
+        }));
+      } else if (t.match(/^(Subject|To|From|Date|Dear|Sincerely|Best|Re:)/i)) {
+        const colonIdx = t.indexOf(':');
+        if (colonIdx > 0 && colonIdx < 15) {
+          docChildren.push(new Paragraph({
+            children: [
+              new TextRun({ text: t.substring(0, colonIdx + 1), bold: true, size: 20 }),
+              new TextRun({ text: t.substring(colonIdx + 1), size: 20 })
+            ],
+            spacing: { after: 80 }
+          }));
+        } else {
+          docChildren.push(new Paragraph({ children: [new TextRun({ text: t, size: 20 })], spacing: { after: 80 } }));
+        }
+      } else {
+        docChildren.push(new Paragraph({ children: [new TextRun({ text: t, size: 20 })], spacing: { after: 80 } }));
+      }
+    }
+
+    flushTable();
+
+    // Footer
+    docChildren.push(new Paragraph({ spacing: { before: 400 }, children: [] }));
+    docChildren.push(new Paragraph({
+      children: [new TextRun({ text: `Generated by SeedAI Event Planner | ${new Date().toLocaleDateString()}`, size: 16, color: '71717A', italics: true })]
+    }));
+
+    const docFile = new DocxDoc({
+      styles: { default: { document: { run: { font: 'Arial', size: 20 } } } },
+      sections: [{
+        properties: {
+          page: { size: { width: 12240, height: 15840 }, margin: { top: 1440, right: 1440, bottom: 1440, left: 1440 } }
+        },
+        children: docChildren
+      }]
+    });
+
+    const blob = await Packer.toBlob(docFile);
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `${data.name || 'event'}-${docKey}.docx`.toLowerCase().replace(/\s+/g, '-');
+    a.click();
+    URL.revokeObjectURL(url);
+  }, [data]);
 
   // Load saved data
   useEffect(() => {
@@ -1907,27 +2174,105 @@ export default function EventPlannerV8() {
   // Document Modal
   const DocumentModal = () => {
     if (!activeDoc) return null;
-    const doc = DOCUMENTS[activeDoc];
-    const content = doc.generate(data, budget);
-    const filename = `${data.name || 'event'}-${activeDoc}.txt`.toLowerCase().replace(/\s+/g, '-');
+    const docDef = DOCUMENTS[activeDoc];
+    const draftContent = docDef.generate(data, budget);
+    const refined = refinedDocs[activeDoc];
+    const viewMode = docViewMode[activeDoc] || 'draft';
+    const displayContent = viewMode === 'refined' && refined ? refined : draftContent;
+    const isRefining = refiningDoc === activeDoc;
+    const filename = `${data.name || 'event'}-${activeDoc}`.toLowerCase().replace(/\s+/g, '-');
 
     return (
       <div className="fixed inset-0 bg-black/80 flex items-center justify-center z-50 p-4" onClick={() => setActiveDoc(null)}>
-        <div className="bg-zinc-900 rounded-xl max-w-3xl w-full max-h-[80vh] flex flex-col" onClick={e => e.stopPropagation()}>
+        <div className="bg-zinc-900 rounded-xl max-w-4xl w-full max-h-[90vh] flex flex-col" onClick={e => e.stopPropagation()}>
+          {/* Header */}
           <div className="flex items-center justify-between p-4 border-b border-zinc-700">
-            <h3 className="text-lg font-semibold text-white">{doc.icon} {doc.name}</h3>
+            <div>
+              <h3 className="text-lg font-semibold text-white">{docDef.icon} {docDef.name}</h3>
+              {refined && (
+                <div className="flex gap-2 mt-2">
+                  <button
+                    onClick={() => setDocViewMode(prev => ({ ...prev, [activeDoc]: 'draft' }))}
+                    className={`px-3 py-1 rounded text-xs font-medium transition-all ${
+                      viewMode === 'draft' ? 'bg-zinc-600 text-white' : 'bg-zinc-800 text-zinc-400 hover:text-white'
+                    }`}
+                  >
+                    📝 Draft
+                  </button>
+                  <button
+                    onClick={() => setDocViewMode(prev => ({ ...prev, [activeDoc]: 'refined' }))}
+                    className={`px-3 py-1 rounded text-xs font-medium transition-all ${
+                      viewMode === 'refined' ? 'bg-emerald-600 text-white' : 'bg-zinc-800 text-zinc-400 hover:text-white'
+                    }`}
+                  >
+                    ✨ AI Refined
+                  </button>
+                </div>
+              )}
+            </div>
             <button onClick={() => setActiveDoc(null)} className="text-zinc-400 hover:text-white text-2xl">×</button>
           </div>
+
+          {/* Content */}
           <div className="flex-1 overflow-auto p-4">
-            <pre className="text-sm text-zinc-300 whitespace-pre-wrap font-mono bg-zinc-950 p-4 rounded-lg">{content}</pre>
+            {isRefining ? (
+              <div className="flex flex-col items-center justify-center py-16 text-center">
+                <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-emerald-400 mb-4" />
+                <p className="text-emerald-400 font-medium text-lg">Refining with AI...</p>
+                <p className="text-zinc-500 text-sm mt-2">Claude is making this document ready for your team</p>
+              </div>
+            ) : (
+              <pre className="text-sm text-zinc-300 whitespace-pre-wrap font-mono bg-zinc-950 p-4 rounded-lg">{displayContent}</pre>
+            )}
+            {refineError && (
+              <div className="mt-3 p-3 bg-red-900/30 border border-red-700/50 rounded-lg text-red-300 text-sm">
+                ⚠️ {refineError}
+              </div>
+            )}
           </div>
-          <div className="flex gap-2 p-4 border-t border-zinc-700">
-            <button onClick={() => handleCopy(content)} className="flex-1 bg-emerald-600 text-white py-2 rounded-lg hover:bg-emerald-500">
-              {copySuccess ? '✓ Copied!' : 'Copy to Clipboard'}
-            </button>
-            <button onClick={() => handleDownload(content, filename)} className="flex-1 bg-zinc-700 text-white py-2 rounded-lg hover:bg-zinc-600">
-              Download .txt
-            </button>
+
+          {/* Action Bar */}
+          <div className="p-4 border-t border-zinc-700 space-y-3">
+            {/* AI Refine Button */}
+            {!isRefining && (
+              <button
+                onClick={() => refineDocument(activeDoc)}
+                disabled={isRefining}
+                className="w-full bg-gradient-to-r from-purple-600 to-emerald-600 text-white py-3 rounded-lg font-medium hover:from-purple-500 hover:to-emerald-500 transition-all flex items-center justify-center gap-2"
+              >
+                <span>✨</span>
+                {refined ? 'Re-Refine with AI' : 'Refine with AI'}
+                <span className="text-xs opacity-75 ml-1">~$0.03</span>
+              </button>
+            )}
+
+            {/* Export & Copy Buttons */}
+            <div className="flex gap-2">
+              <button
+                onClick={() => handleCopy(displayContent)}
+                className="flex-1 bg-zinc-700 text-white py-2 rounded-lg hover:bg-zinc-600 text-sm font-medium"
+              >
+                {copySuccess ? '✓ Copied!' : '📋 Copy'}
+              </button>
+              <button
+                onClick={() => handleDownload(displayContent, `${filename}.txt`)}
+                className="flex-1 bg-zinc-700 text-white py-2 rounded-lg hover:bg-zinc-600 text-sm font-medium"
+              >
+                📄 .txt
+              </button>
+              <button
+                onClick={() => exportDocPDF(docDef.name, displayContent, `${filename}.pdf`)}
+                className="flex-1 bg-red-700 text-white py-2 rounded-lg hover:bg-red-600 text-sm font-medium"
+              >
+                📄 .pdf
+              </button>
+              <button
+                onClick={() => exportDocDOCX(activeDoc, docDef.name, displayContent)}
+                className="flex-1 bg-blue-700 text-white py-2 rounded-lg hover:bg-blue-600 text-sm font-medium"
+              >
+                📝 .docx
+              </button>
+            </div>
           </div>
         </div>
       </div>
