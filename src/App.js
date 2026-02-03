@@ -1939,6 +1939,7 @@ export default function EventPlannerV8() {
   const [isLoadingAI, setIsLoadingAI] = useState(false);
   const [aiError, setAiError] = useState(null);
   const [marketData, setMarketData] = useState(null);
+  const [marketDataLocation, setMarketDataLocation] = useState(null);
   const [isLoadingMarket, setIsLoadingMarket] = useState(false);
   const [marketError, setMarketError] = useState(null);
   const [refinedDocs, setRefinedDocs] = useState({});
@@ -2012,6 +2013,7 @@ export default function EventPlannerV8() {
       
       const result = await response.json();
       setMarketData(result);
+      setMarketDataLocation(regionName);
     } catch (error) {
       console.error('Error fetching market data:', error);
       setMarketError(error.message);
@@ -2518,6 +2520,253 @@ export default function EventPlannerV8() {
     a.click();
     URL.revokeObjectURL(url);
   }, [data, timeline]);
+
+  // Export All Documents
+  const [isExportingAll, setIsExportingAll] = useState(false);
+  
+  const handleExportAllDocs = useCallback(async (format) => {
+    setIsExportingAll(true);
+    try {
+      // Ensure docx library is loaded
+      if (!window.docx) {
+        const script = document.createElement('script');
+        script.src = 'https://unpkg.com/docx@8.2.2/build/index.umd.js';
+        document.head.appendChild(script);
+        await new Promise(resolve => script.onload = resolve);
+      }
+
+      const { Document: DocxDoc, Packer, Paragraph, TextRun, Table, TableRow, TableCell,
+              HeadingLevel, BorderStyle, WidthType, ShadingType, PageBreak } = window.docx;
+
+      const bdr = { style: BorderStyle.SINGLE, size: 1, color: 'D1D5DB' };
+      const bdrs = { top: bdr, bottom: bdr, left: bdr, right: bdr };
+      const cellMg = { top: 60, bottom: 60, left: 100, right: 100 };
+      const eventSlug = (data.name || 'event').toLowerCase().replace(/\s+/g, '-');
+
+      // Shared function to parse content into docx paragraphs
+      const parseContentToDocx = (content, title) => {
+        const contentLines = content.split('\n');
+        const children = [];
+        const pendingTable = [];
+
+        const flushTable = () => {
+          if (pendingTable.length === 0) return;
+          const hdrCells = pendingTable[0].split('|').map(c => c.trim()).filter(Boolean);
+          const cols = hdrCells.length;
+          const cw = Math.floor(9360 / cols);
+          const tblRows = [
+            new TableRow({
+              children: hdrCells.map(cell => new TableCell({
+                borders: bdrs, width: { size: cw, type: WidthType.DXA }, margins: cellMg,
+                shading: { fill: '10B981', type: ShadingType.CLEAR },
+                children: [new Paragraph({ children: [new TextRun({ text: cell, bold: true, size: 18, color: 'FFFFFF' })] })]
+              }))
+            })
+          ];
+          for (let i = 1; i < pendingTable.length; i++) {
+            const cells = pendingTable[i].split('|').map(c => c.trim()).filter(Boolean);
+            while (cells.length < cols) cells.push('');
+            tblRows.push(new TableRow({
+              children: cells.slice(0, cols).map(cell => new TableCell({
+                borders: bdrs, width: { size: cw, type: WidthType.DXA }, margins: cellMg,
+                children: [new Paragraph({ children: [new TextRun({ text: cell, size: 18 })] })]
+              }))
+            }));
+          }
+          children.push(new Table({ width: { size: 100, type: WidthType.PERCENTAGE }, columnWidths: Array(cols).fill(cw), rows: tblRows }));
+          children.push(new Paragraph({ spacing: { after: 200 }, children: [] }));
+          pendingTable.length = 0;
+        };
+
+        // Section header
+        children.push(new Paragraph({
+          children: [new TextRun({ text: `${data.name || 'Event'} — ${title}`, bold: true, size: 36 })],
+          heading: HeadingLevel.HEADING_1,
+          spacing: { after: 80 }
+        }));
+        children.push(new Paragraph({
+          children: [new TextRun({ text: `${data.type || 'Event'} | ${data.date || 'Date TBD'} | Generated: ${new Date().toLocaleDateString()}`, size: 20, color: '71717A' })],
+          spacing: { after: 400 }
+        }));
+
+        for (const line of contentLines) {
+          const t = line.trim();
+          if (!t) { flushTable(); children.push(new Paragraph({ spacing: { after: 120 }, children: [] })); continue; }
+          if (t.includes('|') && t.split('|').filter(Boolean).length >= 2 && !t.match(/^[\s|:-]+$/)) { pendingTable.push(t); continue; }
+          if (t.match(/^[\s|:-]+$/)) continue;
+          flushTable();
+          if (t.match(/^[A-Z][A-Z\s\-—&/()]{4,}$/) || t.match(/^#{1,3}\s/)) {
+            children.push(new Paragraph({
+              children: [new TextRun({ text: t.replace(/^#+\s*/, ''), bold: true, size: 24, color: 'FFFFFF' })],
+              shading: { fill: '10B981', type: ShadingType.CLEAR },
+              spacing: { before: 300, after: 200 }, heading: HeadingLevel.HEADING_2
+            }));
+          } else if (t.startsWith('---') || t.startsWith('===') || t.startsWith('Generated by SeedAI')) {
+            // skip
+          } else if (t.startsWith('- ') || t.startsWith('• ')) {
+            children.push(new Paragraph({ children: [new TextRun({ text: `  ${t}`, size: 20 })], spacing: { after: 60 } }));
+          } else if (t.match(/^\[[\sx]\]/)) {
+            const checked = t.startsWith('[x]');
+            const label = t.replace(/^\[[\sx]\]\s*/, '');
+            children.push(new Paragraph({
+              children: [new TextRun({ text: `${checked ? '☑' : '☐'} ${label}`, size: 20 })],
+              spacing: { after: 60 }
+            }));
+          } else if (t.match(/^(Subject|To|From|Date|Dear|Sincerely|Best|Re:)/i)) {
+            const colonIdx = t.indexOf(':');
+            if (colonIdx > 0 && colonIdx < 15) {
+              children.push(new Paragraph({
+                children: [
+                  new TextRun({ text: t.substring(0, colonIdx + 1), bold: true, size: 20 }),
+                  new TextRun({ text: t.substring(colonIdx + 1), size: 20 })
+                ], spacing: { after: 80 }
+              }));
+            } else {
+              children.push(new Paragraph({ children: [new TextRun({ text: t, size: 20 })], spacing: { after: 80 } }));
+            }
+          } else {
+            children.push(new Paragraph({ children: [new TextRun({ text: t, size: 20 })], spacing: { after: 80 } }));
+          }
+        }
+        flushTable();
+        return children;
+      };
+
+      if (format === 'combined') {
+        // One .docx with all documents, page breaks between sections
+        const allSections = [];
+        const docEntries = Object.entries(DOCUMENTS);
+        
+        // Cover page
+        allSections.push(new Paragraph({ spacing: { before: 3000 }, children: [] }));
+        allSections.push(new Paragraph({
+          children: [new TextRun({ text: '🌱 SeedAI Event Planner', bold: true, size: 32, color: '10B981' })],
+          spacing: { after: 200 }
+        }));
+        allSections.push(new Paragraph({
+          children: [new TextRun({ text: data.name || 'Event', bold: true, size: 52 })],
+          spacing: { after: 100 }
+        }));
+        allSections.push(new Paragraph({
+          children: [new TextRun({ text: 'Complete Planning Package', size: 28, color: '71717A' })],
+          spacing: { after: 400 }
+        }));
+        allSections.push(new Paragraph({
+          children: [new TextRun({ text: `${data.type || 'Event'} | ${data.date || 'Date TBD'} | ${REGIONS[data.region]?.name || data.customCity || 'Location TBD'}`, size: 22, color: '71717A' })],
+          spacing: { after: 200 }
+        }));
+        allSections.push(new Paragraph({
+          children: [new TextRun({ text: `Exported: ${new Date().toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric', year: 'numeric' })}`, size: 20, color: '999999' })],
+          spacing: { after: 400 }
+        }));
+        // Table of contents
+        allSections.push(new Paragraph({
+          children: [new TextRun({ text: 'Documents Included:', bold: true, size: 22 })],
+          spacing: { before: 400, after: 100 }
+        }));
+        docEntries.forEach(([, doc], i) => {
+          allSections.push(new Paragraph({
+            children: [new TextRun({ text: `  ${i + 1}. ${doc.icon}  ${doc.name}`, size: 20 })],
+            spacing: { after: 60 }
+          }));
+        });
+
+        // Each document section with page break
+        docEntries.forEach(([key, doc]) => {
+          const content = doc.generate(data, budget);
+          const sectionChildren = parseContentToDocx(content, doc.name);
+          allSections.push(new Paragraph({
+            children: [new TextRun({ text: '', break: 1 })],
+            pageBreakBefore: true
+          }));
+          allSections.push(...sectionChildren);
+        });
+
+        // Footer
+        allSections.push(new Paragraph({ spacing: { before: 600 }, children: [] }));
+        allSections.push(new Paragraph({
+          children: [new TextRun({ text: 'Generated by SeedAI Event Planner', size: 16, color: '71717A', italics: true })]
+        }));
+
+        const docFile = new DocxDoc({
+          styles: { default: { document: { run: { font: 'Arial', size: 20 } } } },
+          sections: [{
+            properties: { page: { size: { width: 12240, height: 15840 }, margin: { top: 1440, right: 1440, bottom: 1440, left: 1440 } } },
+            children: allSections
+          }]
+        });
+
+        const blob = await Packer.toBlob(docFile);
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = `${eventSlug}-complete-package.docx`;
+        a.click();
+        URL.revokeObjectURL(url);
+
+      } else if (format === 'zip') {
+        // Load JSZip
+        if (!window.JSZip) {
+          await new Promise((resolve, reject) => {
+            const script = document.createElement('script');
+            script.src = 'https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js';
+            script.onload = resolve;
+            script.onerror = reject;
+            document.head.appendChild(script);
+          });
+        }
+        
+        const zip = new window.JSZip();
+        
+        // Generate each document as .docx and add to zip
+        for (const [key, doc] of Object.entries(DOCUMENTS)) {
+          const content = doc.generate(data, budget);
+          const sectionChildren = parseContentToDocx(content, doc.name);
+
+          // Add SeedAI header
+          const docChildren = [
+            new Paragraph({
+              children: [new TextRun({ text: '🌱 SeedAI Event Planner', bold: true, size: 28, color: '10B981' })],
+              spacing: { after: 80 }
+            }),
+            ...sectionChildren,
+            new Paragraph({ spacing: { before: 400 }, children: [] }),
+            new Paragraph({
+              children: [new TextRun({ text: `Generated by SeedAI Event Planner | ${new Date().toLocaleDateString()}`, size: 16, color: '71717A', italics: true })]
+            })
+          ];
+
+          const docFile = new DocxDoc({
+            styles: { default: { document: { run: { font: 'Arial', size: 20 } } } },
+            sections: [{
+              properties: { page: { size: { width: 12240, height: 15840 }, margin: { top: 1440, right: 1440, bottom: 1440, left: 1440 } } },
+              children: docChildren
+            }]
+          });
+
+          const blob = await Packer.toBlob(docFile);
+          zip.file(`${eventSlug}-${key}.docx`, blob);
+        }
+        
+        // Also add the JSON plan data
+        const planData = { version: 'v8', exportedAt: new Date().toISOString(), data };
+        zip.file(`${eventSlug}-plan.json`, JSON.stringify(planData, null, 2));
+        
+        const zipBlob = await zip.generateAsync({ type: 'blob' });
+        const url = URL.createObjectURL(zipBlob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = `${eventSlug}-documents.zip`;
+        a.click();
+        URL.revokeObjectURL(url);
+      }
+    } catch (error) {
+      console.error('Export all failed:', error);
+      alert('Export failed. Please try again.');
+    } finally {
+      setIsExportingAll(false);
+    }
+  }, [data, budget]);
 
   const handleCopyForAI = useCallback(() => {
     const prompt = generateAIPrompt(data, budget);
@@ -3145,18 +3394,18 @@ export default function EventPlannerV8() {
             <FormInput label="Duration" value={data.duration} onChange={(v) => update('duration', v)} type="select" required options={DURATION_OPTIONS} prompt={PROMPTS.duration} />
             <FormInput label="Format" value={data.format} onChange={(v) => update('format', v)} type="select" required options={OPTIONS.format} prompt={PROMPTS.format} />
             <FormInput label="Venue Type" value={data.venue} onChange={(v) => update('venue', v)} type="select" required options={OPTIONS.venue} prompt={PROMPTS.venue} />
-            <FormInput label="Location" value={data.region} onChange={(v) => { update('region', v); if (v !== 'other') update('customCity', ''); }} type="select" required options={Object.entries(REGIONS).map(([k, v]) => ({ value: k, label: v.name }))} prompt={PROMPTS.region} />
+            <FormInput label="Location" value={data.region} onChange={(v) => { update('region', v); if (v !== 'other') update('customCity', ''); setMarketData(null); setMarketDataLocation(null); }} type="select" required options={Object.entries(REGIONS).map(([k, v]) => ({ value: k, label: v.name }))} prompt={PROMPTS.region} />
             {data.region === 'other' && (
               <div>
                 <label className="block text-sm font-medium text-zinc-300 mb-1">City / Metro Area</label>
                 <input
                   type="text"
                   value={data.customCity || ''}
-                  onChange={(e) => update('customCity', e.target.value)}
+                  onChange={(e) => { update('customCity', e.target.value); setMarketData(null); setMarketDataLocation(null); }}
                   placeholder="e.g., Nashville, TN"
                   className="w-full bg-zinc-900 border border-zinc-700 rounded-lg px-4 py-3 text-white focus:border-emerald-500 focus:outline-none"
                 />
-                <p className="text-zinc-500 text-xs mt-1">Use "Get Live Market Rates" on the Review page for pricing specific to this city</p>
+                <p className="text-zinc-500 text-xs mt-1">Budget estimates use baseline pricing. Click "Get Live Market Rates" on the Review page for location-specific pricing.</p>
               </div>
             )}
             <CheckboxGroup label="Spaces Needed" options={OPTIONS.spaces} selected={data.spaces} onToggle={(v) => toggle('spaces', v)} prompt={PROMPTS.spaces} />
@@ -3261,14 +3510,17 @@ export default function EventPlannerV8() {
             {/* Budget Summary */}
             <div className="bg-zinc-800/50 rounded-xl p-6">
               <div className="flex justify-between items-center mb-4">
-                <h3 className="text-lg font-semibold text-white">💰 Budget Estimate</h3>
+                <div>
+                  <h3 className="text-lg font-semibold text-white">💰 Budget Estimate</h3>
+                  <p className="text-zinc-500 text-xs mt-0.5">Based on national averages{data.region && data.region !== 'other' ? `, adjusted for ${REGIONS[data.region]?.name}` : ''}</p>
+                </div>
                 {data.region && data.size && (
                   <button
                     onClick={fetchMarketData}
                     disabled={isLoadingMarket}
                     className="text-sm bg-emerald-600 hover:bg-emerald-500 disabled:bg-emerald-800 px-3 py-1.5 rounded-lg transition-all"
                   >
-                    {isLoadingMarket ? 'Loading...' : '📊 Get Live Market Rates'}
+                    {isLoadingMarket ? 'Loading...' : marketData ? '📊 Refresh Market Rates' : '📊 Get Live Market Rates'}
                   </button>
                 )}
               </div>
@@ -3297,7 +3549,7 @@ export default function EventPlannerV8() {
               {marketData && (
                 <div className="mt-6 pt-6 border-t border-zinc-700">
                   <h4 className="text-md font-semibold text-emerald-400 mb-4 flex items-center gap-2">
-                    📊 Live Market Data for {data.customCity || REGIONS[data.region]?.name || data.region}
+                    📊 Live Market Data for {marketDataLocation || data.customCity || REGIONS[data.region]?.name || data.region}
                     <span className={`text-xs px-2 py-0.5 rounded ${
                       marketData.confidence === 'high' ? 'bg-green-900 text-green-300' :
                       marketData.confidence === 'medium' ? 'bg-yellow-900 text-yellow-300' :
@@ -3382,7 +3634,25 @@ export default function EventPlannerV8() {
 
             {/* Documents */}
             <div className="bg-zinc-800/50 rounded-xl p-6">
-              <h3 className="text-lg font-semibold text-white mb-4">📄 Generate Documents</h3>
+              <div className="flex justify-between items-center mb-4">
+                <h3 className="text-lg font-semibold text-white">📄 Generate Documents</h3>
+                <div className="flex gap-2">
+                  <button
+                    onClick={() => handleExportAllDocs('zip')}
+                    disabled={isExportingAll}
+                    className="text-xs bg-emerald-700 hover:bg-emerald-600 disabled:bg-emerald-900 text-white px-3 py-1.5 rounded-lg transition-all"
+                  >
+                    {isExportingAll ? 'Exporting...' : '📦 Download All (.zip)'}
+                  </button>
+                  <button
+                    onClick={() => handleExportAllDocs('combined')}
+                    disabled={isExportingAll}
+                    className="text-xs bg-zinc-600 hover:bg-zinc-500 disabled:bg-zinc-800 text-white px-3 py-1.5 rounded-lg transition-all"
+                  >
+                    📝 Combined (.docx)
+                  </button>
+                </div>
+              </div>
               <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
                 {Object.entries(DOCUMENTS).map(([key, doc]) => (
                   <button
