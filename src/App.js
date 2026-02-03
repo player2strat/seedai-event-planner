@@ -59,7 +59,6 @@ const OPTIONS = {
   format: ['In-Person', 'Virtual', 'Hybrid'],
   venue: ['Hotel Ballroom', 'Conference Center', 'Historic Venue', 'Government Building', 'University/Academic', 'Museum/Cultural', 'Rooftop/Outdoor', 'Restaurant/Private Dining', 'Corporate Office', 'Embassy/Diplomatic', 'Other'],
   audience: ['Congressional Staff', 'Members of Congress', 'Federal Agency Officials', 'State/Local Officials', 'Industry Executives', 'AI/Tech Company Representatives', 'Frontier AI Lab Staff', 'Think Tank / Policy Researchers', 'Small Business Owners', 'Nonprofit Leaders', 'Academics/Researchers', 'Coalition Members', 'Journalists/Media', 'General Public', 'International Delegates', 'Students/Young Professionals'],
-  recordPolicy: ['On the Record', 'Off the Record (Chatham House)', 'Background Only', 'Mixed (varies by session)', 'Not Applicable'],
   inviteStrategy: ['Open Registration', 'Invite Only', 'Application-Based', 'Tiered (VIP invite + open registration)'],
   program: ['Keynote Address', 'Panel Discussion', 'Fireside Chat', 'Breakout Sessions', 'Workshops', 'Networking Breaks', 'Awards/Recognition', 'Press Conference', 'VIP Reception', 'Group Photo', 'Demo / Exhibition / Hands-On', 'Lightning Talks', 'Roundtable Discussion', 'Private Dinner'],
   agendaFormats: ['Keynote', 'Panel', 'Fireside Chat', 'Breakout', 'Workshop', 'Networking', 'Meal/Reception', 'Demo/Hands-On', 'Roundtable', 'Lightning Talks', 'Press Availability', 'Private Dinner', 'Registration/Arrival', 'Break', 'Other'],
@@ -274,7 +273,6 @@ const PROMPTS = {
   type: "What type of event best describes what you're planning?",
   description: "In 2-3 sentences, describe what this event is about. What's the core theme or focus?",
   objectives: "If one attendee tells a colleague about this event next week, what do you want them to say? What decisions or actions should this event drive?",
-  recordPolicy: "Will conversations be on or off the record? This shapes who says yes, how candid speakers are, and whether media can attend.",
   partners: "Who are you co-hosting or co-presenting with? Partners change the invite list, credibility, branding, and sometimes the budget split.",
   inviteStrategy: "How are you controlling who attends? Open events maximize reach; invite-only builds exclusivity and trust.",
   size: "How many people do you realistically expect to attend? If invite-only, plan to invite 2-3x your target.",
@@ -288,7 +286,7 @@ const PROMPTS = {
   region: "Where will this event take place? This helps us estimate local market costs.",
   spaces: "Beyond the main room, what other spaces might you need? Think about where informal conversations happen.",
   program: "What elements will make up your agenda? Think about variety, pacing, and what the signature moment will be.",
-  agenda: "Sketch your agenda flow — even rough timing helps. This feeds directly into your Run of Show document.",
+  agenda: "Jot down what you're thinking so far — even 'panel on something about evals' counts. The AI will help flesh it out.",
   fnb: "Food and beverage sets the tone and affects compliance. Note: federal ethics rules limit gifts to $20/item for government attendees.",
   av: "What technology do you need to deliver your content effectively?",
   production: "What visual and design elements will enhance the experience?",
@@ -306,6 +304,96 @@ const PROMPTS = {
 // ============================================================================
 
 const fmt = (n) => new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD', minimumFractionDigits: 0, maximumFractionDigits: 0 }).format(n);
+
+// Maps selected services to the vendor/person role needed
+const VENDOR_MAP = {
+  // F&B
+  'Continental Breakfast': { vendor: 'Caterer', category: 'Food & Beverage' },
+  'Hot Breakfast': { vendor: 'Caterer', category: 'Food & Beverage' },
+  'Morning Coffee/Tea': { vendor: 'Caterer / Venue', category: 'Food & Beverage' },
+  'Working Lunch (Boxed)': { vendor: 'Caterer', category: 'Food & Beverage' },
+  'Plated Lunch': { vendor: 'Caterer', category: 'Food & Beverage' },
+  'Afternoon Break': { vendor: 'Caterer / Venue', category: 'Food & Beverage' },
+  'Cocktail Reception': { vendor: 'Caterer / Bar Service', category: 'Food & Beverage' },
+  'Happy Hour / Reception': { vendor: 'Caterer / Bar Service', category: 'Food & Beverage' },
+  'Plated Dinner': { vendor: 'Caterer', category: 'Food & Beverage' },
+  'Dessert Reception': { vendor: 'Caterer', category: 'Food & Beverage' },
+  // AV
+  'Projector/Screen': { vendor: 'AV Vendor / Venue', category: 'Audio/Visual' },
+  'Confidence Monitor': { vendor: 'AV Vendor', category: 'Audio/Visual' },
+  'Wireless Microphones': { vendor: 'AV Vendor / Venue', category: 'Audio/Visual' },
+  'Podium with Mic': { vendor: 'AV Vendor / Venue', category: 'Audio/Visual' },
+  'Livestream Setup': { vendor: 'AV Vendor / Production Company', category: 'Audio/Visual' },
+  'Recording Equipment': { vendor: 'AV Vendor / Videographer', category: 'Audio/Visual' },
+  'Video Playback': { vendor: 'AV Vendor', category: 'Audio/Visual' },
+  'LED Wall/Display': { vendor: 'AV Vendor / Production Company', category: 'Audio/Visual' },
+  'Interpretation Equipment': { vendor: 'AV Vendor / Interpretation Service', category: 'Audio/Visual' },
+  // Production
+  'Stage Design': { vendor: 'Production Company', category: 'Production' },
+  'Custom Backdrop': { vendor: 'Production Company / Print Vendor', category: 'Production' },
+  'Step & Repeat': { vendor: 'Print Vendor', category: 'Production' },
+  'Branded Signage': { vendor: 'Print Vendor / Graphic Designer', category: 'Production' },
+  'Floral Arrangements': { vendor: 'Florist', category: 'Production' },
+  'Lighting Design': { vendor: 'Lighting Vendor / Production Company', category: 'Production' },
+  'Event Photographer': { vendor: 'Photographer', category: 'Production' },
+  'Videographer': { vendor: 'Videographer / Production Company', category: 'Production' },
+  // Collateral
+  'Name Badges': { vendor: 'Print Vendor / In-House', category: 'Collateral' },
+  'Printed Agenda': { vendor: 'Print Vendor / In-House', category: 'Collateral' },
+  'Branded Folders': { vendor: 'Print Vendor', category: 'Collateral' },
+  'Note Pads/Pens': { vendor: 'Promotional Products Vendor', category: 'Collateral' },
+  'Gift Bags': { vendor: 'Promotional Products Vendor', category: 'Collateral' },
+  'Promotional Items': { vendor: 'Promotional Products Vendor', category: 'Collateral' },
+  'Policy Briefs/Reports': { vendor: 'Print Vendor / In-House', category: 'Collateral' },
+  'Speaker Bios': { vendor: 'In-House / Graphic Designer', category: 'Collateral' },
+  // Accessibility
+  'Sign Language Interpretation': { vendor: 'Sign Language Interpretation Service', category: 'Accessibility' },
+  'Live Captioning / CART': { vendor: 'CART / Captioning Service', category: 'Accessibility' },
+  'Assistive Listening Devices': { vendor: 'AV Vendor / Venue', category: 'Accessibility' },
+};
+
+function getRequiredVendors(data) {
+  const allSelections = [
+    ...(data.fnb || []),
+    ...(data.av || []),
+    ...(data.production || []),
+    ...(data.collateral || []),
+    ...(data.accessibility || []),
+  ];
+  
+  // Deduplicate by vendor role within each category
+  const byCategory = {};
+  for (const item of allSelections) {
+    const mapping = VENDOR_MAP[item];
+    if (!mapping) continue;
+    if (!byCategory[mapping.category]) byCategory[mapping.category] = {};
+    const vendors = mapping.vendor.split(' / ');
+    for (const v of vendors) {
+      const vt = v.trim();
+      if (!byCategory[mapping.category][vt]) byCategory[mapping.category][vt] = [];
+      byCategory[mapping.category][vt].push(item);
+    }
+  }
+  
+  return byCategory;
+}
+
+function generateVendorSection(data) {
+  const vendors = getRequiredVendors(data);
+  if (Object.keys(vendors).length === 0) return '';
+  
+  let section = `VENDORS & ASSIGNMENTS\n${'-'.repeat(40)}\nBased on your selections, you'll need the following vendors or responsible parties:\n\n`;
+  section += `Category | Vendor / Role Needed | For | Assigned To\n`;
+  
+  for (const [category, roles] of Object.entries(vendors)) {
+    for (const [role, items] of Object.entries(roles)) {
+      section += `${category} | ${role} | ${items.join(', ')} | ___________\n`;
+    }
+  }
+  
+  section += `\nTip: Fill in the "Assigned To" column as you confirm vendors. Use "Refine with AI" to get vendor outreach suggestions.`;
+  return section;
+}
 
 function checkCongressionalCalendar(dateStr) {
   if (!dateStr) return [];
@@ -624,7 +712,6 @@ Expected Attendance: ${size.min}-${size.max} guests
 Duration: ${DURATION_OPTIONS.find(d => d.value === data.duration)?.label || 'TBD'}
 Location: ${budget.region}
 Venue Type: ${data.venue || 'TBD'}
-${data.recordPolicy ? `Record Policy: ${data.recordPolicy}` : ''}
 ${data.inviteStrategy ? `Invitation Strategy: ${data.inviteStrategy}` : ''}
 
 ${data.partners ? `PARTNERS & CO-HOSTS\n${'-'.repeat(40)}\n${data.partners}\n` : ''}BUDGET SUMMARY
@@ -646,8 +733,10 @@ ${data.speakers || 'Not confirmed'}
 PROGRAM HIGHLIGHTS
 ${'-'.repeat(40)}
 ${(data.program || []).join(', ') || 'Program not finalized'}
-${(data.agenda || []).filter(a => a.title).length > 0 ? `\nAGENDA SKETCH\n${'-'.repeat(40)}\n${data.agenda.filter(a => a.title).map(a => `${a.time || 'TBD'} — ${a.title}${a.format ? ` [${a.format}]` : ''}`).join('\n')}` : ''}
+${(data.agenda || []).filter(a => a.title && a.title.trim()).length > 0 ? `\nAGENDA SKETCH (WORKING DRAFT)\n${'-'.repeat(40)}\n${data.agenda.filter(a => a.title && a.title.trim()).map(a => `${a.time || 'TBD'} — ${a.title}${a.format ? ` [${a.format}]` : ''}${a.notes ? ` (${a.notes})` : ''}`).join('\n')}` : ''}
 ${(data.accessibility || []).length > 0 ? `\nACCESSIBILITY\n${'-'.repeat(40)}\n${data.accessibility.join(', ')}` : ''}
+
+${generateVendorSection(data)}
 
 ---
 Generated by SeedAI Event Planner | ${new Date().toLocaleDateString()}`;
@@ -655,46 +744,78 @@ Generated by SeedAI Event Planner | ${new Date().toLocaleDateString()}`;
 
 const generateRunOfShow = (data, budget) => {
   const duration = DURATION_OPTIONS.find(d => d.value === data.duration) || DURATION_OPTIONS[1];
-  const agendaItems = (data.agenda || []).filter(a => a.time || a.title);
+  const agendaItems = (data.agenda || []).filter(a => a.title && a.title.trim());
+  const hasAgenda = agendaItems.length > 0;
+  
+  // Always build a complete default schedule first
   let schedule = '';
-
-  if (agendaItems.length > 0) {
-    // Use the user's actual agenda sketch
-    schedule = `\n08:00 AM  Staff arrival and setup\n08:30 AM  Vendor check-in, AV testing`;
-    for (const item of agendaItems) {
-      const time = item.time ? item.time.padEnd(10) : '          ';
-      const title = item.title || 'TBD';
-      const fmt = item.format ? ` [${item.format}]` : '';
-      const notes = item.notes ? `\n          Notes: ${item.notes}` : '';
-      schedule += `\n${time}${title}${fmt}${notes}`;
+  
+  if (duration.days <= 1) {
+    // Build the default blocks
+    const blocks = [
+      { time: '08:00 AM', label: 'Staff arrival and setup', type: 'ops' },
+      { time: '08:30 AM', label: 'Vendor check-in, AV testing', type: 'ops' },
+      { time: '09:00 AM', label: 'Registration opens', type: 'ops' },
+      { time: '09:30 AM', label: 'Welcome and opening remarks', type: 'program' },
+    ];
+    
+    if (hasAgenda) {
+      // Weave agenda items into the schedule after opening remarks
+      for (const item of agendaItems) {
+        const time = item.time || '';
+        const title = item.title || 'Session TBD';
+        const fmt = item.format ? ` [${item.format}]` : '';
+        const notes = item.notes || '';
+        blocks.push({ time, label: `${title}${fmt}`, notes, type: 'agenda' });
+      }
+    } else {
+      // Use smart defaults based on program selections
+      blocks.push({ time: '10:00 AM', label: (data.program || []).includes('Keynote Address') ? 'Keynote Address' : 'Opening Session', type: 'program' });
+      blocks.push({ time: '10:45 AM', label: 'Networking break', type: 'break' });
+      blocks.push({ time: '11:00 AM', label: (data.program || []).includes('Panel Discussion') ? 'Panel Discussion' : 'Main Program', type: 'program' });
     }
-    schedule += `\n          Closing & wrap-up\n          Venue breakdown`;
-  } else if (duration.days <= 1) {
-    schedule = `
-08:00 AM  Staff arrival and setup
-08:30 AM  Vendor check-in, AV testing
-09:00 AM  Registration opens
-09:30 AM  Welcome and opening remarks
-10:00 AM  ${(data.program || []).includes('Keynote Address') ? 'Keynote Address' : 'Opening Session'}
-10:45 AM  Networking break
-11:00 AM  ${(data.program || []).includes('Panel Discussion') ? 'Panel Discussion' : 'Main Program'}
-12:00 PM  ${(data.fnb || []).some(f => f.includes('Lunch')) ? 'Lunch Service' : 'Midday Break'}
-01:00 PM  Afternoon programming
-02:30 PM  Break
-02:45 PM  ${(data.program || []).includes('Breakout Sessions') ? 'Breakout Sessions' : 'Continued Programming'}
-04:00 PM  Closing remarks
-04:30 PM  ${(data.fnb || []).some(f => f.includes('Reception') || f.includes('Happy Hour')) ? 'Networking Reception' : 'Event Concludes'}
-06:00 PM  Venue breakdown`;
+    
+    blocks.push({ time: '12:00 PM', label: (data.fnb || []).some(f => f.includes('Lunch')) ? 'Lunch Service' : 'Midday Break', type: 'break' });
+    
+    if (!hasAgenda) {
+      blocks.push({ time: '01:00 PM', label: 'Afternoon programming', type: 'program' });
+      blocks.push({ time: '02:30 PM', label: 'Break', type: 'break' });
+      blocks.push({ time: '02:45 PM', label: (data.program || []).includes('Breakout Sessions') ? 'Breakout Sessions' : 'Continued Programming', type: 'program' });
+    }
+    
+    blocks.push({ time: '04:00 PM', label: 'Closing remarks', type: 'program' });
+    blocks.push({ time: '04:30 PM', label: (data.fnb || []).some(f => f.includes('Reception') || f.includes('Happy Hour')) ? 'Networking Reception' : 'Event Concludes', type: 'break' });
+    blocks.push({ time: '06:00 PM', label: 'Venue breakdown', type: 'ops' });
+    
+    schedule = blocks.map(b => {
+      const timePad = (b.time || '         ').padEnd(10);
+      let line = `${timePad}${b.label}`;
+      if (b.notes) line += `\n          ↳ ${b.notes}`;
+      return line;
+    }).join('\n');
   } else {
-    schedule = `
-DAY 1
+    schedule = `DAY 1
 ------
 08:00 AM  Staff arrival and setup
 09:00 AM  Registration opens
-09:30 AM  Welcome and opening remarks
+09:30 AM  Welcome and opening remarks`;
+
+    if (hasAgenda) {
+      for (const item of agendaItems) {
+        const time = item.time || '';
+        const title = item.title || 'Session TBD';
+        const fmt = item.format ? ` [${item.format}]` : '';
+        const notes = item.notes ? `\n          ↳ ${item.notes}` : '';
+        schedule += `\n${(time || '         ').padEnd(10)}${title}${fmt}${notes}`;
+      }
+    } else {
+      schedule += `
 10:00 AM  Morning sessions
 12:00 PM  Lunch
-01:30 PM  Afternoon programming
+01:30 PM  Afternoon programming`;
+    }
+
+    schedule += `
 05:00 PM  Day 1 concludes
 06:00 PM  Evening reception (if applicable)
 
@@ -723,15 +844,23 @@ DAY 3
     }
   }
 
-  const recordLine = data.recordPolicy ? `Record Policy: ${data.recordPolicy}` : '';
-  const partnersLine = data.partners ? `Partners: ${data.partners}` : '';
+  // Build header metadata
+  const meta = [];
+  if (data.partners) meta.push(`Partners: ${data.partners}`);
+
+  // If user provided agenda items, add a note about what came from their sketch
+  const agendaNote = hasAgenda
+    ? `\nNote: ${agendaItems.length} session(s) from your agenda sketch are included below. Use "Refine with AI" to assign team members and fill in timing gaps.\n`
+    : '';
 
   return `RUN OF SHOW
 ${'='.repeat(60)}
 
 ${data.name || 'Untitled Event'}
 ${data.date || 'Date TBD'} | ${budget.region}
-${recordLine ? recordLine + '\n' : ''}${partnersLine ? partnersLine + '\n' : ''}
+${meta.length > 0 ? meta.join('\n') + '\n' : ''}${agendaNote}
+SCHEDULE
+${'-'.repeat(40)}
 ${schedule}
 
 KEY CONTACTS
@@ -794,107 +923,173 @@ FUNDING SOURCES
 ${'-'.repeat(40)}
 ${data.funding || 'Not specified'}
 
+${generateVendorSection(data)}
+
 ---
 Generated by SeedAI Event Planner | ${new Date().toLocaleDateString()}`;
 };
 
 const generateChecklist = (data) => {
-  return `PLANNING CHECKLIST
+  // Calculate real dates if event date is set
+  const eventDate = data.date ? new Date(data.date + 'T00:00:00') : null;
+  const weeksOut = (n) => {
+    if (!eventDate) return '';
+    const d = new Date(eventDate);
+    d.setDate(d.getDate() - (n * 7));
+    return ` (by ${d.toLocaleDateString('en-US', { month: 'short', day: 'numeric' })})`;
+  };
+  const dayLabel = (n) => `${n}+ WEEKS OUT${weeksOut(n)}`;
+
+  // Helpers for conditional tasks
+  const has = (arr, item) => (data[arr] || []).includes(item);
+  const hasAny = (arr) => (data[arr] || []).length > 0;
+  const hasFed = (data.audience || []).some(a => ['Congressional Staff', 'Members of Congress', 'Federal Agency Officials'].includes(a));
+  const hasLivestream = has('av', 'Livestream Setup');
+  const hasPhotographer = has('production', 'Event Photographer');
+  const hasVideographer = has('production', 'Videographer');
+  const hasStage = (data.production || []).some(p => ['Stage Design', 'Lighting Design', 'Custom Backdrop', 'LED Wall/Display'].includes(p));
+  const hasFloral = has('production', 'Floral Arrangements');
+  const hasPrint = (data.production || []).some(p => ['Step & Repeat', 'Branded Signage'].includes(p)) || hasAny('collateral');
+  const hasMarketing = hasAny('marketing');
+  const hasSpeakers = (data.program || []).some(p => ['Keynote Address', 'Panel Discussion', 'Fireside Chat', 'Lightning Talks'].includes(p));
+  const hasBreakouts = has('program', 'Breakout Sessions') || has('program', 'Workshops');
+  const hasVIP = has('program', 'VIP Reception') || has('program', 'Private Dinner');
+  const hasDemo = has('program', 'Demo / Exhibition / Hands-On');
+
+  // Build tasks per phase
+  let checklist = `PLANNING CHECKLIST
 ${'='.repeat(60)}
 
 ${data.name || 'Untitled Event'}
-${data.date || 'Date TBD'}
+${data.date ? new Date(data.date + 'T00:00:00').toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric', year: 'numeric' }) : 'Date TBD'}
 
-16+ WEEKS OUT
+${dayLabel(16)}
 ${'-'.repeat(40)}
 [ ] Define event goals and success metrics
 [ ] Establish preliminary budget
 [ ] Identify key stakeholders
-${data.partners ? '[ ] Confirm co-host/partner commitments and roles' : ''}
+${data.partners ? '[ ] Confirm co-host/partner commitments and roles\n[ ] Agree on branding, cost-sharing, and invite list ownership' : ''}
 [ ] Begin venue research
-${data.recordPolicy && data.recordPolicy !== 'Not Applicable' ? `[ ] Establish record policy (${data.recordPolicy}) and communicate to speakers` : ''}
+${hasAny('accessibility') ? '[ ] Document accessibility requirements for venue search' : ''}
 
-14 WEEKS OUT
+${dayLabel(14)}
 ${'-'.repeat(40)}
 [ ] Secure venue contract
-${(data.accessibility || []).length > 0 ? '[ ] Confirm venue accessibility requirements' : ''}
+${hasAny('accessibility') ? '[ ] Confirm venue meets accessibility requirements' : ''}
 [ ] Confirm event date
-[ ] Draft speaker wish list
+${hasSpeakers ? '[ ] Draft speaker wish list and begin outreach' : ''}
 [ ] Create project timeline
 ${data.inviteStrategy === 'Application-Based' ? '[ ] Design and launch application process' : ''}
+${data.inviteStrategy === 'Tiered (VIP invite + open registration)' ? '[ ] Send VIP invitations first, plan public registration launch' : ''}
 
-12 WEEKS OUT
+${dayLabel(12)}
 ${'-'.repeat(40)}
-[ ] Confirm keynote speakers
+${hasSpeakers ? '[ ] Confirm keynote/lead speakers\n[ ] Collect speaker bios and headshots' : ''}
 [ ] Finalize program outline
-[ ] Select catering vendor
-[ ] Book AV provider
-${(data.audience || []).some(a => ['Congressional Staff', 'Members of Congress', 'Federal Agency Officials'].includes(a)) ? '[ ] Verify federal ethics compliance for meals/gifts' : ''}
-${(data.accessibility || []).includes('Sign Language Interpretation') ? '[ ] Book sign language interpreters' : ''}
-${(data.accessibility || []).includes('Live Captioning / CART') ? '[ ] Book CART / live captioning services' : ''}
+${hasAny('fnb') ? '[ ] Select and contract caterer' : ''}
+${hasAny('av') ? '[ ] Book AV provider' : ''}
+${hasPhotographer ? '[ ] Book photographer' : ''}
+${hasVideographer ? '[ ] Book videographer' : ''}
+${hasStage ? '[ ] Book production company (stage, lighting, backdrop)' : ''}
+${hasFloral ? '[ ] Book florist' : ''}
+${hasFed ? '[ ] Verify federal ethics compliance for meals/gifts ($20/$50 limits)' : ''}
+${has('accessibility', 'Sign Language Interpretation') ? '[ ] Book sign language interpreters' : ''}
+${has('accessibility', 'Live Captioning / CART') ? '[ ] Book CART / live captioning service' : ''}
+${hasLivestream ? '[ ] Book livestream operator / confirm platform' : ''}
 
-10 WEEKS OUT
+${dayLabel(10)}
 ${'-'.repeat(40)}
-[ ] Launch save-the-date
-[ ] Open registration
-[ ] Finalize marketing plan
-[ ] Order collateral materials
+${has('marketing', 'Save the Date') ? '[ ] Send save-the-date' : ''}
+${has('marketing', 'Event Website') ? '[ ] Launch event website' : ''}
+${has('marketing', 'Email Invitations') ? '[ ] Prepare invitation email sequence' : ''}
+${data.inviteStrategy !== 'Invite Only' ? '[ ] Open registration' : '[ ] Send formal invitations'}
+${hasMarketing ? '[ ] Finalize marketing plan and calendar' : ''}
+${hasPrint ? '[ ] Finalize designs and send to print vendor' : ''}
+${hasDemo ? '[ ] Confirm exhibitors/demo participants and requirements' : ''}
 
-8 WEEKS OUT
+${dayLabel(8)}
 ${'-'.repeat(40)}
-[ ] Send formal invitations
-[ ] Confirm all vendors
-[ ] Finalize menu selections
-[ ] Review AV requirements
+${has('marketing', 'Email Invitations') ? '[ ] Send formal invitations / reminder wave' : ''}
+[ ] Confirm all vendor contracts and deliverables
+${hasAny('fnb') ? '[ ] Finalize menu selections with caterer' : ''}
+${hasAny('av') ? '[ ] Provide AV vendor with detailed room specs and program needs' : ''}
+${has('marketing', 'Social Media Campaign') ? '[ ] Launch social media campaign' : ''}
+${has('marketing', 'Press Release') ? '[ ] Draft and distribute press release' : ''}
+${hasBreakouts ? '[ ] Finalize breakout session topics, moderators, and room assignments' : ''}
 
-6 WEEKS OUT
+${dayLabel(6)}
 ${'-'.repeat(40)}
-[ ] Track RSVPs
-[ ] Brief speakers on logistics
-[ ] Finalize printed materials
-[ ] Confirm staffing plan
+[ ] Track RSVPs and manage waitlist
+${hasSpeakers ? '[ ] Brief speakers on logistics, timing, and AV setup' : ''}
+${hasPrint ? '[ ] Review print proofs and approve final materials' : ''}
+[ ] Confirm staffing plan and assign day-of roles
+${hasVIP ? '[ ] Finalize VIP/private dinner guest list and seating' : ''}
+${hasPhotographer ? '[ ] Prepare shot list for photographer' : ''}
 
-4 WEEKS OUT
+${dayLabel(4)}
 ${'-'.repeat(40)}
-[ ] Send reminder emails
-[ ] Finalize seating/layout
+[ ] Send reminder emails to registered attendees
+[ ] Finalize seating/room layout
 [ ] Create run of show
-[ ] Prepare name badges
+${has('collateral', 'Name Badges') ? '[ ] Prepare and print name badges' : ''}
+${hasLivestream ? '[ ] Test livestream setup and confirm streaming URL' : ''}
+${hasDemo ? '[ ] Confirm demo equipment, power, and WiFi requirements' : ''}
 
-2 WEEKS OUT
+${dayLabel(2)}
 ${'-'.repeat(40)}
 [ ] Final venue walkthrough
-[ ] Confirm final headcount
-[ ] Brief all staff/volunteers
-[ ] Test all technology
+[ ] Confirm final headcount with venue and caterer
+[ ] Brief all staff and volunteers
+${hasAny('av') ? '[ ] Test all AV equipment and run tech rehearsal' : ''}
+${hasSpeakers ? '[ ] Send final logistics packet to speakers' : ''}
+${has('accessibility', 'Sign Language Interpretation') ? '[ ] Confirm interpreter assignments and share agenda' : ''}
 
-1 WEEK OUT
+${dayLabel(1)}
 ${'-'.repeat(40)}
-[ ] Final vendor confirmations
-[ ] Print final materials
-[ ] Prepare emergency kit
-[ ] Send final attendee communications
+[ ] Final vendor confirmations (call each one)
+${hasPrint ? '[ ] Confirm print materials received and correct' : ''}
+[ ] Prepare emergency kit (tape, markers, chargers, first aid)
+[ ] Send final attendee communication with directions and schedule
+${hasLivestream ? '[ ] Confirm stream is scheduled and test URL works' : ''}
 
-EVENT DAY
+EVENT DAY${eventDate ? ` — ${eventDate.toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric' })}` : ''}
 ${'-'.repeat(40)}
 [ ] Early arrival for setup
-[ ] Staff briefing
-[ ] Vendor check-ins
+[ ] Staff briefing and role assignments
+[ ] Vendor check-ins as they arrive
+${hasPhotographer ? '[ ] Brief photographer on key moments and shot list' : ''}
+${hasVideographer ? '[ ] Brief videographer on recording plan' : ''}
+${hasLivestream ? '[ ] Go live — confirm stream is running' : ''}
 [ ] Execute run of show
-[ ] Capture photos/video
 [ ] Monitor and adjust as needed
+${has('marketing', 'Social Media Campaign') ? '[ ] Post real-time social media updates' : ''}
+
+${generateVendorSection(data)}
 
 POST-EVENT
 ${'-'.repeat(40)}
-[ ] Send thank you notes
-[ ] Distribute survey
-[ ] Compile event report
+[ ] Send thank you notes to speakers, VIPs, and partners
+${has('postEvent', 'Survey/Feedback') ? '[ ] Distribute attendee survey' : ''}
+${has('postEvent', 'Event Recording') ? '[ ] Edit and distribute event recording' : ''}
+${has('postEvent', 'Photo Gallery') ? '[ ] Review, edit, and share photo gallery' : ''}
+${has('postEvent', 'Summary Report') ? '[ ] Compile event summary report' : ''}
+${has('postEvent', 'Social Media Recap') ? '[ ] Post social media recap' : ''}
+${has('postEvent', 'Media Clips Package') ? '[ ] Compile media clips package' : ''}
+${has('postEvent', 'Impact Report for Funders') ? '[ ] Prepare impact report for funders/sponsors' : ''}
+${has('postEvent', 'Follow-Up Meetings') ? '[ ] Schedule follow-up meetings with key contacts' : ''}
 [ ] Process vendor payments
-[ ] Archive materials
-[ ] Debrief with team
+[ ] Archive materials and document lessons learned
+[ ] Debrief with team`;
+
+  // Clean up blank lines from conditional items that didn't render
+  checklist = checklist.replace(/\n{3,}/g, '\n\n');
+  
+  checklist += `
 
 ---
 Generated by SeedAI Event Planner | ${new Date().toLocaleDateString()}`;
+
+  return checklist;
 };
 
 const generateVenueRFP = (data, budget) => {
@@ -1056,6 +1251,61 @@ Generated by SeedAI Event Planner | ${new Date().toLocaleDateString()}`;
 };
 
 const generateContacts = (data) => {
+  // Build dynamic vendor contact sections based on selections
+  const vendorBlocks = [];
+  
+  // Always include venue
+  vendorBlocks.push(`VENUE CONTACT\n${'-'.repeat(40)}\nVenue: ${data.venue || 'TBD'}\nContact: [Name]\nPhone: [Phone]\nEmail: [Email]`);
+  
+  // F&B → Caterer
+  if ((data.fnb || []).length > 0) {
+    vendorBlocks.push(`CATERER\n${'-'.repeat(40)}\nCompany: [Caterer Name]\nContact: [Name]\nPhone: [Phone]\nDay-of Lead: [Name]\nServices: ${data.fnb.join(', ')}`);
+  }
+  
+  // AV → AV Vendor
+  if ((data.av || []).length > 0) {
+    vendorBlocks.push(`AV / PRODUCTION VENDOR\n${'-'.repeat(40)}\nCompany: [AV Company]\nContact: [Name]\nPhone: [Phone]\nDay-of Tech: [Name]\nServices: ${data.av.join(', ')}`);
+  }
+  
+  // Photographer
+  if ((data.production || []).includes('Event Photographer')) {
+    vendorBlocks.push(`PHOTOGRAPHER\n${'-'.repeat(40)}\nCompany/Name: [Photographer]\nPhone: [Phone]\nEmail: [Email]\nArrival Time: [Time]\nShot List: [Attach or note]`);
+  }
+  
+  // Videographer
+  if ((data.production || []).includes('Videographer')) {
+    vendorBlocks.push(`VIDEOGRAPHER\n${'-'.repeat(40)}\nCompany/Name: [Videographer]\nPhone: [Phone]\nEmail: [Email]\nDeliverables: [e.g., highlight reel, full recording]`);
+  }
+  
+  // Florist
+  if ((data.production || []).includes('Floral Arrangements')) {
+    vendorBlocks.push(`FLORIST\n${'-'.repeat(40)}\nCompany: [Florist]\nPhone: [Phone]\nDelivery Time: [Time]`);
+  }
+  
+  // Stage / Lighting / Production Company
+  if ((data.production || []).some(p => ['Stage Design', 'Lighting Design', 'Custom Backdrop'].includes(p))) {
+    vendorBlocks.push(`PRODUCTION COMPANY\n${'-'.repeat(40)}\nCompany: [Production Co.]\nContact: [Name]\nPhone: [Phone]\nLoad-In Time: [Time]\nServices: ${(data.production || []).filter(p => ['Stage Design', 'Lighting Design', 'Custom Backdrop'].includes(p)).join(', ')}`);
+  }
+  
+  // Print Vendor
+  if ((data.production || []).some(p => ['Step & Repeat', 'Branded Signage'].includes(p)) || 
+      (data.collateral || []).some(c => ['Branded Folders', 'Printed Agenda', 'Policy Briefs/Reports'].includes(c))) {
+    vendorBlocks.push(`PRINT VENDOR\n${'-'.repeat(40)}\nCompany: [Print Vendor]\nContact: [Name]\nPhone: [Phone]\nDelivery Date: [Date]`);
+  }
+  
+  // Accessibility services
+  if ((data.accessibility || []).includes('Sign Language Interpretation')) {
+    vendorBlocks.push(`SIGN LANGUAGE INTERPRETER\n${'-'.repeat(40)}\nService/Name: [Interpreter]\nPhone: [Phone]\nArrival Time: [Time]`);
+  }
+  if ((data.accessibility || []).includes('Live Captioning / CART')) {
+    vendorBlocks.push(`CAPTIONING / CART SERVICE\n${'-'.repeat(40)}\nService: [CART Provider]\nContact: [Name]\nPhone: [Phone]\nSetup Time: [Time]`);
+  }
+  
+  // Livestream
+  if ((data.av || []).includes('Livestream Setup')) {
+    vendorBlocks.push(`LIVESTREAM OPERATOR\n${'-'.repeat(40)}\nCompany/Name: [Operator]\nPhone: [Phone]\nPlatform: [e.g., YouTube, Zoom]\nStream URL: [URL]`);
+  }
+
   return `DAY-OF CONTACTS
 ${'='.repeat(60)}
 
@@ -1068,26 +1318,7 @@ ${(data.team || []).map(t => `${t.role || 'Team Member'}: ${t.name || 'TBD'}
   Phone: [Add phone]
   Email: [Add email]`).join('\n\n') || 'Team not assigned'}
 
-VENUE CONTACT
-${'-'.repeat(40)}
-Venue: ${data.venue || 'TBD'}
-Contact: [Name]
-Phone: [Phone]
-Email: [Email]
-
-CATERING CONTACT
-${'-'.repeat(40)}
-Company: [Caterer Name]
-Contact: [Name]
-Phone: [Phone]
-Day-of Lead: [Name]
-
-AV/PRODUCTION CONTACT
-${'-'.repeat(40)}
-Company: [AV Company]
-Contact: [Name]
-Phone: [Phone]
-Day-of Tech: [Name]
+${vendorBlocks.join('\n\n')}
 
 EMERGENCY CONTACTS
 ${'-'.repeat(40)}
@@ -1469,30 +1700,17 @@ const DateInput = ({ label, value, onChange, required, prompt }) => (
       {label} {required && <span className="text-red-400">*</span>}
     </label>
     {prompt && <Prompt text={prompt} />}
-    <div className="flex gap-2">
-      <input
-        type="date"
-        value={value}
-        onChange={(e) => onChange(e.target.value)}
-        className="flex-1 bg-zinc-900 border border-zinc-700 rounded-lg px-4 py-3 text-white focus:border-emerald-500 focus:outline-none [&::-webkit-calendar-picker-indicator]:invert"
-      />
-      <input
-        type="text"
-        value={value ? new Date(value + 'T00:00:00').toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }) : ''}
-        onChange={(e) => {
-          const input = e.target.value;
-          const parsed = new Date(input);
-          if (!isNaN(parsed.getTime())) {
-            const yyyy = parsed.getFullYear();
-            const mm = String(parsed.getMonth() + 1).padStart(2, '0');
-            const dd = String(parsed.getDate()).padStart(2, '0');
-            onChange(`${yyyy}-${mm}-${dd}`);
-          }
-        }}
-        placeholder="or type: Mar 15, 2026"
-        className="flex-1 bg-zinc-900 border border-zinc-700 rounded-lg px-4 py-3 text-white focus:border-emerald-500 focus:outline-none"
-      />
-    </div>
+    <input
+      type="date"
+      value={value}
+      onChange={(e) => onChange(e.target.value)}
+      className="w-full bg-zinc-900 border border-zinc-700 rounded-lg px-4 py-3 text-white focus:border-emerald-500 focus:outline-none [&::-webkit-calendar-picker-indicator]:invert"
+    />
+    {value && (
+      <p className="text-zinc-400 text-sm mt-1">
+        {new Date(value + 'T00:00:00').toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric', year: 'numeric' })}
+      </p>
+    )}
   </div>
 );
 
@@ -1568,24 +1786,25 @@ const TeamMemberInput = ({ members, onChange, prompt }) => (
 
 const AgendaSketch = ({ agenda, onChange, prompt }) => (
   <div className="mb-6">
-    <label className="block text-sm font-medium text-zinc-300 mb-1">Agenda Sketch</label>
+    <label className="block text-sm font-medium text-zinc-300 mb-1">Agenda Sketch <span className="text-zinc-500 font-normal">(optional)</span></label>
     {prompt && <Prompt text={prompt} />}
+    <p className="text-zinc-500 text-xs mb-3">Rough ideas are great — use "TBD" or leave fields blank. AI refinement will fill in gaps and suggest timing.</p>
     <div className="space-y-3">
       {agenda.map((item, i) => (
         <div key={i} className="bg-zinc-900/50 border border-zinc-800 rounded-lg p-3">
           <div className="flex gap-2 mb-2">
             <input
-              placeholder="Time (e.g. 9:00 AM)"
+              placeholder="Time? (or leave blank)"
               value={item.time}
               onChange={(e) => {
                 const updated = [...agenda];
                 updated[i] = { ...updated[i], time: e.target.value };
                 onChange(updated);
               }}
-              className="w-32 bg-zinc-900 border border-zinc-700 rounded-lg px-3 py-2 text-white text-sm focus:border-emerald-500 focus:outline-none"
+              className="w-36 bg-zinc-900 border border-zinc-700 rounded-lg px-3 py-2 text-white text-sm focus:border-emerald-500 focus:outline-none"
             />
             <input
-              placeholder="Session title"
+              placeholder="What happens here? (e.g. 'opening panel on AI safety' or just 'panel TBD')"
               value={item.title}
               onChange={(e) => {
                 const updated = [...agenda];
@@ -1617,7 +1836,7 @@ const AgendaSketch = ({ agenda, onChange, prompt }) => (
             )}
           </div>
           <input
-            placeholder="Notes — speaker names, key topics, special setup..."
+            placeholder="Any details — speaker ideas, topics, special needs... (optional)"
             value={item.notes}
             onChange={(e) => {
               const updated = [...agenda];
@@ -1634,7 +1853,7 @@ const AgendaSketch = ({ agenda, onChange, prompt }) => (
       onClick={() => onChange([...agenda, { time: '', title: '', format: '', notes: '' }])}
       className="text-emerald-400 text-sm hover:text-emerald-300 mt-2"
     >
-      + Add session
+      + Add another idea
     </button>
   </div>
 );
@@ -1646,9 +1865,9 @@ const AgendaSketch = ({ agenda, onChange, prompt }) => (
 export default function EventPlannerV8() {
   const [currentPhase, setCurrentPhase] = useState(0);
   const [data, setData] = useState({
-    name: '', type: '', size: '', duration: '', date: '', format: '', venue: '', region: 'dc-metro',
+    name: '', type: '', size: '', duration: '', date: '', format: '', venue: '', region: '',
     description: '', objectives: '', audience: [], vips: '', speakers: '',
-    recordPolicy: '', partners: '', inviteStrategy: '',
+    partners: '', inviteStrategy: '',
     agenda: [{ time: '', title: '', format: '', notes: '' }],
     program: [], spaces: [], fnb: [], av: [], production: [], collateral: [], marketing: [], postEvent: [],
     accessibility: [],
@@ -1772,7 +1991,6 @@ export default function EventPlannerV8() {
             duration: durationName,
             format: data.format,
             venue: data.venue,
-            recordPolicy: data.recordPolicy,
             partners: data.partners,
             inviteStrategy: data.inviteStrategy,
             accessibility: data.accessibility
@@ -2593,7 +2811,7 @@ export default function EventPlannerV8() {
         description: '',
         objectives: '',
         date: '',
-        region: prev.region || 'dc-metro',
+        region: prev.region || '',
         vips: '',
         speakers: '',
         team: [{ name: '', role: '' }],
@@ -2846,7 +3064,6 @@ export default function EventPlannerV8() {
             <FormInput label="Event Type" value={data.type} onChange={(v) => update('type', v)} type="select" options={EVENT_TYPES} required prompt={PROMPTS.type} />
             <FormInput label="Description" value={data.description} onChange={(v) => update('description', v)} type="textarea" required placeholder="Describe the event's purpose and focus..." prompt={PROMPTS.description} />
             <FormInput label="Objectives" value={data.objectives} onChange={(v) => update('objectives', v)} type="textarea" required placeholder="If one attendee tells a colleague about this event, what should they say?" prompt={PROMPTS.objectives} />
-            <FormInput label="Record Policy" value={data.recordPolicy} onChange={(v) => update('recordPolicy', v)} type="select" options={OPTIONS.recordPolicy} prompt={PROMPTS.recordPolicy} />
             <FormInput label="Partners & Co-Hosts" value={data.partners} onChange={(v) => update('partners', v)} type="textarea" placeholder="e.g., Co-hosted with FAS and IFP. ASN coalition members invited to participate." prompt={PROMPTS.partners} />
           </div>
         );
@@ -3153,9 +3370,9 @@ export default function EventPlannerV8() {
                   if (confirm('Clear all data and start over?')) {
                     localStorage.removeItem('seedai-planner-v8');
                     setData({
-                      name: '', type: '', size: '', duration: '', date: '', format: '', venue: '', region: 'dc-metro',
+                      name: '', type: '', size: '', duration: '', date: '', format: '', venue: '', region: '',
                       description: '', objectives: '', audience: [], vips: '', speakers: '',
-                      recordPolicy: '', partners: '', inviteStrategy: '',
+                      partners: '', inviteStrategy: '',
                       agenda: [{ time: '', title: '', format: '', notes: '' }],
                       program: [], spaces: [], fnb: [], av: [], production: [], collateral: [], marketing: [], postEvent: [],
                       accessibility: [],
