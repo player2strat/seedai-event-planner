@@ -29,9 +29,19 @@ export default async function handler(req, res) {
       body: JSON.stringify({
         model: 'claude-sonnet-4-20250514',
         max_tokens: 1024,
+        tools: [
+          {
+            type: 'web_search_20250305',
+            name: 'web_search'
+          }
+        ],
         messages: [{
           role: 'user',
-          content: `You are an expert event planner with deep knowledge of venue and vendor pricing across US markets. Provide realistic 2025-2026 pricing estimates for this event:
+          content: `You are an expert event planner with deep knowledge of venue and vendor pricing across US markets. 
+
+IMPORTANT: Use web search to find current pricing information, recent venue rates, and up-to-date market conditions for ${region}. Do not rely solely on training data.
+
+Provide realistic 2025-2026 pricing estimates for this event:
 
 LOCATION: ${region}
 VENUE TYPE: ${venueType || 'Conference venue'}
@@ -81,7 +91,11 @@ Return ONLY a valid JSON object with no additional text:
     }
 
     const data = await response.json();
-    const textContent = data.content?.find(c => c.type === 'text')?.text || '{}';
+    // Handle multiple content blocks when web search is used
+    const textContent = data.content
+      ?.filter(c => c.type === 'text')
+      ?.map(c => c.text)
+      ?.join('\n') || '{}';
     
     let marketData;
     try {
