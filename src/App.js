@@ -57,28 +57,24 @@ const DURATION_OPTIONS = [
 
 const OPTIONS = {
   format: ['In-Person', 'Virtual', 'Hybrid'],
-  venue: ['Hotel Ballroom', 'Conference Center', 'Historic Venue', 'Government Building', 'University/Academic', 'Museum/Cultural', 'Rooftop/Outdoor', 'Restaurant/Private Dining', 'Corporate Office', 'Embassy/Diplomatic', 'Other'],
-  audience: ['Congressional Staff', 'Members of Congress', 'Federal Agency Officials', 'State/Local Officials', 'Industry Executives', 'AI/Tech Company Representatives', 'Frontier AI Lab Staff', 'Think Tank / Policy Researchers', 'Small Business Owners', 'Nonprofit Leaders', 'Academics/Researchers', 'Coalition Members', 'Journalists/Media', 'General Public', 'International Delegates', 'Students/Young Professionals'],
-  inviteStrategy: ['Open Registration', 'Invite Only', 'Application-Based', 'Tiered (VIP invite + open registration)'],
-  program: ['Keynote Address', 'Panel Discussion', 'Fireside Chat', 'Breakout Sessions', 'Workshops', 'Networking Breaks', 'Awards/Recognition', 'Press Conference', 'VIP Reception', 'Group Photo', 'Demo / Exhibition / Hands-On', 'Lightning Talks', 'Roundtable Discussion', 'Private Dinner'],
-  agendaFormats: ['Keynote', 'Panel', 'Fireside Chat', 'Breakout', 'Workshop', 'Networking', 'Meal/Reception', 'Demo/Hands-On', 'Roundtable', 'Lightning Talks', 'Press Availability', 'Private Dinner', 'Registration/Arrival', 'Break', 'Other'],
-  spaces: ['Main Plenary Hall', 'Breakout Rooms', 'VIP Green Room', 'Press/Media Room', 'Registration Area', 'Networking Lounge', 'Outdoor Terrace', 'Executive Boardroom', 'Demo/Exhibition Area', 'Prayer/Quiet Room', 'Coat Check Area'],
-  fnb: ['Continental Breakfast', 'Hot Breakfast', 'Morning Coffee/Tea', 'Working Lunch (Boxed)', 'Plated Lunch', 'Afternoon Break', 'Cocktail Reception', 'Happy Hour / Reception', 'Plated Dinner', 'Dessert Reception', 'Water Service (tables)', 'Speaker Refreshments (podium water, mints)'],
-  av: ['Projector/Screen', 'Confidence Monitor', 'Wireless Microphones', 'Podium with Mic', 'Livestream Setup', 'Recording Equipment', 'Video Playback', 'LED Wall/Display', 'Interpretation Equipment', 'Presenter Timer / Countdown', 'AV Adapters Kit (HDMI, USB-C)', 'Power Strips / Extension Cords', 'WiFi for Speakers/Staff'],
-  production: ['Stage Design', 'Custom Backdrop', 'Step & Repeat', 'Branded Signage', 'Directional Signage / Wayfinding', 'Floral Arrangements', 'Lighting Design', 'Event Photographer', 'Videographer', 'Easels / Sign Stands', 'Table Numbers'],
-  collateral: ['Name Badges', 'Lanyards / Badge Holders', 'Printed Agenda', 'Branded Folders', 'Note Pads/Pens', 'Gift Bags', 'Promotional Items', 'Policy Briefs/Reports', 'Speaker Bios', 'Place Cards / Name Tents', 'Panelist Tent Cards', 'WiFi Info Cards', 'Seating Chart / Table Assignments', 'Feedback Cards'],
+  venue: ['Hotel Ballroom', 'Conference Center', 'Historic Venue', 'Government Building', 'University/Academic', 'Museum/Cultural', 'Rooftop/Outdoor', 'Restaurant/Private Dining', 'Corporate Office', 'Other'],
+  audience: ['Congressional Staff', 'Federal Agency Officials', 'State/Local Officials', 'Industry Executives', 'Small Business Owners', 'Nonprofit Leaders', 'Academics/Researchers', 'Journalists/Media', 'General Public', 'International Delegates', 'Students/Young Professionals'],
+  program: ['Keynote Address', 'Panel Discussion', 'Fireside Chat', 'Breakout Sessions', 'Workshops', 'Networking Breaks', 'Awards/Recognition', 'Press Conference', 'VIP Reception', 'Group Photo'],
+  spaces: ['Main Plenary Hall', 'Breakout Rooms', 'VIP Green Room', 'Press/Media Room', 'Registration Area', 'Networking Lounge', 'Outdoor Terrace', 'Executive Boardroom'],
+  fnb: ['Continental Breakfast', 'Hot Breakfast', 'Morning Coffee/Tea', 'Working Lunch (Boxed)', 'Plated Lunch', 'Afternoon Break', 'Cocktail Reception', 'Happy Hour / Reception', 'Plated Dinner', 'Dessert Reception'],
+  av: ['Projector/Screen', 'Confidence Monitor', 'Wireless Microphones', 'Podium with Mic', 'Livestream Setup', 'Recording Equipment', 'Video Playback', 'LED Wall/Display', 'Interpretation Equipment'],
+  production: ['Stage Design', 'Custom Backdrop', 'Step & Repeat', 'Branded Signage', 'Floral Arrangements', 'Lighting Design', 'Event Photographer', 'Videographer'],
+  collateral: ['Name Badges', 'Printed Agenda', 'Branded Folders', 'Note Pads/Pens', 'Gift Bags', 'Promotional Items', 'Policy Briefs/Reports', 'Speaker Bios'],
   marketing: ['Save the Date', 'Email Invitations', 'Event Website', 'Social Media Campaign', 'Press Release', 'Media Advisory', 'Paid Advertising', 'Partner Outreach'],
-  postEvent: ['Thank You Emails', 'Event Recording', 'Photo Gallery', 'Summary Report', 'Survey/Feedback', 'Social Media Recap', 'Media Clips Package', 'Follow-Up Meetings', 'Impact Report for Funders'],
-  onsite: ['Registration Table & Supplies', 'Coat Check', 'Parking Info / Validation', 'Phone Charging Station', 'Emergency Kit (tape, scissors, markers, first aid)', 'Trash / Recycling Stations', 'Attendee Welcome Packets'],
-  accessibility: ['Wheelchair Accessible Venue', 'Sign Language Interpretation', 'Live Captioning / CART', 'Assistive Listening Devices', 'Large Print Materials', 'Dietary Accommodations Collected', 'Gender-Neutral Restrooms', 'Nursing/Lactation Room', 'Quiet Room Available']
+  postEvent: ['Thank You Emails', 'Event Recording', 'Photo Gallery', 'Summary Report', 'Survey/Feedback', 'Social Media Recap', 'Media Clips Package']
 };
 
 const DEFAULT_COSTS = {
   venue: { 'intimate': [2000, 5000], 'small': [3000, 8000], 'medium': [5000, 15000], 'large': [10000, 30000], 'major': [20000, 50000], 'flagship': [35000, 100000] },
-  fnb: { 'Continental Breakfast': 25, 'Hot Breakfast': 45, 'Morning Coffee/Tea': 12, 'Working Lunch (Boxed)': 35, 'Plated Lunch': 55, 'Afternoon Break': 18, 'Cocktail Reception': 65, 'Happy Hour / Reception': 55, 'Plated Dinner': 95, 'Dessert Reception': 30, 'Water Service (tables)': 5, 'Speaker Refreshments (podium water, mints)': 3 },
-  av: { 'Projector/Screen': 500, 'Confidence Monitor': 400, 'Wireless Microphones': 300, 'Podium with Mic': 250, 'Livestream Setup': 2500, 'Recording Equipment': 1500, 'Video Playback': 400, 'LED Wall/Display': 5000, 'Interpretation Equipment': 2000, 'Presenter Timer / Countdown': 200, 'AV Adapters Kit (HDMI, USB-C)': 50, 'Power Strips / Extension Cords': 75, 'WiFi for Speakers/Staff': 200 },
-  production: { 'Stage Design': 5000, 'Custom Backdrop': 3000, 'Step & Repeat': 1500, 'Branded Signage': 2000, 'Directional Signage / Wayfinding': 800, 'Floral Arrangements': 1500, 'Lighting Design': 4000, 'Event Photographer': 2500, 'Videographer': 4000, 'Easels / Sign Stands': 200, 'Table Numbers': 100 },
-  collateral: { 'Name Badges': 5, 'Lanyards / Badge Holders': 3, 'Printed Agenda': 3, 'Branded Folders': 8, 'Note Pads/Pens': 6, 'Gift Bags': 25, 'Promotional Items': 15, 'Policy Briefs/Reports': 12, 'Speaker Bios': 2, 'Place Cards / Name Tents': 2, 'Panelist Tent Cards': 3, 'WiFi Info Cards': 1, 'Seating Chart / Table Assignments': 1, 'Feedback Cards': 1 },
+  fnb: { 'Continental Breakfast': 25, 'Hot Breakfast': 45, 'Morning Coffee/Tea': 12, 'Working Lunch (Boxed)': 35, 'Plated Lunch': 55, 'Afternoon Break': 18, 'Cocktail Reception': 65, 'Happy Hour / Reception': 55, 'Plated Dinner': 95, 'Dessert Reception': 30 },
+  av: { 'Projector/Screen': 500, 'Confidence Monitor': 400, 'Wireless Microphones': 300, 'Podium with Mic': 250, 'Livestream Setup': 2500, 'Recording Equipment': 1500, 'Video Playback': 400, 'LED Wall/Display': 5000, 'Interpretation Equipment': 2000 },
+  production: { 'Stage Design': 5000, 'Custom Backdrop': 3000, 'Step & Repeat': 1500, 'Branded Signage': 2000, 'Floral Arrangements': 1500, 'Lighting Design': 4000, 'Event Photographer': 2500, 'Videographer': 4000 },
+  collateral: { 'Name Badges': 5, 'Printed Agenda': 3, 'Branded Folders': 8, 'Note Pads/Pens': 6, 'Gift Bags': 25, 'Promotional Items': 15, 'Policy Briefs/Reports': 12, 'Speaker Bios': 2 },
   marketing: { 'Save the Date': 500, 'Email Invitations': 300, 'Event Website': 2500, 'Social Media Campaign': 1500, 'Press Release': 800, 'Media Advisory': 500, 'Paid Advertising': 5000, 'Partner Outreach': 1000 }
 };
 
@@ -273,31 +269,26 @@ const PROMPTS = {
   name: "What's the working title for your event? This can evolve as planning progresses.",
   type: "What type of event best describes what you're planning?",
   description: "In 2-3 sentences, describe what this event is about. What's the core theme or focus?",
-  objectives: "If one attendee tells a colleague about this event next week, what do you want them to say? What decisions or actions should this event drive?",
-  partners: "Who are you co-hosting or co-presenting with? Partners change the invite list, credibility, branding, and sometimes the budget split.",
-  inviteStrategy: "How are you controlling who attends? Open events maximize reach; invite-only builds exclusivity and trust.",
-  size: "How many people do you realistically expect to attend? If invite-only, plan to invite 2-3x your target.",
-  audience: "Who specifically needs to be in the room for this event to succeed? Think about the conversations you want to happen between attendees.",
-  vips: "Who are the 3-5 people whose attendance would make this event a success? What would make them say yes?",
-  speakers: "Who would be ideal to present, moderate, or lead discussions? Consider who your target audience would rearrange their schedule to hear.",
-  date: "When are you planning to hold this event? Consider competing events, holidays, and lead time for invitations. If targeting government audiences, check recess schedules.",
-  duration: "How long do you need to accomplish your goals? Shorter events tend to get better government attendance; longer events allow deeper engagement.",
-  format: "Will attendees gather in person, join virtually, or both? Hybrid requires separate production planning for each audience.",
-  venue: "What type of space fits your event's tone? Government buildings signal official credibility; hotels signal neutrality; universities signal academic rigor.",
+  objectives: "What does success look like? What should attendees walk away with? What impact do you want to create?",
+  size: "How many people do you realistically expect to attend?",
+  audience: "Who specifically are you trying to reach? Think about job titles, sectors, and why they'd want to attend.",
+  vips: "Are there specific high-profile individuals you're hoping to attract? Members of Congress, executives, thought leaders?",
+  speakers: "Who would be ideal to present, moderate, or lead discussions? Dream big, but also consider realistic options.",
+  date: "When are you planning to hold this event? Consider seasonality and competing events.",
+  duration: "How long do you need to accomplish your goals?",
+  format: "Will attendees gather in person, join virtually, or both?",
+  venue: "What type of space fits your event's tone and needs?",
   region: "Where will this event take place? This helps us estimate local market costs.",
-  spaces: "Beyond the main room, what other spaces might you need? Think about where informal conversations happen.",
-  program: "What elements will make up your agenda? Think about variety, pacing, and what the signature moment will be.",
-  agenda: "Jot down what you're thinking so far — even 'panel on something about evals' counts. The AI will help flesh it out.",
-  fnb: "Food and beverage sets the tone and affects compliance. Note: if hosting government attendees, federal ethics rules limit gifts to $20/item.",
+  spaces: "Beyond the main room, what other spaces might you need?",
+  program: "What elements will make up your agenda? Think about variety and pacing.",
+  fnb: "Food and beverage sets the tone. What level of hospitality fits your event?",
   av: "What technology do you need to deliver your content effectively?",
   production: "What visual and design elements will enhance the experience?",
   collateral: "What materials will attendees receive or take home?",
   marketing: "How will you spread the word and drive registration?",
-  postEvent: "What happens after the event to extend its impact? The best events create follow-up opportunities that wouldn't have existed otherwise.",
-  accessibility: "What accommodations should you provide? Check ADA requirements for your venue, and consider what your specific attendees may need.",
-  onsite: "The operational details that keep the day running smoothly. Easy to overlook during planning, hard to improvise on event day.",
+  postEvent: "What happens after the event to extend its impact?",
   team: "Who are the key people responsible for making this happen?",
-  funding: "Where is the budget coming from? Sponsors, organizational budget, grants? Note any restrictions on how funds can be used.",
+  funding: "Where is the budget coming from? Sponsors, organizational budget, grants?",
   notes: "Anything else important to remember as planning progresses?"
 };
 
@@ -307,170 +298,43 @@ const PROMPTS = {
 
 const fmt = (n) => new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD', minimumFractionDigits: 0, maximumFractionDigits: 0 }).format(n);
 
-// Maps selected services to the vendor/person role needed
-const VENDOR_MAP = {
-  // F&B
-  'Continental Breakfast': { vendor: 'Caterer', category: 'Food & Beverage' },
-  'Hot Breakfast': { vendor: 'Caterer', category: 'Food & Beverage' },
-  'Morning Coffee/Tea': { vendor: 'Caterer or Venue', category: 'Food & Beverage' },
-  'Working Lunch (Boxed)': { vendor: 'Caterer', category: 'Food & Beverage' },
-  'Plated Lunch': { vendor: 'Caterer', category: 'Food & Beverage' },
-  'Afternoon Break': { vendor: 'Caterer or Venue', category: 'Food & Beverage' },
-  'Cocktail Reception': { vendor: 'Caterer + Bar Service', category: 'Food & Beverage' },
-  'Happy Hour / Reception': { vendor: 'Caterer + Bar Service', category: 'Food & Beverage' },
-  'Plated Dinner': { vendor: 'Caterer', category: 'Food & Beverage' },
-  'Dessert Reception': { vendor: 'Caterer', category: 'Food & Beverage' },
-  'Water Service (tables)': { vendor: 'Caterer or Venue', category: 'Food & Beverage' },
-  'Speaker Refreshments (podium water, mints)': { vendor: 'Caterer or Venue', category: 'Food & Beverage' },
-  // AV
-  'Projector/Screen': { vendor: 'AV Vendor or Venue', category: 'Audio/Visual' },
-  'Confidence Monitor': { vendor: 'AV Vendor', category: 'Audio/Visual' },
-  'Wireless Microphones': { vendor: 'AV Vendor or Venue', category: 'Audio/Visual' },
-  'Podium with Mic': { vendor: 'AV Vendor or Venue', category: 'Audio/Visual' },
-  'Livestream Setup': { vendor: 'AV Vendor or Production Co.', category: 'Audio/Visual' },
-  'Recording Equipment': { vendor: 'AV Vendor or Videographer', category: 'Audio/Visual' },
-  'Video Playback': { vendor: 'AV Vendor', category: 'Audio/Visual' },
-  'LED Wall/Display': { vendor: 'AV Vendor or Production Co.', category: 'Audio/Visual' },
-  'Interpretation Equipment': { vendor: 'AV Vendor or Interpretation Service', category: 'Audio/Visual' },
-  'Presenter Timer / Countdown': { vendor: 'AV Vendor', category: 'Audio/Visual' },
-  'AV Adapters Kit (HDMI, USB-C)': { vendor: 'AV Vendor or In-House', category: 'Audio/Visual' },
-  'Power Strips / Extension Cords': { vendor: 'Venue or In-House', category: 'Audio/Visual' },
-  'WiFi for Speakers/Staff': { vendor: 'Venue', category: 'Audio/Visual' },
-  // Production
-  'Stage Design': { vendor: 'Production Company', category: 'Production' },
-  'Custom Backdrop': { vendor: 'Production Co. or Print Vendor', category: 'Production' },
-  'Step & Repeat': { vendor: 'Print Vendor', category: 'Production' },
-  'Branded Signage': { vendor: 'Print Vendor or Graphic Designer', category: 'Production' },
-  'Floral Arrangements': { vendor: 'Florist', category: 'Production' },
-  'Lighting Design': { vendor: 'Lighting Vendor or Production Co.', category: 'Production' },
-  'Event Photographer': { vendor: 'Photographer', category: 'Production' },
-  'Videographer': { vendor: 'Videographer or Production Co.', category: 'Production' },
-  'Directional Signage / Wayfinding': { vendor: 'Print Vendor or In-House', category: 'Production' },
-  'Easels / Sign Stands': { vendor: 'Venue or Rental Company', category: 'Production' },
-  'Table Numbers': { vendor: 'Print Vendor or In-House', category: 'Production' },
-  // Collateral
-  'Name Badges': { vendor: 'Print Vendor or In-House', category: 'Collateral' },
-  'Lanyards / Badge Holders': { vendor: 'Promo Products Vendor or In-House', category: 'Collateral' },
-  'Printed Agenda': { vendor: 'Print Vendor or In-House', category: 'Collateral' },
-  'Branded Folders': { vendor: 'Print Vendor', category: 'Collateral' },
-  'Note Pads/Pens': { vendor: 'Promo Products Vendor', category: 'Collateral' },
-  'Gift Bags': { vendor: 'Promo Products Vendor', category: 'Collateral' },
-  'Promotional Items': { vendor: 'Promo Products Vendor', category: 'Collateral' },
-  'Policy Briefs/Reports': { vendor: 'Print Vendor or In-House', category: 'Collateral' },
-  'Speaker Bios': { vendor: 'In-House or Graphic Designer', category: 'Collateral' },
-  'Place Cards / Name Tents': { vendor: 'Print Vendor or In-House', category: 'Collateral' },
-  'Panelist Tent Cards': { vendor: 'Print Vendor or In-House', category: 'Collateral' },
-  'WiFi Info Cards': { vendor: 'In-House', category: 'Collateral' },
-  'Seating Chart / Table Assignments': { vendor: 'In-House', category: 'Collateral' },
-  'Feedback Cards': { vendor: 'Print Vendor or In-House', category: 'Collateral' },
-  // Accessibility
-  'Sign Language Interpretation': { vendor: 'Interpretation Service', category: 'Accessibility' },
-  'Live Captioning / CART': { vendor: 'CART Provider', category: 'Accessibility' },
-  'Assistive Listening Devices': { vendor: 'AV Vendor or Venue', category: 'Accessibility' },
-  // On-Site
-  'Registration Table & Supplies': { vendor: 'In-House or Rental Company', category: 'On-Site' },
-  'Coat Check': { vendor: 'Venue or Staffing Agency', category: 'On-Site' },
-  'Parking Info / Validation': { vendor: 'Venue', category: 'On-Site' },
-  'Phone Charging Station': { vendor: 'Rental Company or In-House', category: 'On-Site' },
-};
-
-function generateVendorSection(data) {
-  const allSelections = [
-    ...(data.fnb || []),
-    ...(data.av || []),
-    ...(data.production || []),
-    ...(data.collateral || []),
-    ...(data.onsite || []),
-    ...(data.accessibility || []),
-  ];
-  
-  if (allSelections.length === 0) return '';
-  
-  // Group by vendor type — collect all items that need that vendor
-  const vendorGroups = {};
-  for (const item of allSelections) {
-    const mapping = VENDOR_MAP[item];
-    if (!mapping) continue;
-    const key = mapping.vendor;
-    if (!vendorGroups[key]) vendorGroups[key] = { category: mapping.category, items: [] };
-    vendorGroups[key].items.push(item);
-  }
-  
-  if (Object.keys(vendorGroups).length === 0) return '';
-  
-  let section = `VENDORS & ASSIGNMENTS\n${'-'.repeat(40)}\nBased on your selections, you'll need to source the following:\n\n`;
-  section += `What You Need | Who to Hire | Services They'll Cover | Confirmed Vendor\n`;
-  
-  for (const [vendorType, info] of Object.entries(vendorGroups)) {
-    section += `${info.category} | ${vendorType} | ${info.items.join(', ')} | ___________\n`;
-  }
-  
-  section += `\nFill in the "Confirmed Vendor" column as you book. Use "Refine with AI" for outreach suggestions.`;
-  return section;
-}
-
-function checkCongressionalCalendar(dateStr, data) {
+function checkCongressionalCalendar(dateStr) {
   if (!dateStr) return [];
   const date = new Date(dateStr);
   const warnings = [];
-  const hasGovAudience = (data?.audience || []).some(a => 
-    ['Congressional Staff', 'Members of Congress', 'Federal Agency Officials', 'State/Local Officials'].includes(a)
-  );
   
-  // Congressional recess — only relevant if targeting government audiences
-  if (hasGovAudience) {
-    for (const recess of CONGRESSIONAL_CALENDAR_2026.recesses) {
-      const start = new Date(recess.start);
-      const end = new Date(recess.end);
-      if (date >= start && date <= end) {
-        warnings.push({ type: 'recess', severity: 'high', message: `During ${recess.name} — Congress not in session, government staff may be traveling` });
-      }
+  for (const recess of CONGRESSIONAL_CALENDAR_2026.recesses) {
+    const start = new Date(recess.start);
+    const end = new Date(recess.end);
+    if (date >= start && date <= end) {
+      warnings.push({ type: 'recess', severity: 'high', message: `During ${recess.name} — Congress not in session, Hill staff may be traveling` });
     }
   }
   
-  // August — universally slow, but frame differently based on audience
   if (date.getMonth() === 7 && !warnings.some(w => w.type === 'recess')) {
-    warnings.push({ type: 'august', severity: 'medium', message: 'August is traditionally slow — many people take vacation, which can affect attendance' });
+    warnings.push({ type: 'august', severity: 'medium', message: 'August is traditionally slow in DC — many contacts may be away' });
   }
   
-  // Day-of-week warnings — only for government audiences
   const dayOfWeek = date.getDay();
-  if (hasGovAudience) {
-    if (dayOfWeek === 4 || dayOfWeek === 5) {
-      warnings.push({ type: 'endOfWeek', severity: 'low', message: 'Thu/Fri can be tricky for government audiences — officials often travel to districts' });
-    }
-    if (dayOfWeek === 1) {
-      warnings.push({ type: 'monday', severity: 'low', message: 'Monday mornings can have lower government attendance — afternoon may work better' });
-    }
+  if (dayOfWeek === 4 || dayOfWeek === 5) {
+    warnings.push({ type: 'endOfWeek', severity: 'low', message: 'Thu/Fri can be tricky — Members often travel to districts' });
+  }
+  if (dayOfWeek === 1) {
+    warnings.push({ type: 'monday', severity: 'low', message: 'Monday mornings can have lower Hill attendance — afternoon may work better' });
   }
   
-  // Election proximity — relevant for all political/policy events
   const election = new Date(CONGRESSIONAL_CALENDAR_2026.electionDay);
   const daysToElection = Math.ceil((election - date) / (1000 * 60 * 60 * 24));
   if (daysToElection > 0 && daysToElection <= 28) {
-    warnings.push({ type: 'election', severity: 'high', message: `${daysToElection} days before Election Day — political figures and staff will be focused on campaigns` });
+    warnings.push({ type: 'election', severity: 'high', message: `${daysToElection} days before Election Day — political figures will be campaigning` });
   }
   
-  // Budget dates — only for government audiences
-  if (hasGovAudience) {
-    for (const bd of CONGRESSIONAL_CALENDAR_2026.budgetDates) {
-      const budgetDate = new Date(bd.date);
-      const daysDiff = Math.abs(Math.ceil((date - budgetDate) / (1000 * 60 * 60 * 24)));
-      if (daysDiff <= 7) {
-        warnings.push({ type: 'budget', severity: 'medium', message: `Near ${bd.event} — budget-related events may compete for government attention` });
-      }
+  for (const bd of CONGRESSIONAL_CALENDAR_2026.budgetDates) {
+    const budgetDate = new Date(bd.date);
+    const daysDiff = Math.abs(Math.ceil((date - budgetDate) / (1000 * 60 * 60 * 24)));
+    if (daysDiff <= 7) {
+      warnings.push({ type: 'budget', severity: 'medium', message: `Near ${bd.event} — budget-related events may compete for attention` });
     }
-  }
-  
-  // Universal date warnings
-  const month = date.getMonth();
-  const day = date.getDate();
-  // Major holidays / long weekends
-  if (month === 11 && day >= 20 && day <= 31) {
-    warnings.push({ type: 'holiday', severity: 'high', message: 'Late December — holiday season will significantly impact attendance' });
-  }
-  if (month === 10 && day >= 20 && day <= 28) {
-    warnings.push({ type: 'holiday', severity: 'medium', message: 'Thanksgiving week — many people traveling, attendance may be lower' });
   }
   
   return warnings;
@@ -751,9 +615,8 @@ Expected Attendance: ${size.min}-${size.max} guests
 Duration: ${DURATION_OPTIONS.find(d => d.value === data.duration)?.label || 'TBD'}
 Location: ${budget.region}
 Venue Type: ${data.venue || 'TBD'}
-${data.inviteStrategy ? `Invitation Strategy: ${data.inviteStrategy}` : ''}
 
-${data.partners ? `PARTNERS & CO-HOSTS\n${'-'.repeat(40)}\n${data.partners}\n` : ''}BUDGET SUMMARY
+BUDGET SUMMARY
 ${'-'.repeat(40)}
 Estimated Range: ${fmt(budget.total.min)} - ${fmt(budget.total.max)}
 
@@ -772,11 +635,6 @@ ${data.speakers || 'Not confirmed'}
 PROGRAM HIGHLIGHTS
 ${'-'.repeat(40)}
 ${(data.program || []).join(', ') || 'Program not finalized'}
-${(data.agenda || []).filter(a => a.title && a.title.trim()).length > 0 ? `\nAGENDA SKETCH (WORKING DRAFT)\n${'-'.repeat(40)}\n${data.agenda.filter(a => a.title && a.title.trim()).map(a => `${a.time || 'TBD'} — ${a.title}${a.format ? ` [${a.format}]` : ''}${a.notes ? ` (${a.notes})` : ''}`).join('\n')}` : ''}
-${(data.accessibility || []).length > 0 ? `\nACCESSIBILITY\n${'-'.repeat(40)}\n${data.accessibility.join(', ')}` : ''}
-${(data.onsite || []).length > 0 ? `\nON-SITE ESSENTIALS\n${'-'.repeat(40)}\n${data.onsite.join(', ')}` : ''}
-
-${generateVendorSection(data)}
 
 ---
 Generated by SeedAI Event Planner | ${new Date().toLocaleDateString()}`;
@@ -784,78 +642,34 @@ Generated by SeedAI Event Planner | ${new Date().toLocaleDateString()}`;
 
 const generateRunOfShow = (data, budget) => {
   const duration = DURATION_OPTIONS.find(d => d.value === data.duration) || DURATION_OPTIONS[1];
-  const agendaItems = (data.agenda || []).filter(a => a.title && a.title.trim());
-  const hasAgenda = agendaItems.length > 0;
-  
-  // Always build a complete default schedule first
   let schedule = '';
   
   if (duration.days <= 1) {
-    // Build the default blocks
-    const blocks = [
-      { time: '08:00 AM', label: 'Staff arrival and setup', type: 'ops' },
-      { time: '08:30 AM', label: 'Vendor check-in, AV testing', type: 'ops' },
-      { time: '09:00 AM', label: 'Registration opens', type: 'ops' },
-      { time: '09:30 AM', label: 'Welcome and opening remarks', type: 'program' },
-    ];
-    
-    if (hasAgenda) {
-      // Weave agenda items into the schedule after opening remarks
-      for (const item of agendaItems) {
-        const time = item.time || '';
-        const title = item.title || 'Session TBD';
-        const fmt = item.format ? ` [${item.format}]` : '';
-        const notes = item.notes || '';
-        blocks.push({ time, label: `${title}${fmt}`, notes, type: 'agenda' });
-      }
-    } else {
-      // Use smart defaults based on program selections
-      blocks.push({ time: '10:00 AM', label: (data.program || []).includes('Keynote Address') ? 'Keynote Address' : 'Opening Session', type: 'program' });
-      blocks.push({ time: '10:45 AM', label: 'Networking break', type: 'break' });
-      blocks.push({ time: '11:00 AM', label: (data.program || []).includes('Panel Discussion') ? 'Panel Discussion' : 'Main Program', type: 'program' });
-    }
-    
-    blocks.push({ time: '12:00 PM', label: (data.fnb || []).some(f => f.includes('Lunch')) ? 'Lunch Service' : 'Midday Break', type: 'break' });
-    
-    if (!hasAgenda) {
-      blocks.push({ time: '01:00 PM', label: 'Afternoon programming', type: 'program' });
-      blocks.push({ time: '02:30 PM', label: 'Break', type: 'break' });
-      blocks.push({ time: '02:45 PM', label: (data.program || []).includes('Breakout Sessions') ? 'Breakout Sessions' : 'Continued Programming', type: 'program' });
-    }
-    
-    blocks.push({ time: '04:00 PM', label: 'Closing remarks', type: 'program' });
-    blocks.push({ time: '04:30 PM', label: (data.fnb || []).some(f => f.includes('Reception') || f.includes('Happy Hour')) ? 'Networking Reception' : 'Event Concludes', type: 'break' });
-    blocks.push({ time: '06:00 PM', label: 'Venue breakdown', type: 'ops' });
-    
-    schedule = blocks.map(b => {
-      const timePad = (b.time || '         ').padEnd(10);
-      let line = `${timePad}${b.label}`;
-      if (b.notes) line += `\n          ↳ ${b.notes}`;
-      return line;
-    }).join('\n');
+    schedule = `
+08:00 AM  Staff arrival and setup
+08:30 AM  Vendor check-in, AV testing
+09:00 AM  Registration opens
+09:30 AM  Welcome and opening remarks
+10:00 AM  ${(data.program || []).includes('Keynote Address') ? 'Keynote Address' : 'Opening Session'}
+10:45 AM  Networking break
+11:00 AM  ${(data.program || []).includes('Panel Discussion') ? 'Panel Discussion' : 'Main Program'}
+12:00 PM  ${(data.fnb || []).some(f => f.includes('Lunch')) ? 'Lunch Service' : 'Midday Break'}
+01:00 PM  Afternoon programming
+02:30 PM  Break
+02:45 PM  ${(data.program || []).includes('Breakout Sessions') ? 'Breakout Sessions' : 'Continued Programming'}
+04:00 PM  Closing remarks
+04:30 PM  ${(data.fnb || []).some(f => f.includes('Reception') || f.includes('Happy Hour')) ? 'Networking Reception' : 'Event Concludes'}
+06:00 PM  Venue breakdown`;
   } else {
-    schedule = `DAY 1
+    schedule = `
+DAY 1
 ------
 08:00 AM  Staff arrival and setup
 09:00 AM  Registration opens
-09:30 AM  Welcome and opening remarks`;
-
-    if (hasAgenda) {
-      for (const item of agendaItems) {
-        const time = item.time || '';
-        const title = item.title || 'Session TBD';
-        const fmt = item.format ? ` [${item.format}]` : '';
-        const notes = item.notes ? `\n          ↳ ${item.notes}` : '';
-        schedule += `\n${(time || '         ').padEnd(10)}${title}${fmt}${notes}`;
-      }
-    } else {
-      schedule += `
+09:30 AM  Welcome and opening remarks
 10:00 AM  Morning sessions
 12:00 PM  Lunch
-01:30 PM  Afternoon programming`;
-    }
-
-    schedule += `
+01:30 PM  Afternoon programming
 05:00 PM  Day 1 concludes
 06:00 PM  Evening reception (if applicable)
 
@@ -884,23 +698,11 @@ DAY 3
     }
   }
 
-  // Build header metadata
-  const meta = [];
-  if (data.partners) meta.push(`Partners: ${data.partners}`);
-
-  // If user provided agenda items, add a note about what came from their sketch
-  const agendaNote = hasAgenda
-    ? `\nNote: ${agendaItems.length} session(s) from your agenda sketch are included below. Use "Refine with AI" to assign team members and fill in timing gaps.\n`
-    : '';
-
   return `RUN OF SHOW
 ${'='.repeat(60)}
 
 ${data.name || 'Untitled Event'}
 ${data.date || 'Date TBD'} | ${budget.region}
-${meta.length > 0 ? meta.join('\n') + '\n' : ''}${agendaNote}
-SCHEDULE
-${'-'.repeat(40)}
 ${schedule}
 
 KEY CONTACTS
@@ -963,189 +765,100 @@ FUNDING SOURCES
 ${'-'.repeat(40)}
 ${data.funding || 'Not specified'}
 
-${generateVendorSection(data)}
-
 ---
 Generated by SeedAI Event Planner | ${new Date().toLocaleDateString()}`;
 };
 
 const generateChecklist = (data) => {
-  // Calculate real dates if event date is set
-  const eventDate = data.date ? new Date(data.date + 'T00:00:00') : null;
-  const weeksOut = (n) => {
-    if (!eventDate) return '';
-    const d = new Date(eventDate);
-    d.setDate(d.getDate() - (n * 7));
-    return ` (by ${d.toLocaleDateString('en-US', { month: 'short', day: 'numeric' })})`;
-  };
-  const dayLabel = (n) => `${n}+ WEEKS OUT${weeksOut(n)}`;
-
-  // Helpers for conditional tasks
-  const has = (arr, item) => (data[arr] || []).includes(item);
-  const hasAny = (arr) => (data[arr] || []).length > 0;
-  const hasFed = (data.audience || []).some(a => ['Congressional Staff', 'Members of Congress', 'Federal Agency Officials'].includes(a));
-  const hasLivestream = has('av', 'Livestream Setup');
-  const hasPhotographer = has('production', 'Event Photographer');
-  const hasVideographer = has('production', 'Videographer');
-  const hasStage = (data.production || []).some(p => ['Stage Design', 'Lighting Design', 'Custom Backdrop', 'LED Wall/Display'].includes(p));
-  const hasFloral = has('production', 'Floral Arrangements');
-  const hasPrint = (data.production || []).some(p => ['Step & Repeat', 'Branded Signage'].includes(p)) || hasAny('collateral');
-  const hasMarketing = hasAny('marketing');
-  const hasSpeakers = (data.program || []).some(p => ['Keynote Address', 'Panel Discussion', 'Fireside Chat', 'Lightning Talks'].includes(p));
-  const hasBreakouts = has('program', 'Breakout Sessions') || has('program', 'Workshops');
-  const hasVIP = has('program', 'VIP Reception') || has('program', 'Private Dinner');
-  const hasDemo = has('program', 'Demo / Exhibition / Hands-On');
-  const hasCoatCheck = has('onsite', 'Coat Check');
-  const hasCharging = has('onsite', 'Phone Charging Station');
-  const hasParking = has('onsite', 'Parking Info / Validation');
-  const hasEmergencyKit = has('onsite', 'Emergency Kit (tape, scissors, markers, first aid)');
-  const hasWelcomePacks = has('onsite', 'Attendee Welcome Packets');
-  const hasRegTable = has('onsite', 'Registration Table & Supplies');
-
-  // Build tasks per phase
-  let checklist = `PLANNING CHECKLIST
+  return `PLANNING CHECKLIST
 ${'='.repeat(60)}
 
 ${data.name || 'Untitled Event'}
-${data.date ? new Date(data.date + 'T00:00:00').toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric', year: 'numeric' }) : 'Date TBD'}
+${data.date || 'Date TBD'}
 
-${dayLabel(16)}
+16+ WEEKS OUT
 ${'-'.repeat(40)}
 [ ] Define event goals and success metrics
 [ ] Establish preliminary budget
 [ ] Identify key stakeholders
-${data.partners ? '[ ] Confirm co-host/partner commitments and roles\n[ ] Agree on branding, cost-sharing, and invite list ownership' : ''}
 [ ] Begin venue research
-${hasAny('accessibility') ? '[ ] Document accessibility requirements for venue search' : ''}
 
-${dayLabel(14)}
+14 WEEKS OUT
 ${'-'.repeat(40)}
 [ ] Secure venue contract
-${hasAny('accessibility') ? '[ ] Confirm venue meets accessibility requirements' : ''}
 [ ] Confirm event date
-${hasSpeakers ? '[ ] Draft speaker wish list and begin outreach' : ''}
+[ ] Draft speaker wish list
 [ ] Create project timeline
-${data.inviteStrategy === 'Application-Based' ? '[ ] Design and launch application process' : ''}
-${data.inviteStrategy === 'Tiered (VIP invite + open registration)' ? '[ ] Send VIP invitations first, plan public registration launch' : ''}
 
-${dayLabel(12)}
+12 WEEKS OUT
 ${'-'.repeat(40)}
-${hasSpeakers ? '[ ] Confirm keynote/lead speakers\n[ ] Collect speaker bios and headshots' : ''}
+[ ] Confirm keynote speakers
 [ ] Finalize program outline
-${hasAny('fnb') ? '[ ] Select and contract caterer' : ''}
-${hasAny('av') ? '[ ] Book AV provider' : ''}
-${hasPhotographer ? '[ ] Book photographer' : ''}
-${hasVideographer ? '[ ] Book videographer' : ''}
-${hasStage ? '[ ] Book production company (stage, lighting, backdrop)' : ''}
-${hasFloral ? '[ ] Book florist' : ''}
-${hasFed ? '[ ] Verify federal ethics compliance for meals/gifts ($20/$50 limits)' : ''}
-${has('accessibility', 'Sign Language Interpretation') ? '[ ] Book sign language interpreters' : ''}
-${has('accessibility', 'Live Captioning / CART') ? '[ ] Book CART / live captioning service' : ''}
-${hasLivestream ? '[ ] Book livestream operator / confirm platform' : ''}
+[ ] Select catering vendor
+[ ] Book AV provider
 
-${dayLabel(10)}
+10 WEEKS OUT
 ${'-'.repeat(40)}
-${has('marketing', 'Save the Date') ? '[ ] Send save-the-date' : ''}
-${has('marketing', 'Event Website') ? '[ ] Launch event website' : ''}
-${has('marketing', 'Email Invitations') ? '[ ] Prepare invitation email sequence' : ''}
-${data.inviteStrategy !== 'Invite Only' ? '[ ] Open registration' : '[ ] Send formal invitations'}
-${hasMarketing ? '[ ] Finalize marketing plan and calendar' : ''}
-${hasPrint ? '[ ] Finalize designs and send to print vendor' : ''}
-${hasDemo ? '[ ] Confirm exhibitors/demo participants and requirements' : ''}
+[ ] Launch save-the-date
+[ ] Open registration
+[ ] Finalize marketing plan
+[ ] Order collateral materials
 
-${dayLabel(8)}
+8 WEEKS OUT
 ${'-'.repeat(40)}
-${has('marketing', 'Email Invitations') ? '[ ] Send formal invitations / reminder wave' : ''}
-[ ] Confirm all vendor contracts and deliverables
-${hasAny('fnb') ? '[ ] Finalize menu selections with caterer' : ''}
-${hasAny('av') ? '[ ] Provide AV vendor with detailed room specs and program needs' : ''}
-${has('marketing', 'Social Media Campaign') ? '[ ] Launch social media campaign' : ''}
-${has('marketing', 'Press Release') ? '[ ] Draft and distribute press release' : ''}
-${hasBreakouts ? '[ ] Finalize breakout session topics, moderators, and room assignments' : ''}
+[ ] Send formal invitations
+[ ] Confirm all vendors
+[ ] Finalize menu selections
+[ ] Review AV requirements
 
-${dayLabel(6)}
+6 WEEKS OUT
 ${'-'.repeat(40)}
-[ ] Track RSVPs and manage waitlist
-${hasSpeakers ? '[ ] Brief speakers on logistics, timing, and AV setup' : ''}
-${hasPrint ? '[ ] Review print proofs and approve final materials' : ''}
-[ ] Confirm staffing plan and assign day-of roles
-${hasVIP ? '[ ] Finalize VIP/private dinner guest list and seating' : ''}
-${hasPhotographer ? '[ ] Prepare shot list for photographer' : ''}
+[ ] Track RSVPs
+[ ] Brief speakers on logistics
+[ ] Finalize printed materials
+[ ] Confirm staffing plan
 
-${dayLabel(4)}
+4 WEEKS OUT
 ${'-'.repeat(40)}
-[ ] Send reminder emails to registered attendees
-[ ] Finalize seating/room layout
+[ ] Send reminder emails
+[ ] Finalize seating/layout
 [ ] Create run of show
-${has('collateral', 'Name Badges') ? '[ ] Prepare and print name badges' : ''}
-${has('collateral', 'Place Cards / Name Tents') ? '[ ] Prepare place cards / name tents' : ''}
-${has('collateral', 'Seating Chart / Table Assignments') ? '[ ] Finalize seating chart and table assignments' : ''}
-${hasLivestream ? '[ ] Test livestream setup and confirm streaming URL' : ''}
-${hasDemo ? '[ ] Confirm demo equipment, power, and WiFi requirements' : ''}
-${hasCharging ? '[ ] Confirm charging station rental/setup' : ''}
-${hasParking ? '[ ] Confirm parking arrangements with venue' : ''}
+[ ] Prepare name badges
 
-${dayLabel(2)}
+2 WEEKS OUT
 ${'-'.repeat(40)}
 [ ] Final venue walkthrough
-[ ] Confirm final headcount with venue and caterer
-[ ] Brief all staff and volunteers
-${hasAny('av') ? '[ ] Test all AV equipment and run tech rehearsal' : ''}
-${hasSpeakers ? '[ ] Send final logistics packet to speakers' : ''}
-${has('accessibility', 'Sign Language Interpretation') ? '[ ] Confirm interpreter assignments and share agenda' : ''}
+[ ] Confirm final headcount
+[ ] Brief all staff/volunteers
+[ ] Test all technology
 
-${dayLabel(1)}
+1 WEEK OUT
 ${'-'.repeat(40)}
-[ ] Final vendor confirmations (call each one)
-${hasPrint ? '[ ] Confirm print materials received and correct' : ''}
-${hasEmergencyKit ? '[ ] Prepare emergency kit (tape, markers, chargers, first aid)' : ''}
-[ ] Send final attendee communication with directions and schedule
-${hasLivestream ? '[ ] Confirm stream is scheduled and test URL works' : ''}
-${hasParking ? '[ ] Confirm parking validation process and prepare info for attendees' : ''}
-${hasCoatCheck ? '[ ] Confirm coat check staffing and setup' : ''}
-${hasWelcomePacks ? '[ ] Assemble attendee welcome packets' : ''}
+[ ] Final vendor confirmations
+[ ] Print final materials
+[ ] Prepare emergency kit
+[ ] Send final attendee communications
 
-EVENT DAY${eventDate ? ` — ${eventDate.toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric' })}` : ''}
+EVENT DAY
 ${'-'.repeat(40)}
 [ ] Early arrival for setup
-[ ] Staff briefing and role assignments
-[ ] Vendor check-ins as they arrive
-${hasRegTable ? '[ ] Set up registration table with supplies, badge display, pens' : ''}
-${hasCoatCheck ? '[ ] Open coat check' : ''}
-${hasCharging ? '[ ] Set up and power on charging station' : ''}
-${hasPhotographer ? '[ ] Brief photographer on key moments and shot list' : ''}
-${hasVideographer ? '[ ] Brief videographer on recording plan' : ''}
-${hasLivestream ? '[ ] Go live — confirm stream is running' : ''}
+[ ] Staff briefing
+[ ] Vendor check-ins
 [ ] Execute run of show
+[ ] Capture photos/video
 [ ] Monitor and adjust as needed
-${has('marketing', 'Social Media Campaign') ? '[ ] Post real-time social media updates' : ''}
-
-${generateVendorSection(data)}
 
 POST-EVENT
 ${'-'.repeat(40)}
-[ ] Send thank you notes to speakers, VIPs, and partners
-${has('postEvent', 'Survey/Feedback') ? '[ ] Distribute attendee survey' : ''}
-${has('postEvent', 'Event Recording') ? '[ ] Edit and distribute event recording' : ''}
-${has('postEvent', 'Photo Gallery') ? '[ ] Review, edit, and share photo gallery' : ''}
-${has('postEvent', 'Summary Report') ? '[ ] Compile event summary report' : ''}
-${has('postEvent', 'Social Media Recap') ? '[ ] Post social media recap' : ''}
-${has('postEvent', 'Media Clips Package') ? '[ ] Compile media clips package' : ''}
-${has('postEvent', 'Impact Report for Funders') ? '[ ] Prepare impact report for funders/sponsors' : ''}
-${has('postEvent', 'Follow-Up Meetings') ? '[ ] Schedule follow-up meetings with key contacts' : ''}
+[ ] Send thank you notes
+[ ] Distribute survey
+[ ] Compile event report
 [ ] Process vendor payments
-[ ] Archive materials and document lessons learned
-[ ] Debrief with team`;
-
-  // Clean up blank lines from conditional items that didn't render
-  checklist = checklist.replace(/\n{3,}/g, '\n\n');
-  
-  checklist += `
+[ ] Archive materials
+[ ] Debrief with team
 
 ---
 Generated by SeedAI Event Planner | ${new Date().toLocaleDateString()}`;
-
-  return checklist;
 };
 
 const generateVenueRFP = (data, budget) => {
@@ -1171,7 +884,6 @@ Format: ${data.format || 'In-Person'}
 SPACE REQUIREMENTS
 ${'-'.repeat(40)}
 ${(data.spaces || []).map(s => `• ${s}`).join('\n') || '• Main event space\n• Registration area'}
-${(data.accessibility || []).length > 0 ? `\nACCESSIBILITY REQUIREMENTS\n${'-'.repeat(40)}\n${data.accessibility.map(a => `• ${a}`).join('\n')}` : ''}
 
 CATERING NEEDS
 ${'-'.repeat(40)}
@@ -1307,61 +1019,6 @@ Generated by SeedAI Event Planner | ${new Date().toLocaleDateString()}`;
 };
 
 const generateContacts = (data) => {
-  // Build dynamic vendor contact sections based on selections
-  const vendorBlocks = [];
-  
-  // Always include venue
-  vendorBlocks.push(`VENUE CONTACT\n${'-'.repeat(40)}\nVenue: ${data.venue || 'TBD'}\nContact: [Name]\nPhone: [Phone]\nEmail: [Email]`);
-  
-  // F&B → Caterer
-  if ((data.fnb || []).length > 0) {
-    vendorBlocks.push(`CATERER\n${'-'.repeat(40)}\nCompany: [Caterer Name]\nContact: [Name]\nPhone: [Phone]\nDay-of Lead: [Name]\nServices: ${data.fnb.join(', ')}`);
-  }
-  
-  // AV → AV Vendor
-  if ((data.av || []).length > 0) {
-    vendorBlocks.push(`AV / PRODUCTION VENDOR\n${'-'.repeat(40)}\nCompany: [AV Company]\nContact: [Name]\nPhone: [Phone]\nDay-of Tech: [Name]\nServices: ${data.av.join(', ')}`);
-  }
-  
-  // Photographer
-  if ((data.production || []).includes('Event Photographer')) {
-    vendorBlocks.push(`PHOTOGRAPHER\n${'-'.repeat(40)}\nCompany/Name: [Photographer]\nPhone: [Phone]\nEmail: [Email]\nArrival Time: [Time]\nShot List: [Attach or note]`);
-  }
-  
-  // Videographer
-  if ((data.production || []).includes('Videographer')) {
-    vendorBlocks.push(`VIDEOGRAPHER\n${'-'.repeat(40)}\nCompany/Name: [Videographer]\nPhone: [Phone]\nEmail: [Email]\nDeliverables: [e.g., highlight reel, full recording]`);
-  }
-  
-  // Florist
-  if ((data.production || []).includes('Floral Arrangements')) {
-    vendorBlocks.push(`FLORIST\n${'-'.repeat(40)}\nCompany: [Florist]\nPhone: [Phone]\nDelivery Time: [Time]`);
-  }
-  
-  // Stage / Lighting / Production Company
-  if ((data.production || []).some(p => ['Stage Design', 'Lighting Design', 'Custom Backdrop'].includes(p))) {
-    vendorBlocks.push(`PRODUCTION COMPANY\n${'-'.repeat(40)}\nCompany: [Production Co.]\nContact: [Name]\nPhone: [Phone]\nLoad-In Time: [Time]\nServices: ${(data.production || []).filter(p => ['Stage Design', 'Lighting Design', 'Custom Backdrop'].includes(p)).join(', ')}`);
-  }
-  
-  // Print Vendor
-  if ((data.production || []).some(p => ['Step & Repeat', 'Branded Signage'].includes(p)) || 
-      (data.collateral || []).some(c => ['Branded Folders', 'Printed Agenda', 'Policy Briefs/Reports'].includes(c))) {
-    vendorBlocks.push(`PRINT VENDOR\n${'-'.repeat(40)}\nCompany: [Print Vendor]\nContact: [Name]\nPhone: [Phone]\nDelivery Date: [Date]`);
-  }
-  
-  // Accessibility services
-  if ((data.accessibility || []).includes('Sign Language Interpretation')) {
-    vendorBlocks.push(`SIGN LANGUAGE INTERPRETER\n${'-'.repeat(40)}\nService/Name: [Interpreter]\nPhone: [Phone]\nArrival Time: [Time]`);
-  }
-  if ((data.accessibility || []).includes('Live Captioning / CART')) {
-    vendorBlocks.push(`CAPTIONING / CART SERVICE\n${'-'.repeat(40)}\nService: [CART Provider]\nContact: [Name]\nPhone: [Phone]\nSetup Time: [Time]`);
-  }
-  
-  // Livestream
-  if ((data.av || []).includes('Livestream Setup')) {
-    vendorBlocks.push(`LIVESTREAM OPERATOR\n${'-'.repeat(40)}\nCompany/Name: [Operator]\nPhone: [Phone]\nPlatform: [e.g., YouTube, Zoom]\nStream URL: [URL]`);
-  }
-
   return `DAY-OF CONTACTS
 ${'='.repeat(60)}
 
@@ -1374,7 +1031,26 @@ ${(data.team || []).map(t => `${t.role || 'Team Member'}: ${t.name || 'TBD'}
   Phone: [Add phone]
   Email: [Add email]`).join('\n\n') || 'Team not assigned'}
 
-${vendorBlocks.join('\n\n')}
+VENUE CONTACT
+${'-'.repeat(40)}
+Venue: ${data.venue || 'TBD'}
+Contact: [Name]
+Phone: [Phone]
+Email: [Email]
+
+CATERING CONTACT
+${'-'.repeat(40)}
+Company: [Caterer Name]
+Contact: [Name]
+Phone: [Phone]
+Day-of Lead: [Name]
+
+AV/PRODUCTION CONTACT
+${'-'.repeat(40)}
+Company: [AV Company]
+Contact: [Name]
+Phone: [Phone]
+Day-of Tech: [Name]
 
 EMERGENCY CONTACTS
 ${'-'.repeat(40)}
@@ -1404,13 +1080,13 @@ const DOCUMENTS = {
 function generateAIPrompt(data, budget) {
   const size = SIZE_CONFIG[data.size] || SIZE_CONFIG.medium;
   
-  return `I'm planning an event and need help refining my plan. Here are the details:
+  return `I'm planning a policy event and need help refining my plan. Here are the details:
 
 ## Event Overview
 - **Name:** ${data.name || '[Not yet named]'}
 - **Type:** ${data.type || '[Not specified]'}
 - **Date:** ${data.date || '[TBD]'}
-- **Location:** ${REGIONS[data.region]?.name || '[Location TBD]'}
+- **Location:** ${REGIONS[data.region]?.name || 'Washington, DC'}
 - **Format:** ${data.format || '[Not specified]'}
 - **Expected Size:** ${size ? `${size.min}-${size.max} guests` : '[Not specified]'}
 - **Duration:** ${DURATION_OPTIONS.find(d => d.value === data.duration)?.label || '[Not specified]'}
@@ -1454,258 +1130,13 @@ ${data.notes || '[None]'}
 
 Please help me with:
 1. Review this plan for any gaps or risks I might have missed
-2. Suggest improvements based on policy event best practices
+2. Suggest improvements based on DC policy event best practices
 3. [Add your specific question here]`;
 }
 
 // ============================================================================
 // REUSABLE UI COMPONENTS (defined outside main component to prevent re-creation)
 // ============================================================================
-
-const DocumentRenderer = ({ content, docType }) => {
-  if (!content) return null;
-  
-  const lines = content.split('\n');
-  const elements = [];
-  let i = 0;
-  let tableBuffer = [];
-  
-  const flushTable = () => {
-    if (tableBuffer.length === 0) return;
-    const headerCells = tableBuffer[0].split('|').map(c => c.trim()).filter(Boolean);
-    const dataRows = tableBuffer.slice(1).filter(row => !row.match(/^[\s|:-]+$/));
-    
-    elements.push(
-      <div key={`table-${elements.length}`} className="overflow-x-auto my-4">
-        <table className="w-full border-collapse">
-          <thead>
-            <tr>
-              {headerCells.map((cell, ci) => (
-                <th key={ci} className="bg-emerald-600 text-white text-left px-3 py-2 text-sm font-semibold border border-emerald-700">
-                  {cell}
-                </th>
-              ))}
-            </tr>
-          </thead>
-          <tbody>
-            {dataRows.map((row, ri) => {
-              const cells = row.split('|').map(c => c.trim()).filter(Boolean);
-              return (
-                <tr key={ri} className={ri % 2 === 0 ? 'bg-zinc-900/50' : 'bg-zinc-900/30'}>
-                  {headerCells.map((_, ci) => (
-                    <td key={ci} className="px-3 py-2 text-sm text-zinc-300 border border-zinc-800">
-                      {cells[ci] || ''}
-                    </td>
-                  ))}
-                </tr>
-              );
-            })}
-          </tbody>
-        </table>
-      </div>
-    );
-    tableBuffer = [];
-  };
-
-  while (i < lines.length) {
-    const line = lines[i];
-    const trimmed = line.trim();
-    
-    // Skip the "Generated by" footer — we'll add our own
-    if (trimmed.startsWith('Generated by SeedAI')) { i++; continue; }
-    if (trimmed === '---' && i > lines.length - 5) { i++; continue; }
-    
-    // Table detection: pipe-delimited with 2+ columns
-    if (trimmed.includes('|') && trimmed.split('|').filter(Boolean).length >= 2 && !trimmed.match(/^[-=]+$/)) {
-      if (trimmed.match(/^[\s|:-]+$/)) { i++; continue; } // skip separator
-      tableBuffer.push(trimmed);
-      i++;
-      continue;
-    }
-    
-    // Flush any pending table
-    if (tableBuffer.length > 0) flushTable();
-    
-    // Empty line
-    if (!trimmed) {
-      elements.push(<div key={`sp-${i}`} className="h-3" />);
-      i++;
-      continue;
-    }
-    
-    // Main title (all caps with === underneath, or the first ALL CAPS line)
-    if (trimmed.match(/^={4,}$/)) { i++; continue; } // skip separator
-    if (trimmed.match(/^-{4,}$/)) { i++; continue; } // skip separator
-    
-    // Section headers: ALL CAPS lines with 5+ chars
-    if (trimmed.match(/^[A-Z][A-Z\s\-—&/()#:]{4,}$/) && !trimmed.match(/^(AM|PM|TBD|TBA|AV|VIP|RFP|RSVP|FAQ)$/)) {
-      // Check if this is the doc title (first real text line)
-      const isTitle = elements.filter(e => e.type !== 'div' || !e.props?.className?.includes('h-3')).length === 0;
-      if (isTitle) {
-        elements.push(
-          <h1 key={`h1-${i}`} className="text-xl font-bold text-white mb-1 pb-2 border-b-2 border-emerald-500">
-            {trimmed}
-          </h1>
-        );
-      } else {
-        elements.push(
-          <h2 key={`h2-${i}`} className="text-base font-bold text-emerald-400 mt-6 mb-2 pb-1 border-b border-zinc-700 uppercase tracking-wide">
-            {trimmed}
-          </h2>
-        );
-      }
-      i++;
-      continue;
-    }
-    
-    // Markdown-style headers
-    if (trimmed.match(/^#{1,3}\s/)) {
-      const level = trimmed.match(/^(#+)/)[1].length;
-      const text = trimmed.replace(/^#+\s*/, '');
-      if (level === 1) {
-        elements.push(<h1 key={`md-h1-${i}`} className="text-xl font-bold text-white mb-1 pb-2 border-b-2 border-emerald-500">{text}</h1>);
-      } else if (level === 2) {
-        elements.push(<h2 key={`md-h2-${i}`} className="text-base font-bold text-emerald-400 mt-6 mb-2 pb-1 border-b border-zinc-700">{text}</h2>);
-      } else {
-        elements.push(<h3 key={`md-h3-${i}`} className="text-sm font-semibold text-zinc-200 mt-4 mb-1">{text}</h3>);
-      }
-      i++;
-      continue;
-    }
-    
-    // Checkbox items: [ ] or [x]
-    if (trimmed.match(/^\[[\sx]\]/)) {
-      const checked = trimmed.startsWith('[x]') || trimmed.startsWith('[X]');
-      const text = trimmed.replace(/^\[[\sxX]\]\s*/, '');
-      elements.push(
-        <label key={`cb-${i}`} className="flex items-start gap-2 py-1 px-2 rounded hover:bg-zinc-800/50 cursor-pointer group">
-          <input type="checkbox" defaultChecked={checked} className="mt-1 rounded border-zinc-600 bg-zinc-800 text-emerald-500 focus:ring-emerald-500 focus:ring-offset-0" />
-          <span className={`text-sm ${checked ? 'text-zinc-500 line-through' : 'text-zinc-300'} group-hover:text-white`}>{text}</span>
-        </label>
-      );
-      i++;
-      continue;
-    }
-    
-    // Bullet items
-    if (trimmed.match(/^[•\-]\s/) && !trimmed.match(/^-{3,}/)) {
-      const text = trimmed.replace(/^[•\-]\s*/, '');
-      elements.push(
-        <div key={`bullet-${i}`} className="flex items-start gap-2 py-0.5 pl-2">
-          <span className="text-emerald-500 mt-0.5 text-xs">●</span>
-          <span className="text-sm text-zinc-300">{text}</span>
-        </div>
-      );
-      i++;
-      continue;
-    }
-    
-    // Time-based entries (Run of Show format: "09:00 AM  Session name")
-    if (trimmed.match(/^\d{1,2}:\d{2}\s*(AM|PM)?\s{2,}/i)) {
-      const timeMatch = trimmed.match(/^(\d{1,2}:\d{2}\s*(?:AM|PM)?)\s{2,}(.+)/i);
-      if (timeMatch) {
-        elements.push(
-          <div key={`time-${i}`} className="flex items-start gap-3 py-1.5 pl-2 border-l-2 border-zinc-700 hover:border-emerald-500 transition-colors">
-            <span className="text-emerald-400 font-mono text-sm w-20 shrink-0 font-medium">{timeMatch[1].trim()}</span>
-            <span className="text-sm text-zinc-300">{timeMatch[2]}</span>
-          </div>
-        );
-        i++;
-        continue;
-      }
-    }
-    
-    // "Notes:" sub-lines (indented follow-up to time entries)
-    if (trimmed.match(/^Notes?:/i)) {
-      elements.push(
-        <div key={`note-${i}`} className="pl-24 pb-1">
-          <span className="text-xs text-zinc-500 italic">{trimmed}</span>
-        </div>
-      );
-      i++;
-      continue;
-    }
-    
-    // Letter-style fields: "Subject:", "To:", "From:", "Dear", "Sincerely"
-    if (trimmed.match(/^(Subject|To|From|Date|Re):/i)) {
-      const colonIdx = trimmed.indexOf(':');
-      elements.push(
-        <div key={`letter-${i}`} className="flex gap-2 py-0.5">
-          <span className="text-zinc-400 font-semibold text-sm min-w-16">{trimmed.substring(0, colonIdx + 1)}</span>
-          <span className="text-sm text-zinc-200">{trimmed.substring(colonIdx + 1).trim()}</span>
-        </div>
-      );
-      i++;
-      continue;
-    }
-    
-    if (trimmed.match(/^(Dear\s|Sincerely|Best\sregards|Thank\syou|Regards)/i)) {
-      elements.push(
-        <p key={`salutation-${i}`} className="text-sm text-zinc-200 mt-4 mb-1 italic">{trimmed}</p>
-      );
-      i++;
-      continue;
-    }
-    
-    // "Key: Value" metadata lines (e.g., "Event Name: Summit", "Format: In-Person")
-    if (trimmed.match(/^[A-Z][A-Za-z\s\/&]+:\s/) && trimmed.indexOf(':') < 30 && trimmed.indexOf(':') > 2) {
-      const colonIdx = trimmed.indexOf(':');
-      elements.push(
-        <div key={`meta-${i}`} className="flex gap-2 py-0.5 pl-2">
-          <span className="text-zinc-500 text-sm min-w-36 shrink-0">{trimmed.substring(0, colonIdx + 1)}</span>
-          <span className="text-sm text-zinc-200 font-medium">{trimmed.substring(colonIdx + 1).trim()}</span>
-        </div>
-      );
-      i++;
-      continue;
-    }
-    
-    // Priority emoji lines (🔴 🟡 🟢)
-    if (trimmed.match(/^[🔴🟡🟢⚠️✅📋📞📅💡]/u)) {
-      const bgClass = trimmed.startsWith('🔴') ? 'bg-red-900/20 border-red-800/30' :
-                       trimmed.startsWith('🟡') ? 'bg-yellow-900/20 border-yellow-800/30' :
-                       trimmed.startsWith('🟢') ? 'bg-emerald-900/20 border-emerald-800/30' :
-                       'bg-zinc-800/50 border-zinc-700/30';
-      elements.push(
-        <div key={`emoji-${i}`} className={`text-sm p-2 rounded-lg border ${bgClass} text-zinc-200 my-1`}>{trimmed}</div>
-      );
-      i++;
-      continue;
-    }
-    
-    // Event title lines (first non-header content that looks like a title — name + date)
-    if (elements.length < 5 && !trimmed.match(/^[a-z]/) && trimmed.length < 80 && !trimmed.includes(':') && !trimmed.match(/^[•\-\[]/)) {
-      elements.push(
-        <p key={`subtitle-${i}`} className="text-sm text-zinc-400">{trimmed}</p>
-      );
-      i++;
-      continue;
-    }
-    
-    // Default: body text
-    elements.push(
-      <p key={`p-${i}`} className="text-sm text-zinc-300 leading-relaxed">{trimmed}</p>
-    );
-    i++;
-  }
-  
-  // Flush any remaining table
-  if (tableBuffer.length > 0) flushTable();
-  
-  // Footer
-  elements.push(
-    <div key="footer" className="mt-8 pt-4 border-t border-zinc-800 flex items-center justify-between">
-      <span className="text-xs text-zinc-600">Generated by SeedAI Event Planner</span>
-      <span className="text-xs text-zinc-600">{new Date().toLocaleDateString()}</span>
-    </div>
-  );
-  
-  return (
-    <div className="bg-zinc-950 rounded-lg p-6 space-y-0.5">
-      {elements}
-    </div>
-  );
-};
 
 const Prompt = ({ text }) => (
   <p className="text-zinc-400 text-sm mb-3 italic">{text}</p>
@@ -1756,17 +1187,30 @@ const DateInput = ({ label, value, onChange, required, prompt }) => (
       {label} {required && <span className="text-red-400">*</span>}
     </label>
     {prompt && <Prompt text={prompt} />}
-    <input
-      type="date"
-      value={value}
-      onChange={(e) => onChange(e.target.value)}
-      className="w-full bg-zinc-900 border border-zinc-700 rounded-lg px-4 py-3 text-white focus:border-emerald-500 focus:outline-none [&::-webkit-calendar-picker-indicator]:invert"
-    />
-    {value && (
-      <p className="text-zinc-400 text-sm mt-1">
-        {new Date(value + 'T00:00:00').toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric', year: 'numeric' })}
-      </p>
-    )}
+    <div className="flex gap-2">
+      <input
+        type="date"
+        value={value}
+        onChange={(e) => onChange(e.target.value)}
+        className="flex-1 bg-zinc-900 border border-zinc-700 rounded-lg px-4 py-3 text-white focus:border-emerald-500 focus:outline-none [&::-webkit-calendar-picker-indicator]:invert"
+      />
+      <input
+        type="text"
+        value={value ? new Date(value + 'T00:00:00').toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }) : ''}
+        onChange={(e) => {
+          const input = e.target.value;
+          const parsed = new Date(input);
+          if (!isNaN(parsed.getTime())) {
+            const yyyy = parsed.getFullYear();
+            const mm = String(parsed.getMonth() + 1).padStart(2, '0');
+            const dd = String(parsed.getDate()).padStart(2, '0');
+            onChange(`${yyyy}-${mm}-${dd}`);
+          }
+        }}
+        placeholder="or type: Mar 15, 2026"
+        className="flex-1 bg-zinc-900 border border-zinc-700 rounded-lg px-4 py-3 text-white focus:border-emerald-500 focus:outline-none"
+      />
+    </div>
   </div>
 );
 
@@ -1840,80 +1284,6 @@ const TeamMemberInput = ({ members, onChange, prompt }) => (
   </div>
 );
 
-const AgendaSketch = ({ agenda, onChange, prompt }) => (
-  <div className="mb-6">
-    <label className="block text-sm font-medium text-zinc-300 mb-1">Agenda Sketch <span className="text-zinc-500 font-normal">(optional)</span></label>
-    {prompt && <Prompt text={prompt} />}
-    <p className="text-zinc-500 text-xs mb-3">Rough ideas are great — use "TBD" or leave fields blank. AI refinement will fill in gaps and suggest timing.</p>
-    <div className="space-y-3">
-      {agenda.map((item, i) => (
-        <div key={i} className="bg-zinc-900/50 border border-zinc-800 rounded-lg p-3">
-          <div className="flex gap-2 mb-2">
-            <input
-              placeholder="Time? (or leave blank)"
-              value={item.time}
-              onChange={(e) => {
-                const updated = [...agenda];
-                updated[i] = { ...updated[i], time: e.target.value };
-                onChange(updated);
-              }}
-              className="w-36 bg-zinc-900 border border-zinc-700 rounded-lg px-3 py-2 text-white text-sm focus:border-emerald-500 focus:outline-none"
-            />
-            <input
-              placeholder="What happens here? (e.g. 'opening panel on AI safety' or just 'panel TBD')"
-              value={item.title}
-              onChange={(e) => {
-                const updated = [...agenda];
-                updated[i] = { ...updated[i], title: e.target.value };
-                onChange(updated);
-              }}
-              className="flex-1 bg-zinc-900 border border-zinc-700 rounded-lg px-3 py-2 text-white text-sm focus:border-emerald-500 focus:outline-none"
-            />
-            <select
-              value={item.format}
-              onChange={(e) => {
-                const updated = [...agenda];
-                updated[i] = { ...updated[i], format: e.target.value };
-                onChange(updated);
-              }}
-              className="w-40 bg-zinc-900 border border-zinc-700 rounded-lg px-3 py-2 text-white text-sm focus:border-emerald-500 focus:outline-none"
-            >
-              <option value="">Format...</option>
-              {OPTIONS.agendaFormats.map(f => <option key={f} value={f}>{f}</option>)}
-            </select>
-            {agenda.length > 1 && (
-              <button
-                type="button"
-                onClick={() => onChange(agenda.filter((_, j) => j !== i))}
-                className="px-3 py-2 bg-red-900/50 text-red-400 rounded-lg hover:bg-red-900 text-sm"
-              >
-                ×
-              </button>
-            )}
-          </div>
-          <input
-            placeholder="Any details — speaker ideas, topics, special needs... (optional)"
-            value={item.notes}
-            onChange={(e) => {
-              const updated = [...agenda];
-              updated[i] = { ...updated[i], notes: e.target.value };
-              onChange(updated);
-            }}
-            className="w-full bg-zinc-900 border border-zinc-700 rounded-lg px-3 py-2 text-white text-sm focus:border-emerald-500 focus:outline-none"
-          />
-        </div>
-      ))}
-    </div>
-    <button
-      type="button"
-      onClick={() => onChange([...agenda, { time: '', title: '', format: '', notes: '' }])}
-      className="text-emerald-400 text-sm hover:text-emerald-300 mt-2"
-    >
-      + Add another idea
-    </button>
-  </div>
-);
-
 // ============================================================================
 // MAIN COMPONENT
 // ============================================================================
@@ -1921,13 +1291,9 @@ const AgendaSketch = ({ agenda, onChange, prompt }) => (
 export default function EventPlannerV8() {
   const [currentPhase, setCurrentPhase] = useState(0);
   const [data, setData] = useState({
-    name: '', type: '', size: '', duration: '', date: '', format: '', venue: '', region: '',
+    name: '', type: '', size: '', duration: '', date: '', format: '', venue: '', region: 'dc-metro',
     description: '', objectives: '', audience: [], vips: '', speakers: '',
-    partners: '', inviteStrategy: '',
-    agenda: [{ time: '', title: '', format: '', notes: '' }],
     program: [], spaces: [], fnb: [], av: [], production: [], collateral: [], marketing: [], postEvent: [],
-    accessibility: [],
-    onsite: [],
     team: [{ name: '', role: '' }], notes: '', funding: ''
   });
   const [vendorData, setVendorData] = useState(null);
@@ -1939,13 +1305,8 @@ export default function EventPlannerV8() {
   const [isLoadingAI, setIsLoadingAI] = useState(false);
   const [aiError, setAiError] = useState(null);
   const [marketData, setMarketData] = useState(null);
-  const [marketDataLocation, setMarketDataLocation] = useState(null);
   const [isLoadingMarket, setIsLoadingMarket] = useState(false);
   const [marketError, setMarketError] = useState(null);
-  const [refinedDocs, setRefinedDocs] = useState({});
-  const [refiningDoc, setRefiningDoc] = useState(null);
-  const [refineError, setRefineError] = useState(null);
-  const [docViewMode, setDocViewMode] = useState({});
   const fileInputRef = useRef(null);
 
   // Fetch AI Suggestions from API
@@ -2013,7 +1374,6 @@ export default function EventPlannerV8() {
       
       const result = await response.json();
       setMarketData(result);
-      setMarketDataLocation(regionName);
     } catch (error) {
       console.error('Error fetching market data:', error);
       setMarketError(error.message);
@@ -2021,272 +1381,6 @@ export default function EventPlannerV8() {
       setIsLoadingMarket(false);
     }
   };
-
-  // Refine Document with AI
-  const refineDocument = async (docKey) => {
-    setRefiningDoc(docKey);
-    setRefineError(null);
-    try {
-      const docDef = DOCUMENTS[docKey];
-      const draft = docDef.generate(data, budget);
-      
-      const regionName = data.customCity || REGIONS[data.region]?.name || data.region;
-      const sizeName = SIZE_CONFIG[data.size]?.label || data.size;
-      const durationName = DURATION_OPTIONS.find(d => d.value === data.duration)?.label || data.duration;
-
-      const response = await fetch('/api/refine-document', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          documentType: docKey,
-          draft,
-          teamMembers: data.team,
-          eventData: {
-            name: data.name,
-            type: data.type,
-            date: data.date,
-            region: regionName,
-            size: sizeName,
-            duration: durationName,
-            format: data.format,
-            venue: data.venue,
-            partners: data.partners,
-            inviteStrategy: data.inviteStrategy,
-            accessibility: data.accessibility
-          }
-        })
-      });
-      
-      if (!response.ok) {
-        const errorData = await response.json().catch(() => ({}));
-        throw new Error(errorData.error || 'Failed to refine document');
-      }
-      
-      const result = await response.json();
-      setRefinedDocs(prev => ({ ...prev, [docKey]: result.refined }));
-      setDocViewMode(prev => ({ ...prev, [docKey]: 'refined' }));
-    } catch (error) {
-      console.error('Error refining document:', error);
-      setRefineError(error.message);
-    } finally {
-      setRefiningDoc(null);
-    }
-  };
-
-  // Per-document PDF export
-  const exportDocPDF = useCallback(async (title, content, filename) => {
-    if (!window.jspdf) {
-      const script = document.createElement('script');
-      script.src = 'https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js';
-      document.head.appendChild(script);
-      await new Promise(resolve => script.onload = resolve);
-    }
-
-    const { jsPDF } = window.jspdf;
-    const pdf = new jsPDF();
-    const pageWidth = pdf.internal.pageSize.getWidth();
-    const margin = 20;
-    const contentWidth = pageWidth - (margin * 2);
-    let y = 20;
-
-    // Header bar
-    pdf.setFillColor(24, 24, 27);
-    pdf.rect(0, 0, pageWidth, 35, 'F');
-    pdf.setFontSize(16);
-    pdf.setFont('helvetica', 'bold');
-    pdf.setTextColor(16, 185, 129);
-    pdf.text(title, margin, 15);
-    pdf.setFontSize(9);
-    pdf.setTextColor(161, 161, 170);
-    pdf.text(`${data.name || 'Event'} | Generated: ${new Date().toLocaleDateString()}`, margin, 25);
-    y = 45;
-
-    pdf.setFontSize(10);
-    pdf.setFont('helvetica', 'normal');
-    pdf.setTextColor(30, 30, 30);
-
-    const textLines = pdf.splitTextToSize(content, contentWidth);
-    for (const line of textLines) {
-      if (y > pdf.internal.pageSize.getHeight() - 20) {
-        pdf.addPage();
-        y = 20;
-      }
-      if (line.match(/^[A-Z][A-Z\s\-—|:]{5,}$/) || line.match(/^(TIME|TASK|NAME|CATEGORY)\s*\|/)) {
-        pdf.setFont('helvetica', 'bold');
-        pdf.setTextColor(16, 185, 129);
-        pdf.text(line, margin, y);
-        pdf.setFont('helvetica', 'normal');
-        pdf.setTextColor(30, 30, 30);
-      } else if (line.startsWith('---') || line.startsWith('===')) {
-        pdf.setDrawColor(200, 200, 200);
-        pdf.line(margin, y - 2, pageWidth - margin, y - 2);
-      } else {
-        pdf.text(line, margin, y);
-      }
-      y += 5;
-    }
-
-    const pageCount = pdf.internal.getNumberOfPages();
-    for (let i = 1; i <= pageCount; i++) {
-      pdf.setPage(i);
-      pdf.setFontSize(8);
-      pdf.setTextColor(150, 150, 150);
-      pdf.text(`Page ${i} of ${pageCount}`, pageWidth - margin - 20, pdf.internal.pageSize.getHeight() - 10);
-      pdf.text('SeedAI Event Planner', margin, pdf.internal.pageSize.getHeight() - 10);
-    }
-
-    pdf.save(filename);
-  }, [data]);
-
-  // Per-document DOCX export
-  const exportDocDOCX = useCallback(async (docKey, title, content) => {
-    if (!window.docx) {
-      const script = document.createElement('script');
-      script.src = 'https://unpkg.com/docx@8.2.2/build/index.umd.js';
-      document.head.appendChild(script);
-      await new Promise(resolve => script.onload = resolve);
-    }
-
-    const { Document: DocxDoc, Packer, Paragraph, TextRun, Table, TableRow, TableCell,
-            HeadingLevel, BorderStyle, WidthType, ShadingType } = window.docx;
-
-    const bdr = { style: BorderStyle.SINGLE, size: 1, color: 'D1D5DB' };
-    const bdrs = { top: bdr, bottom: bdr, left: bdr, right: bdr };
-    const cellMg = { top: 60, bottom: 60, left: 100, right: 100 };
-
-    const contentLines = content.split('\n');
-    const docChildren = [];
-
-    // Document header
-    docChildren.push(new Paragraph({
-      children: [new TextRun({ text: '🌱 SeedAI Event Planner', bold: true, size: 28, color: '10B981' })],
-      spacing: { after: 80 }
-    }));
-    docChildren.push(new Paragraph({
-      children: [new TextRun({ text: `${data.name || 'Event'} — ${title}`, bold: true, size: 40 })],
-      heading: HeadingLevel.HEADING_1,
-      spacing: { after: 80 }
-    }));
-    docChildren.push(new Paragraph({
-      children: [new TextRun({ text: `Generated: ${new Date().toLocaleDateString()} | ${data.type || 'Event'} | ${data.date || 'Date TBD'}`, size: 20, color: '71717A' })],
-      spacing: { after: 400 }
-    }));
-
-    // Parse content — detect tables, headers, body text
-    const pendingTable = [];
-
-    const flushTable = () => {
-      if (pendingTable.length === 0) return;
-      const hdrCells = pendingTable[0].split('|').map(c => c.trim()).filter(Boolean);
-      const cols = hdrCells.length;
-      const cw = Math.floor(9360 / cols);
-
-      const tblRows = [
-        new TableRow({
-          children: hdrCells.map(cell => new TableCell({
-            borders: bdrs, width: { size: cw, type: WidthType.DXA }, margins: cellMg,
-            shading: { fill: '10B981', type: ShadingType.CLEAR },
-            children: [new Paragraph({ children: [new TextRun({ text: cell, bold: true, size: 18, color: 'FFFFFF' })] })]
-          }))
-        })
-      ];
-
-      for (let i = 1; i < pendingTable.length; i++) {
-        const cells = pendingTable[i].split('|').map(c => c.trim()).filter(Boolean);
-        while (cells.length < cols) cells.push('');
-        tblRows.push(new TableRow({
-          children: cells.slice(0, cols).map(cell => new TableCell({
-            borders: bdrs, width: { size: cw, type: WidthType.DXA }, margins: cellMg,
-            children: [new Paragraph({ children: [new TextRun({ text: cell, size: 18 })] })]
-          }))
-        }));
-      }
-
-      docChildren.push(new Table({
-        width: { size: 100, type: WidthType.PERCENTAGE },
-        columnWidths: Array(cols).fill(cw),
-        rows: tblRows
-      }));
-      docChildren.push(new Paragraph({ spacing: { after: 200 }, children: [] }));
-      pendingTable.length = 0;
-    };
-
-    for (const line of contentLines) {
-      const t = line.trim();
-
-      if (!t) {
-        flushTable();
-        docChildren.push(new Paragraph({ spacing: { after: 120 }, children: [] }));
-        continue;
-      }
-
-      // Table row detection
-      if (t.includes('|') && t.split('|').filter(Boolean).length >= 2 && !t.match(/^[\s|:-]+$/)) {
-        pendingTable.push(t);
-        continue;
-      }
-      if (t.match(/^[\s|:-]+$/)) continue; // separator line
-
-      flushTable();
-
-      if (t.match(/^[A-Z][A-Z\s\-—&/()]{4,}$/) || t.match(/^#{1,3}\s/)) {
-        docChildren.push(new Paragraph({
-          children: [new TextRun({ text: t.replace(/^#+\s*/, ''), bold: true, size: 24, color: 'FFFFFF' })],
-          shading: { fill: '10B981', type: ShadingType.CLEAR },
-          spacing: { before: 300, after: 200 },
-          heading: HeadingLevel.HEADING_2
-        }));
-      } else if (t.startsWith('---') || t.startsWith('===')) {
-        // skip
-      } else if (t.startsWith('- ') || t.startsWith('• ')) {
-        docChildren.push(new Paragraph({
-          children: [new TextRun({ text: `  ${t}`, size: 20 })],
-          spacing: { after: 60 }
-        }));
-      } else if (t.match(/^(Subject|To|From|Date|Dear|Sincerely|Best|Re:)/i)) {
-        const colonIdx = t.indexOf(':');
-        if (colonIdx > 0 && colonIdx < 15) {
-          docChildren.push(new Paragraph({
-            children: [
-              new TextRun({ text: t.substring(0, colonIdx + 1), bold: true, size: 20 }),
-              new TextRun({ text: t.substring(colonIdx + 1), size: 20 })
-            ],
-            spacing: { after: 80 }
-          }));
-        } else {
-          docChildren.push(new Paragraph({ children: [new TextRun({ text: t, size: 20 })], spacing: { after: 80 } }));
-        }
-      } else {
-        docChildren.push(new Paragraph({ children: [new TextRun({ text: t, size: 20 })], spacing: { after: 80 } }));
-      }
-    }
-
-    flushTable();
-
-    // Footer
-    docChildren.push(new Paragraph({ spacing: { before: 400 }, children: [] }));
-    docChildren.push(new Paragraph({
-      children: [new TextRun({ text: `Generated by SeedAI Event Planner | ${new Date().toLocaleDateString()}`, size: 16, color: '71717A', italics: true })]
-    }));
-
-    const docFile = new DocxDoc({
-      styles: { default: { document: { run: { font: 'Arial', size: 20 } } } },
-      sections: [{
-        properties: {
-          page: { size: { width: 12240, height: 15840 }, margin: { top: 1440, right: 1440, bottom: 1440, left: 1440 } }
-        },
-        children: docChildren
-      }]
-    });
-
-    const blob = await Packer.toBlob(docFile);
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement('a');
-    a.href = url;
-    a.download = `${data.name || 'event'}-${docKey}.docx`.toLowerCase().replace(/\s+/g, '-');
-    a.click();
-    URL.revokeObjectURL(url);
-  }, [data]);
 
   // Load saved data
   useEffect(() => {
@@ -2330,7 +1424,7 @@ export default function EventPlannerV8() {
   const timeline = generateTimeline(data);
   const risks = analyzeRisks(data);
   const suggestions = generateSuggestions(data, budget);
-  const calendarWarnings = checkCongressionalCalendar(data.date, data);
+  const calendarWarnings = checkCongressionalCalendar(data.date);
 
   const phaseComplete = {
     vision: !!(data.name && data.type && data.description && data.objectives),
@@ -2352,123 +1446,6 @@ export default function EventPlannerV8() {
       console.error('Copy failed:', e);
     }
   }, []);
-
-  // Convert plain text to formatted HTML for Google Docs pasting
-  const handleCopyRich = useCallback(async (text) => {
-    try {
-      const lines = text.split('\n');
-      let html = '<div style="font-family: Arial, sans-serif; font-size: 11pt; color: #1a1a1a;">';
-      let inTable = false;
-      let tableRows = [];
-
-      const flushTableHtml = () => {
-        if (tableRows.length === 0) return;
-        const headerCells = tableRows[0].split('|').map(c => c.trim()).filter(Boolean);
-        const dataRows = tableRows.slice(1).filter(r => !r.match(/^[\s|:-]+$/));
-        
-        html += '<table style="border-collapse: collapse; width: 100%; margin: 12px 0;">';
-        html += '<tr>';
-        headerCells.forEach(c => {
-          html += `<th style="background-color: #10B981; color: white; padding: 8px 12px; border: 1px solid #059669; font-weight: bold; text-align: left; font-size: 10pt;">${c}</th>`;
-        });
-        html += '</tr>';
-        dataRows.forEach((row, ri) => {
-          const cells = row.split('|').map(c => c.trim()).filter(Boolean);
-          const bg = ri % 2 === 0 ? '#f9fafb' : '#ffffff';
-          html += '<tr>';
-          headerCells.forEach((_, ci) => {
-            html += `<td style="padding: 6px 12px; border: 1px solid #e5e7eb; background-color: ${bg}; font-size: 10pt;">${cells[ci] || ''}</td>`;
-          });
-          html += '</tr>';
-        });
-        html += '</table>';
-        tableRows = [];
-      };
-
-      for (const line of lines) {
-        const t = line.trim();
-        if (!t) { 
-          if (inTable) { flushTableHtml(); inTable = false; }
-          html += '<br/>'; 
-          continue; 
-        }
-        if (t.startsWith('Generated by SeedAI') || (t === '---' && lines.indexOf(line) > lines.length - 5)) continue;
-        if (t.match(/^={4,}$/) || t.match(/^-{4,}$/)) continue;
-
-        // Table rows
-        if (t.includes('|') && t.split('|').filter(Boolean).length >= 2 && !t.match(/^[\s|:-]+$/)) {
-          tableRows.push(t);
-          inTable = true;
-          continue;
-        }
-        if (inTable) { flushTableHtml(); inTable = false; }
-
-        // Headers
-        if (t.match(/^[A-Z][A-Z\s\-—&/()#:]{4,}$/) && !t.match(/^(AM|PM|TBD|TBA|AV|VIP)$/)) {
-          html += `<h2 style="font-size: 14pt; font-weight: bold; color: #10B981; border-bottom: 2px solid #10B981; padding-bottom: 4px; margin-top: 16px; margin-bottom: 8px;">${t}</h2>`;
-          continue;
-        }
-        if (t.match(/^#{1,3}\s/)) {
-          const text = t.replace(/^#+\s*/, '');
-          html += `<h2 style="font-size: 13pt; font-weight: bold; color: #10B981; margin-top: 14px; margin-bottom: 6px;">${text}</h2>`;
-          continue;
-        }
-
-        // Checkboxes
-        if (t.match(/^\[[\sx]\]/)) {
-          const checked = t.startsWith('[x]') || t.startsWith('[X]');
-          const text = t.replace(/^\[[\sxX]\]\s*/, '');
-          html += `<div style="margin: 2px 0; padding-left: 8px;">${checked ? '☑' : '☐'} ${text}</div>`;
-          continue;
-        }
-
-        // Bullets
-        if (t.match(/^[•\-]\s/) && !t.match(/^-{3,}/)) {
-          html += `<div style="margin: 2px 0; padding-left: 16px;">● ${t.replace(/^[•\-]\s*/, '')}</div>`;
-          continue;
-        }
-
-        // Time entries
-        if (t.match(/^\d{1,2}:\d{2}\s*(AM|PM)?\s{2,}/i)) {
-          const m = t.match(/^(\d{1,2}:\d{2}\s*(?:AM|PM)?)\s{2,}(.+)/i);
-          if (m) {
-            html += `<div style="margin: 4px 0; border-left: 3px solid #10B981; padding-left: 12px;"><span style="color: #10B981; font-weight: bold; font-family: monospace; display: inline-block; width: 80px;">${m[1].trim()}</span> ${m[2]}</div>`;
-            continue;
-          }
-        }
-
-        // Key: value lines
-        if (t.match(/^(Subject|To|From|Date|Re):/i) || (t.match(/^[A-Z][A-Za-z\s\/&]+:\s/) && t.indexOf(':') < 30 && t.indexOf(':') > 2)) {
-          const ci = t.indexOf(':');
-          html += `<div style="margin: 2px 0;"><strong>${t.substring(0, ci + 1)}</strong> ${t.substring(ci + 1).trim()}</div>`;
-          continue;
-        }
-
-        // Default paragraph
-        html += `<p style="margin: 4px 0; line-height: 1.6;">${t}</p>`;
-      }
-      
-      if (inTable) flushTableHtml();
-      html += '</div>';
-
-      // Use Clipboard API to write both HTML and plain text
-      const htmlBlob = new Blob([html], { type: 'text/html' });
-      const textBlob = new Blob([text], { type: 'text/plain' });
-      await navigator.clipboard.write([
-        new ClipboardItem({
-          'text/html': htmlBlob,
-          'text/plain': textBlob
-        })
-      ]);
-      
-      setCopySuccess(true);
-      setTimeout(() => setCopySuccess(false), 2000);
-    } catch (e) {
-      // Fallback to plain text copy
-      console.error('Rich copy failed, falling back to plain text:', e);
-      handleCopy(text);
-    }
-  }, [handleCopy]);
 
   const handleDownload = useCallback((text, filename) => {
     const blob = new Blob([text], { type: 'text/plain' });
@@ -2520,253 +1497,6 @@ export default function EventPlannerV8() {
     a.click();
     URL.revokeObjectURL(url);
   }, [data, timeline]);
-
-  // Export All Documents
-  const [isExportingAll, setIsExportingAll] = useState(false);
-  
-  const handleExportAllDocs = useCallback(async (format) => {
-    setIsExportingAll(true);
-    try {
-      // Ensure docx library is loaded
-      if (!window.docx) {
-        const script = document.createElement('script');
-        script.src = 'https://unpkg.com/docx@8.2.2/build/index.umd.js';
-        document.head.appendChild(script);
-        await new Promise(resolve => script.onload = resolve);
-      }
-
-      const { Document: DocxDoc, Packer, Paragraph, TextRun, Table, TableRow, TableCell,
-              HeadingLevel, BorderStyle, WidthType, ShadingType, PageBreak } = window.docx;
-
-      const bdr = { style: BorderStyle.SINGLE, size: 1, color: 'D1D5DB' };
-      const bdrs = { top: bdr, bottom: bdr, left: bdr, right: bdr };
-      const cellMg = { top: 60, bottom: 60, left: 100, right: 100 };
-      const eventSlug = (data.name || 'event').toLowerCase().replace(/\s+/g, '-');
-
-      // Shared function to parse content into docx paragraphs
-      const parseContentToDocx = (content, title) => {
-        const contentLines = content.split('\n');
-        const children = [];
-        const pendingTable = [];
-
-        const flushTable = () => {
-          if (pendingTable.length === 0) return;
-          const hdrCells = pendingTable[0].split('|').map(c => c.trim()).filter(Boolean);
-          const cols = hdrCells.length;
-          const cw = Math.floor(9360 / cols);
-          const tblRows = [
-            new TableRow({
-              children: hdrCells.map(cell => new TableCell({
-                borders: bdrs, width: { size: cw, type: WidthType.DXA }, margins: cellMg,
-                shading: { fill: '10B981', type: ShadingType.CLEAR },
-                children: [new Paragraph({ children: [new TextRun({ text: cell, bold: true, size: 18, color: 'FFFFFF' })] })]
-              }))
-            })
-          ];
-          for (let i = 1; i < pendingTable.length; i++) {
-            const cells = pendingTable[i].split('|').map(c => c.trim()).filter(Boolean);
-            while (cells.length < cols) cells.push('');
-            tblRows.push(new TableRow({
-              children: cells.slice(0, cols).map(cell => new TableCell({
-                borders: bdrs, width: { size: cw, type: WidthType.DXA }, margins: cellMg,
-                children: [new Paragraph({ children: [new TextRun({ text: cell, size: 18 })] })]
-              }))
-            }));
-          }
-          children.push(new Table({ width: { size: 100, type: WidthType.PERCENTAGE }, columnWidths: Array(cols).fill(cw), rows: tblRows }));
-          children.push(new Paragraph({ spacing: { after: 200 }, children: [] }));
-          pendingTable.length = 0;
-        };
-
-        // Section header
-        children.push(new Paragraph({
-          children: [new TextRun({ text: `${data.name || 'Event'} — ${title}`, bold: true, size: 36 })],
-          heading: HeadingLevel.HEADING_1,
-          spacing: { after: 80 }
-        }));
-        children.push(new Paragraph({
-          children: [new TextRun({ text: `${data.type || 'Event'} | ${data.date || 'Date TBD'} | Generated: ${new Date().toLocaleDateString()}`, size: 20, color: '71717A' })],
-          spacing: { after: 400 }
-        }));
-
-        for (const line of contentLines) {
-          const t = line.trim();
-          if (!t) { flushTable(); children.push(new Paragraph({ spacing: { after: 120 }, children: [] })); continue; }
-          if (t.includes('|') && t.split('|').filter(Boolean).length >= 2 && !t.match(/^[\s|:-]+$/)) { pendingTable.push(t); continue; }
-          if (t.match(/^[\s|:-]+$/)) continue;
-          flushTable();
-          if (t.match(/^[A-Z][A-Z\s\-—&/()]{4,}$/) || t.match(/^#{1,3}\s/)) {
-            children.push(new Paragraph({
-              children: [new TextRun({ text: t.replace(/^#+\s*/, ''), bold: true, size: 24, color: 'FFFFFF' })],
-              shading: { fill: '10B981', type: ShadingType.CLEAR },
-              spacing: { before: 300, after: 200 }, heading: HeadingLevel.HEADING_2
-            }));
-          } else if (t.startsWith('---') || t.startsWith('===') || t.startsWith('Generated by SeedAI')) {
-            // skip
-          } else if (t.startsWith('- ') || t.startsWith('• ')) {
-            children.push(new Paragraph({ children: [new TextRun({ text: `  ${t}`, size: 20 })], spacing: { after: 60 } }));
-          } else if (t.match(/^\[[\sx]\]/)) {
-            const checked = t.startsWith('[x]');
-            const label = t.replace(/^\[[\sx]\]\s*/, '');
-            children.push(new Paragraph({
-              children: [new TextRun({ text: `${checked ? '☑' : '☐'} ${label}`, size: 20 })],
-              spacing: { after: 60 }
-            }));
-          } else if (t.match(/^(Subject|To|From|Date|Dear|Sincerely|Best|Re:)/i)) {
-            const colonIdx = t.indexOf(':');
-            if (colonIdx > 0 && colonIdx < 15) {
-              children.push(new Paragraph({
-                children: [
-                  new TextRun({ text: t.substring(0, colonIdx + 1), bold: true, size: 20 }),
-                  new TextRun({ text: t.substring(colonIdx + 1), size: 20 })
-                ], spacing: { after: 80 }
-              }));
-            } else {
-              children.push(new Paragraph({ children: [new TextRun({ text: t, size: 20 })], spacing: { after: 80 } }));
-            }
-          } else {
-            children.push(new Paragraph({ children: [new TextRun({ text: t, size: 20 })], spacing: { after: 80 } }));
-          }
-        }
-        flushTable();
-        return children;
-      };
-
-      if (format === 'combined') {
-        // One .docx with all documents, page breaks between sections
-        const allSections = [];
-        const docEntries = Object.entries(DOCUMENTS);
-        
-        // Cover page
-        allSections.push(new Paragraph({ spacing: { before: 3000 }, children: [] }));
-        allSections.push(new Paragraph({
-          children: [new TextRun({ text: '🌱 SeedAI Event Planner', bold: true, size: 32, color: '10B981' })],
-          spacing: { after: 200 }
-        }));
-        allSections.push(new Paragraph({
-          children: [new TextRun({ text: data.name || 'Event', bold: true, size: 52 })],
-          spacing: { after: 100 }
-        }));
-        allSections.push(new Paragraph({
-          children: [new TextRun({ text: 'Complete Planning Package', size: 28, color: '71717A' })],
-          spacing: { after: 400 }
-        }));
-        allSections.push(new Paragraph({
-          children: [new TextRun({ text: `${data.type || 'Event'} | ${data.date || 'Date TBD'} | ${REGIONS[data.region]?.name || data.customCity || 'Location TBD'}`, size: 22, color: '71717A' })],
-          spacing: { after: 200 }
-        }));
-        allSections.push(new Paragraph({
-          children: [new TextRun({ text: `Exported: ${new Date().toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric', year: 'numeric' })}`, size: 20, color: '999999' })],
-          spacing: { after: 400 }
-        }));
-        // Table of contents
-        allSections.push(new Paragraph({
-          children: [new TextRun({ text: 'Documents Included:', bold: true, size: 22 })],
-          spacing: { before: 400, after: 100 }
-        }));
-        docEntries.forEach(([, doc], i) => {
-          allSections.push(new Paragraph({
-            children: [new TextRun({ text: `  ${i + 1}. ${doc.icon}  ${doc.name}`, size: 20 })],
-            spacing: { after: 60 }
-          }));
-        });
-
-        // Each document section with page break
-        docEntries.forEach(([key, doc]) => {
-          const content = doc.generate(data, budget);
-          const sectionChildren = parseContentToDocx(content, doc.name);
-          allSections.push(new Paragraph({
-            children: [new TextRun({ text: '', break: 1 })],
-            pageBreakBefore: true
-          }));
-          allSections.push(...sectionChildren);
-        });
-
-        // Footer
-        allSections.push(new Paragraph({ spacing: { before: 600 }, children: [] }));
-        allSections.push(new Paragraph({
-          children: [new TextRun({ text: 'Generated by SeedAI Event Planner', size: 16, color: '71717A', italics: true })]
-        }));
-
-        const docFile = new DocxDoc({
-          styles: { default: { document: { run: { font: 'Arial', size: 20 } } } },
-          sections: [{
-            properties: { page: { size: { width: 12240, height: 15840 }, margin: { top: 1440, right: 1440, bottom: 1440, left: 1440 } } },
-            children: allSections
-          }]
-        });
-
-        const blob = await Packer.toBlob(docFile);
-        const url = URL.createObjectURL(blob);
-        const a = document.createElement('a');
-        a.href = url;
-        a.download = `${eventSlug}-complete-package.docx`;
-        a.click();
-        URL.revokeObjectURL(url);
-
-      } else if (format === 'zip') {
-        // Load JSZip
-        if (!window.JSZip) {
-          await new Promise((resolve, reject) => {
-            const script = document.createElement('script');
-            script.src = 'https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js';
-            script.onload = resolve;
-            script.onerror = reject;
-            document.head.appendChild(script);
-          });
-        }
-        
-        const zip = new window.JSZip();
-        
-        // Generate each document as .docx and add to zip
-        for (const [key, doc] of Object.entries(DOCUMENTS)) {
-          const content = doc.generate(data, budget);
-          const sectionChildren = parseContentToDocx(content, doc.name);
-
-          // Add SeedAI header
-          const docChildren = [
-            new Paragraph({
-              children: [new TextRun({ text: '🌱 SeedAI Event Planner', bold: true, size: 28, color: '10B981' })],
-              spacing: { after: 80 }
-            }),
-            ...sectionChildren,
-            new Paragraph({ spacing: { before: 400 }, children: [] }),
-            new Paragraph({
-              children: [new TextRun({ text: `Generated by SeedAI Event Planner | ${new Date().toLocaleDateString()}`, size: 16, color: '71717A', italics: true })]
-            })
-          ];
-
-          const docFile = new DocxDoc({
-            styles: { default: { document: { run: { font: 'Arial', size: 20 } } } },
-            sections: [{
-              properties: { page: { size: { width: 12240, height: 15840 }, margin: { top: 1440, right: 1440, bottom: 1440, left: 1440 } } },
-              children: docChildren
-            }]
-          });
-
-          const blob = await Packer.toBlob(docFile);
-          zip.file(`${eventSlug}-${key}.docx`, blob);
-        }
-        
-        // Also add the JSON plan data
-        const planData = { version: 'v8', exportedAt: new Date().toISOString(), data };
-        zip.file(`${eventSlug}-plan.json`, JSON.stringify(planData, null, 2));
-        
-        const zipBlob = await zip.generateAsync({ type: 'blob' });
-        const url = URL.createObjectURL(zipBlob);
-        const a = document.createElement('a');
-        a.href = url;
-        a.download = `${eventSlug}-documents.zip`;
-        a.click();
-        URL.revokeObjectURL(url);
-      }
-    } catch (error) {
-      console.error('Export all failed:', error);
-      alert('Export failed. Please try again.');
-    } finally {
-      setIsExportingAll(false);
-    }
-  }, [data, budget]);
 
   const handleCopyForAI = useCallback(() => {
     const prompt = generateAIPrompt(data, budget);
@@ -3117,7 +1847,7 @@ export default function EventPlannerV8() {
         description: '',
         objectives: '',
         date: '',
-        region: prev.region || '',
+        region: prev.region || 'dc-metro',
         vips: '',
         speakers: '',
         team: [{ name: '', role: '' }],
@@ -3161,7 +1891,7 @@ export default function EventPlannerV8() {
     return (
       <div className="bg-blue-900/20 border border-blue-700/50 rounded-lg p-4 mt-4">
         <h4 className="text-blue-400 font-medium mb-2 flex items-center gap-2">
-          <span>📅</span> Calendar Notes
+          <span>📅</span> DC Calendar Notes
         </h4>
         <ul className="space-y-2">
           {calendarWarnings.map((w, i) => (
@@ -3177,105 +1907,27 @@ export default function EventPlannerV8() {
   // Document Modal
   const DocumentModal = () => {
     if (!activeDoc) return null;
-    const docDef = DOCUMENTS[activeDoc];
-    const draftContent = docDef.generate(data, budget);
-    const refined = refinedDocs[activeDoc];
-    const viewMode = docViewMode[activeDoc] || 'draft';
-    const displayContent = viewMode === 'refined' && refined ? refined : draftContent;
-    const isRefining = refiningDoc === activeDoc;
-    const filename = `${data.name || 'event'}-${activeDoc}`.toLowerCase().replace(/\s+/g, '-');
+    const doc = DOCUMENTS[activeDoc];
+    const content = doc.generate(data, budget);
+    const filename = `${data.name || 'event'}-${activeDoc}.txt`.toLowerCase().replace(/\s+/g, '-');
 
     return (
       <div className="fixed inset-0 bg-black/80 flex items-center justify-center z-50 p-4" onClick={() => setActiveDoc(null)}>
-        <div className="bg-zinc-900 rounded-xl max-w-4xl w-full max-h-[90vh] flex flex-col" onClick={e => e.stopPropagation()}>
-          {/* Header */}
+        <div className="bg-zinc-900 rounded-xl max-w-3xl w-full max-h-[80vh] flex flex-col" onClick={e => e.stopPropagation()}>
           <div className="flex items-center justify-between p-4 border-b border-zinc-700">
-            <div>
-              <h3 className="text-lg font-semibold text-white">{docDef.icon} {docDef.name}</h3>
-              {refined && (
-                <div className="flex gap-2 mt-2">
-                  <button
-                    onClick={() => setDocViewMode(prev => ({ ...prev, [activeDoc]: 'draft' }))}
-                    className={`px-3 py-1 rounded text-xs font-medium transition-all ${
-                      viewMode === 'draft' ? 'bg-zinc-600 text-white' : 'bg-zinc-800 text-zinc-400 hover:text-white'
-                    }`}
-                  >
-                    📝 Draft
-                  </button>
-                  <button
-                    onClick={() => setDocViewMode(prev => ({ ...prev, [activeDoc]: 'refined' }))}
-                    className={`px-3 py-1 rounded text-xs font-medium transition-all ${
-                      viewMode === 'refined' ? 'bg-emerald-600 text-white' : 'bg-zinc-800 text-zinc-400 hover:text-white'
-                    }`}
-                  >
-                    ✨ AI Refined
-                  </button>
-                </div>
-              )}
-            </div>
+            <h3 className="text-lg font-semibold text-white">{doc.icon} {doc.name}</h3>
             <button onClick={() => setActiveDoc(null)} className="text-zinc-400 hover:text-white text-2xl">×</button>
           </div>
-
-          {/* Content */}
           <div className="flex-1 overflow-auto p-4">
-            {isRefining ? (
-              <div className="flex flex-col items-center justify-center py-16 text-center">
-                <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-emerald-400 mb-4" />
-                <p className="text-emerald-400 font-medium text-lg">Refining with AI...</p>
-                <p className="text-zinc-500 text-sm mt-2">Claude is making this document ready for your team</p>
-              </div>
-            ) : (
-              <DocumentRenderer content={displayContent} docType={activeDoc} />
-            )}
-            {refineError && (
-              <div className="mt-3 p-3 bg-red-900/30 border border-red-700/50 rounded-lg text-red-300 text-sm">
-                ⚠️ {refineError}
-              </div>
-            )}
+            <pre className="text-sm text-zinc-300 whitespace-pre-wrap font-mono bg-zinc-950 p-4 rounded-lg">{content}</pre>
           </div>
-
-          {/* Action Bar */}
-          <div className="p-4 border-t border-zinc-700 space-y-3">
-            {/* AI Refine Button */}
-            {!isRefining && (
-              <button
-                onClick={() => refineDocument(activeDoc)}
-                disabled={isRefining}
-                className="w-full bg-gradient-to-r from-purple-600 to-emerald-600 text-white py-3 rounded-lg font-medium hover:from-purple-500 hover:to-emerald-500 transition-all flex items-center justify-center gap-2"
-              >
-                <span>✨</span>
-                {refined ? 'Re-Refine with AI' : 'Refine with AI'}
-                <span className="text-xs opacity-75 ml-1">~$0.03</span>
-              </button>
-            )}
-
-            {/* Export & Copy Buttons */}
-            <div className="flex gap-2">
-              <button
-                onClick={() => handleCopyRich(displayContent)}
-                className="flex-1 bg-zinc-700 text-white py-2 rounded-lg hover:bg-zinc-600 text-sm font-medium"
-              >
-                {copySuccess ? '✓ Copied!' : '📋 Copy for Docs'}
-              </button>
-              <button
-                onClick={() => handleDownload(displayContent, `${filename}.txt`)}
-                className="flex-1 bg-zinc-700 text-white py-2 rounded-lg hover:bg-zinc-600 text-sm font-medium"
-              >
-                📄 .txt
-              </button>
-              <button
-                onClick={() => exportDocPDF(docDef.name, displayContent, `${filename}.pdf`)}
-                className="flex-1 bg-red-700 text-white py-2 rounded-lg hover:bg-red-600 text-sm font-medium"
-              >
-                📄 .pdf
-              </button>
-              <button
-                onClick={() => exportDocDOCX(activeDoc, docDef.name, displayContent)}
-                className="flex-1 bg-blue-700 text-white py-2 rounded-lg hover:bg-blue-600 text-sm font-medium"
-              >
-                📝 .docx
-              </button>
-            </div>
+          <div className="flex gap-2 p-4 border-t border-zinc-700">
+            <button onClick={() => handleCopy(content)} className="flex-1 bg-emerald-600 text-white py-2 rounded-lg hover:bg-emerald-500">
+              {copySuccess ? '✓ Copied!' : 'Copy to Clipboard'}
+            </button>
+            <button onClick={() => handleDownload(content, filename)} className="flex-1 bg-zinc-700 text-white py-2 rounded-lg hover:bg-zinc-600">
+              Download .txt
+            </button>
           </div>
         </div>
       </div>
@@ -3369,8 +2021,7 @@ export default function EventPlannerV8() {
             <FormInput label="Event Name" value={data.name} onChange={(v) => update('name', v)} required placeholder="e.g., 2026 Climate Policy Summit" prompt={PROMPTS.name} />
             <FormInput label="Event Type" value={data.type} onChange={(v) => update('type', v)} type="select" options={EVENT_TYPES} required prompt={PROMPTS.type} />
             <FormInput label="Description" value={data.description} onChange={(v) => update('description', v)} type="textarea" required placeholder="Describe the event's purpose and focus..." prompt={PROMPTS.description} />
-            <FormInput label="Objectives" value={data.objectives} onChange={(v) => update('objectives', v)} type="textarea" required placeholder="If one attendee tells a colleague about this event, what should they say?" prompt={PROMPTS.objectives} />
-            <FormInput label="Partners & Co-Hosts" value={data.partners} onChange={(v) => update('partners', v)} type="textarea" placeholder="e.g., Co-hosted with FAS and IFP. ASN coalition members invited to participate." prompt={PROMPTS.partners} />
+            <FormInput label="Objectives" value={data.objectives} onChange={(v) => update('objectives', v)} type="textarea" required placeholder="What outcomes are you working toward?" prompt={PROMPTS.objectives} />
           </div>
         );
 
@@ -3378,11 +2029,10 @@ export default function EventPlannerV8() {
         return (
           <div className="space-y-6">
             <FormInput label="Expected Size" value={data.size} onChange={(v) => update('size', v)} type="select" required options={Object.entries(SIZE_CONFIG).map(([k, v]) => ({ value: k, label: v.label }))} prompt={PROMPTS.size} />
-            <FormInput label="Invitation Strategy" value={data.inviteStrategy} onChange={(v) => update('inviteStrategy', v)} type="select" options={OPTIONS.inviteStrategy} prompt={PROMPTS.inviteStrategy} />
             <CheckboxGroup label="Target Audience" options={OPTIONS.audience} selected={data.audience} onToggle={(v) => toggle('audience', v)} prompt={PROMPTS.audience} />
             <SuggestionsPanel phase="audience" />
-            <FormInput label="VIP Attendees" value={data.vips} onChange={(v) => update('vips', v)} type="textarea" placeholder="Who are the 3-5 people whose attendance would make this event a success?" prompt={PROMPTS.vips} />
-            <FormInput label="Speakers / Presenters" value={data.speakers} onChange={(v) => update('speakers', v)} type="textarea" placeholder="Who would your target audience rearrange their schedule to hear?" prompt={PROMPTS.speakers} />
+            <FormInput label="VIP Attendees" value={data.vips} onChange={(v) => update('vips', v)} type="textarea" placeholder="List specific high-profile individuals you're targeting..." prompt={PROMPTS.vips} />
+            <FormInput label="Speakers / Presenters" value={data.speakers} onChange={(v) => update('speakers', v)} type="textarea" placeholder="Who do you want to present or lead sessions?" prompt={PROMPTS.speakers} />
           </div>
         );
 
@@ -3394,18 +2044,18 @@ export default function EventPlannerV8() {
             <FormInput label="Duration" value={data.duration} onChange={(v) => update('duration', v)} type="select" required options={DURATION_OPTIONS} prompt={PROMPTS.duration} />
             <FormInput label="Format" value={data.format} onChange={(v) => update('format', v)} type="select" required options={OPTIONS.format} prompt={PROMPTS.format} />
             <FormInput label="Venue Type" value={data.venue} onChange={(v) => update('venue', v)} type="select" required options={OPTIONS.venue} prompt={PROMPTS.venue} />
-            <FormInput label="Location" value={data.region} onChange={(v) => { update('region', v); if (v !== 'other') update('customCity', ''); setMarketData(null); setMarketDataLocation(null); }} type="select" required options={Object.entries(REGIONS).map(([k, v]) => ({ value: k, label: v.name }))} prompt={PROMPTS.region} />
+            <FormInput label="Location" value={data.region} onChange={(v) => { update('region', v); if (v !== 'other') update('customCity', ''); }} type="select" required options={Object.entries(REGIONS).map(([k, v]) => ({ value: k, label: v.name }))} prompt={PROMPTS.region} />
             {data.region === 'other' && (
               <div>
                 <label className="block text-sm font-medium text-zinc-300 mb-1">City / Metro Area</label>
                 <input
                   type="text"
                   value={data.customCity || ''}
-                  onChange={(e) => { update('customCity', e.target.value); setMarketData(null); setMarketDataLocation(null); }}
+                  onChange={(e) => update('customCity', e.target.value)}
                   placeholder="e.g., Nashville, TN"
                   className="w-full bg-zinc-900 border border-zinc-700 rounded-lg px-4 py-3 text-white focus:border-emerald-500 focus:outline-none"
                 />
-                <p className="text-zinc-500 text-xs mt-1">Budget estimates use baseline pricing. Click "Get Live Market Rates" on the Review page for location-specific pricing.</p>
+                <p className="text-zinc-500 text-xs mt-1">Use "Get Live Market Rates" on the Review page for pricing specific to this city</p>
               </div>
             )}
             <CheckboxGroup label="Spaces Needed" options={OPTIONS.spaces} selected={data.spaces} onToggle={(v) => toggle('spaces', v)} prompt={PROMPTS.spaces} />
@@ -3417,7 +2067,6 @@ export default function EventPlannerV8() {
         return (
           <div className="space-y-6">
             <CheckboxGroup label="Program Elements" options={OPTIONS.program} selected={data.program} onToggle={(v) => toggle('program', v)} prompt={PROMPTS.program} />
-            <AgendaSketch agenda={data.agenda || [{ time: '', title: '', format: '', notes: '' }]} onChange={(v) => update('agenda', v)} prompt={PROMPTS.agenda} />
             <CheckboxGroup label="Post-Event Activities" options={OPTIONS.postEvent} selected={data.postEvent} onToggle={(v) => toggle('postEvent', v)} prompt={PROMPTS.postEvent} />
             <SuggestionsPanel phase="program" />
           </div>
@@ -3431,8 +2080,6 @@ export default function EventPlannerV8() {
             <CheckboxGroup label="Production & Design" options={OPTIONS.production} selected={data.production} onToggle={(v) => toggle('production', v)} prompt={PROMPTS.production} />
             <CheckboxGroup label="Collateral & Materials" options={OPTIONS.collateral} selected={data.collateral} onToggle={(v) => toggle('collateral', v)} prompt={PROMPTS.collateral} />
             <CheckboxGroup label="Marketing & Promotion" options={OPTIONS.marketing} selected={data.marketing} onToggle={(v) => toggle('marketing', v)} prompt={PROMPTS.marketing} />
-            <CheckboxGroup label="On-Site Essentials" options={OPTIONS.onsite} selected={data.onsite || []} onToggle={(v) => toggle('onsite', v)} prompt={PROMPTS.onsite} />
-            <CheckboxGroup label="Accessibility & Accommodations" options={OPTIONS.accessibility} selected={data.accessibility || []} onToggle={(v) => toggle('accessibility', v)} prompt={PROMPTS.accessibility} />
             <SuggestionsPanel phase="services" />
           </div>
         );
@@ -3463,7 +2110,7 @@ export default function EventPlannerV8() {
             <div className="bg-purple-900/20 border border-purple-700/50 rounded-xl p-6">
               <h3 className="text-lg font-semibold text-purple-400 mb-4">🤖 AI-Powered Analysis</h3>
               <p className="text-purple-200/70 text-sm mb-4">
-                Get personalized suggestions based on policy event best practices, your specific audience, and timing considerations.
+                Get personalized suggestions based on DC policy event best practices, your specific audience, and timing considerations.
               </p>
               
               <button
@@ -3510,17 +2157,14 @@ export default function EventPlannerV8() {
             {/* Budget Summary */}
             <div className="bg-zinc-800/50 rounded-xl p-6">
               <div className="flex justify-between items-center mb-4">
-                <div>
-                  <h3 className="text-lg font-semibold text-white">💰 Budget Estimate</h3>
-                  <p className="text-zinc-500 text-xs mt-0.5">Based on national averages{data.region && data.region !== 'other' ? `, adjusted for ${REGIONS[data.region]?.name}` : ''}</p>
-                </div>
+                <h3 className="text-lg font-semibold text-white">💰 Budget Estimate</h3>
                 {data.region && data.size && (
                   <button
                     onClick={fetchMarketData}
                     disabled={isLoadingMarket}
                     className="text-sm bg-emerald-600 hover:bg-emerald-500 disabled:bg-emerald-800 px-3 py-1.5 rounded-lg transition-all"
                   >
-                    {isLoadingMarket ? 'Loading...' : marketData ? '📊 Refresh Market Rates' : '📊 Get Live Market Rates'}
+                    {isLoadingMarket ? 'Loading...' : '📊 Get Live Market Rates'}
                   </button>
                 )}
               </div>
@@ -3549,7 +2193,7 @@ export default function EventPlannerV8() {
               {marketData && (
                 <div className="mt-6 pt-6 border-t border-zinc-700">
                   <h4 className="text-md font-semibold text-emerald-400 mb-4 flex items-center gap-2">
-                    📊 Live Market Data for {marketDataLocation || data.customCity || REGIONS[data.region]?.name || data.region}
+                    📊 Live Market Data for {data.customCity || REGIONS[data.region]?.name || data.region}
                     <span className={`text-xs px-2 py-0.5 rounded ${
                       marketData.confidence === 'high' ? 'bg-green-900 text-green-300' :
                       marketData.confidence === 'medium' ? 'bg-yellow-900 text-yellow-300' :
@@ -3634,25 +2278,7 @@ export default function EventPlannerV8() {
 
             {/* Documents */}
             <div className="bg-zinc-800/50 rounded-xl p-6">
-              <div className="flex justify-between items-center mb-4">
-                <h3 className="text-lg font-semibold text-white">📄 Generate Documents</h3>
-                <div className="flex gap-2">
-                  <button
-                    onClick={() => handleExportAllDocs('zip')}
-                    disabled={isExportingAll}
-                    className="text-xs bg-emerald-700 hover:bg-emerald-600 disabled:bg-emerald-900 text-white px-3 py-1.5 rounded-lg transition-all"
-                  >
-                    {isExportingAll ? 'Exporting...' : '📦 Download All (.zip)'}
-                  </button>
-                  <button
-                    onClick={() => handleExportAllDocs('combined')}
-                    disabled={isExportingAll}
-                    className="text-xs bg-zinc-600 hover:bg-zinc-500 disabled:bg-zinc-800 text-white px-3 py-1.5 rounded-lg transition-all"
-                  >
-                    📝 Combined (.docx)
-                  </button>
-                </div>
-              </div>
+              <h3 className="text-lg font-semibold text-white mb-4">📄 Generate Documents</h3>
               <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
                 {Object.entries(DOCUMENTS).map(([key, doc]) => (
                   <button
@@ -3698,13 +2324,9 @@ export default function EventPlannerV8() {
                   if (confirm('Clear all data and start over?')) {
                     localStorage.removeItem('seedai-planner-v8');
                     setData({
-                      name: '', type: '', size: '', duration: '', date: '', format: '', venue: '', region: '',
+                      name: '', type: '', size: '', duration: '', date: '', format: '', venue: '', region: 'dc-metro',
                       description: '', objectives: '', audience: [], vips: '', speakers: '',
-                      partners: '', inviteStrategy: '',
-                      agenda: [{ time: '', title: '', format: '', notes: '' }],
                       program: [], spaces: [], fnb: [], av: [], production: [], collateral: [], marketing: [], postEvent: [],
-                      accessibility: [],
-                      onsite: [],
                       team: [{ name: '', role: '' }], notes: '', funding: ''
                     });
                     setCurrentPhase(0);
